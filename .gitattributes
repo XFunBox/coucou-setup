@@ -1,0 +1,2 @@
+# Los espacios en líneas de contexto forman parte del formato unified diff.
+*.patch -whitespace

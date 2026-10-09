@@ -1,0 +1,898 @@
+diff --git a/windows/Cargo.lock b/windows/Cargo.lock
+index 24ec823..4861030 100644
+--- a/windows/Cargo.lock
++++ b/windows/Cargo.lock
+@@ -610,7 +610,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "coucou"
+-version = "0.3.0"
++version = "0.3.0-sendoa.2"
+ dependencies = [
+  "dbus",
+  "gtk",
+@@ -633,7 +633,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "coucou-hook"
+-version = "0.3.0"
++version = "0.3.0-sendoa.2"
+ dependencies = [
+  "libc",
+  "serde_json",
+diff --git a/windows/Cargo.toml b/windows/Cargo.toml
+index 548a7fb..68098ef 100644
+--- a/windows/Cargo.toml
++++ b/windows/Cargo.toml
+@@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
+ resolver = "2"
+ 
+ [workspace.package]
+-version = "0.3.0"
++version = "0.3.0-sendoa.2"
+ edition = "2021"
+ license = "MIT"
+ 
+diff --git a/windows/package-lock.json b/windows/package-lock.json
+index ab3c90f..0eb37fc 100644
+--- a/windows/package-lock.json
++++ b/windows/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "coucou-windows",
+-  "version": "0.3.0",
++  "version": "0.3.0-sendoa.2",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "coucou-windows",
+-      "version": "0.3.0",
++      "version": "0.3.0-sendoa.2",
+       "dependencies": {
+         "@tauri-apps/api": "^2"
+       },
+diff --git a/windows/package.json b/windows/package.json
+index bdd559e..5ff49a2 100644
+--- a/windows/package.json
++++ b/windows/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "coucou-windows",
+   "private": true,
+-  "version": "0.3.0",
++  "version": "0.3.0-sendoa.2",
+   "type": "module",
+   "scripts": {
+     "dev": "vite",
+diff --git a/windows/src-tauri/src/github.rs b/windows/src-tauri/src/github.rs
+index f1b2907..a59485e 100644
+--- a/windows/src-tauri/src/github.rs
++++ b/windows/src-tauri/src/github.rs
+@@ -93,6 +93,90 @@ pub struct GitHubPulse {
+     pub fetched_at: u64,
+ }
+ 
++/// Personal dashboard, independent of PR/GraphQL permissions.
++#[derive(Serialize, Clone, Debug, Default)]
++#[serde(rename_all = "camelCase")]
++pub struct GitHubDashboard {
++    pub login: String,
++    pub repositories: Vec<GitHubRepository>,
++    pub commits: Vec<GitHubCommit>,
++    pub pipelines: Vec<GitHubPipeline>,
++    pub commits_unavailable: usize,
++    pub pipelines_unavailable: usize,
++    pub truncated: bool,
++    pub fetched_at: u64,
++}
++
++#[derive(Serialize, Clone, Debug)]
++#[serde(rename_all = "camelCase")]
++pub struct GitHubRepository {
++    pub repo: String,
++    pub url: String,
++    pub description: String,
++    pub private: bool,
++    pub archived: bool,
++    pub branch: String,
++    pub pushed_at: String,
++}
++
++impl GitHubRepository {
++    pub fn parse(value: &Value) -> Option<Self> {
++        let repo = str_at(value, "full_name")?;
++        // Only repository names can form API routes, never URLs from a response.
++        let parts: Vec<_> = repo.split('/').collect();
++        if parts.len() != 2 || parts.iter().any(|s| s.is_empty() || s.chars().any(|c| !c.is_ascii_alphanumeric() && !"-_.".contains(c))) {
++            return None;
++        }
++        Some(Self {
++            repo: repo.into(), url: str_at(value, "html_url")?.into(),
++            description: str_at(value, "description").unwrap_or_default().into(),
++            private: value["private"].as_bool().unwrap_or(false),
++            archived: value["archived"].as_bool().unwrap_or(false),
++            branch: str_at(value, "default_branch").unwrap_or_default().into(),
++            pushed_at: str_at(value, "pushed_at").unwrap_or_default().into(),
++        })
++    }
++}
++
++#[derive(Serialize, Clone, Debug)]
++#[serde(rename_all = "camelCase")]
++pub struct GitHubCommit {
++    pub repo: String, pub url: String, pub sha: String,
++    pub message: String, pub author: String, pub date: String,
++}
++
++impl GitHubCommit {
++    pub fn parse(repo: &str, value: &Value) -> Option<Self> {
++        let commit = value.get("commit")?;
++        Some(Self {
++            repo: repo.into(), url: str_at(value, "html_url")?.into(), sha: str_at(value, "sha")?.into(),
++            message: str_at(commit, "message")?.lines().next().unwrap_or_default().into(),
++            author: commit["author"]["name"].as_str().unwrap_or_default().into(),
++            date: commit["committer"]["date"].as_str().or_else(|| commit["author"]["date"].as_str()).unwrap_or_default().into(),
++        })
++    }
++}
++
++#[derive(Serialize, Clone, Debug)]
++#[serde(rename_all = "camelCase")]
++pub struct GitHubPipeline {
++    pub repo: String, pub url: String, pub name: String, pub branch: String,
++    pub status: String, pub started_at: String,
++}
++
++impl GitHubPipeline {
++    pub fn parse(repo: &str, value: &Value) -> Option<Self> {
++        // Never label a completed workflow as running, even on stale/API fixtures.
++        if str_at(value, "status")? != "in_progress" { return None; }
++        Some(Self {
++            repo: repo.into(), url: str_at(value, "html_url")?.into(),
++            name: str_at(value, "name").unwrap_or("GitHub Actions").into(),
++            branch: str_at(value, "head_branch").unwrap_or_default().into(), status: "in_progress".into(),
++            started_at: str_at(value, "run_started_at").or_else(|| str_at(value, "created_at")).unwrap_or_default().into(),
++        })
++    }
++}
++
+ /// What a pulse poll can raise: the island turns these into a badge and a sound.
+ #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+ #[serde(tag = "kind")]
+@@ -430,6 +514,27 @@ mod tests {
+     use super::*;
+     use serde_json::json;
+ 
++    #[test]
++    fn personal_dashboard_preserves_private_repos_and_commit_first_line() {
++        let repo = GitHubRepository::parse(&json!({"full_name":"me/private", "html_url":"https://github.com/me/private", "private":true, "default_branch":"main"})).unwrap();
++        assert!(repo.private);
++        assert_eq!(repo.branch, "main");
++        assert!(GitHubRepository::parse(&json!({"full_name":"me/repo?token=bad", "html_url":"https://github.com"})).is_none());
++        let commit = GitHubCommit::parse("me/private", &json!({"sha":"abc123", "html_url":"https://github.com/me/private/commit/abc123", "commit":{"message":"Fix timer\n\nFull description", "author":{"name":"Me", "date":"2026-10-09T00:00:00Z"}}})).unwrap();
++        assert_eq!(commit.message, "Fix timer");
++        assert_eq!(commit.date, "2026-10-09T00:00:00Z");
++    }
++
++    #[test]
++    fn completed_and_queued_pipelines_are_not_claimed_to_be_running() {
++        let mut run = json!({"name":"Build", "status":"completed", "html_url":"https://github.com/me/repo/actions/runs/1"});
++        assert!(GitHubPipeline::parse("me/repo", &run).is_none());
++        run["status"] = json!("queued");
++        assert!(GitHubPipeline::parse("me/repo", &run).is_none());
++        run["status"] = json!("in_progress");
++        assert_eq!(GitHubPipeline::parse("me/repo", &run).unwrap().status, "in_progress");
++    }
++
+     fn valid_pulse() -> Value {
+         json!({
+           "data": {
+diff --git a/windows/src-tauri/src/integrations.rs b/windows/src-tauri/src/integrations.rs
+index 14969e4..ec537c0 100644
+--- a/windows/src-tauri/src/integrations.rs
++++ b/windows/src-tauri/src/integrations.rs
+@@ -17,7 +17,7 @@ use serde_json::{json, Value};
+ use tauri::{AppHandle, Emitter, Manager};
+ use tokio::sync::Notify;
+ 
+-use crate::github::{self, GitHubActivity, GitHubPulse};
++use crate::github::{self, GitHubActivity, GitHubPulse, GitHubDashboard, GitHubRepository, GitHubCommit, GitHubPipeline};
+ use crate::island::WINDOW_LABEL;
+ use crate::log;
+ use crate::secrets;
+@@ -68,7 +68,6 @@ pub fn start(app: AppHandle) {
+     spawn(app.clone(), "integration_vercel", 5, 30, poll_vercel);
+     spawn(app.clone(), "integration_stripe", 6, 30, poll_stripe);
+     spawn(app.clone(), "integration_resend", 6, 60, poll_resend);
+-    spawn(app.clone(), "integration_github", 7, 300, poll_github);
+     spawn_github_loops(app.clone());
+     spawn(app.clone(), "integration_calcom", 8, 300, poll_calcom);
+     spawn(app, "integration_notion", 9, 300, poll_notion);
+@@ -113,7 +112,7 @@ pub async fn poll_once(app: AppHandle, id: &str) {
+         "integration_github" => {
+             wake_github_pulse();
+             github_refresh_if_stale("activity");
+-            poll_github(app).await
++            GITHUB.dashboard_wake.notify_one();
+         }
+         "integration_vercel" => poll_vercel(app).await,
+         "integration_n8n" => poll_n8n(app).await,
+@@ -275,6 +274,7 @@ async fn poll_stripe(app: AppHandle) {
+ 
+ async fn poll_github(app: AppHandle) {
+     let Some(token) = secrets::get("github-token") else { return };
++    let generation = GITHUB.generation.load(Ordering::SeqCst);
+     let http = client();
+ 
+     let user = http
+@@ -302,32 +302,78 @@ async fn poll_github(app: AppHandle) {
+         .and_then(Value::as_i64)
+         .unwrap_or(0);
+ 
+-    let repos = http
+-        .get("https://api.github.com/user/repos?per_page=100&affiliation=owner&sort=pushed")
+-        .header("Authorization", format!("Bearer {token}"))
+-        .header("Accept", "application/vnd.github+json")
+-        .header("User-Agent", "Coucou")
+-        .send()
+-        .await;
+-    let stars: i64 = match repos {
+-        Ok(r) if r.status().is_success() => r
+-            .json::<Value>()
+-            .await
+-            .ok()
+-            .and_then(|v| v.as_array().cloned())
+-            .map(|list| {
+-                list.iter()
+-                    .filter_map(|r| r.get("stargazers_count").and_then(Value::as_i64))
+-                    .sum()
+-            })
+-            .unwrap_or(0),
+-        _ => 0,
+-    };
+-
+-    GITHUB.cache.lock().unwrap().stats = Some((public + private, stars));
++    let mut dashboard = GitHubDashboard { login: json["login"].as_str().unwrap_or_default().into(), ..Default::default() };
++    let mut stars = 0;
++    // A bounded paginated list keeps large accounts manageable; the UI says when capped.
++    for page in 1..=5 {
++        if PAUSED.load(Ordering::Relaxed) || !enabled(&app, GITHUB_ID)
++            || GITHUB.generation.load(Ordering::SeqCst) != generation { return; }
++        let path = format!("/user/repos?per_page=100&affiliation=owner&sort=pushed&page={page}");
++        let Ok(list) = github_rest(&http, &token, &path).await else { return };
++        let Some(list) = list.as_array() else { return };
++        stars += list.iter().filter_map(|r| r["stargazers_count"].as_i64()).sum::<i64>();
++        dashboard.repositories.extend(list.iter().filter_map(GitHubRepository::parse));
++        if list.len() < 100 { break; }
++        if page == 5 { dashboard.truncated = true; }
++    }
++    // Batches of four limit traffic and latency. Only the 10 most recently pushed
++    // repositories need a commit history; running Actions are checked across the list.
++    for (batch, repos) in dashboard.repositories.chunks(4).enumerate() {
++        if PAUSED.load(Ordering::Relaxed) || !enabled(&app, GITHUB_ID)
++            || GITHUB.generation.load(Ordering::SeqCst) != generation { return; }
++        let mut jobs = tokio::task::JoinSet::new();
++        for (offset, repo) in repos.iter().enumerate() {
++            let http = http.clone(); let token = token.clone(); let repo = repo.clone();
++            let recent = batch * 4 + offset < 10;
++            jobs.spawn(async move {
++                let commits = if recent {
++                    github_rest(&http, &token, &format!("/repos/{}/commits?per_page=3", repo.repo)).await
++                } else { Ok(json!([])) };
++                let runs = if repo.archived { Ok(json!({"workflow_runs":[]})) } else {
++                    github_rest(&http, &token, &format!("/repos/{}/actions/runs?status=in_progress&per_page=100", repo.repo)).await
++                };
++                (repo.repo, commits, runs)
++            });
++        }
++        while let Some(result) = jobs.join_next().await {
++            let Ok((repo, commits, runs)) = result else {
++                dashboard.commits_unavailable += 1;
++                dashboard.pipelines_unavailable += 1;
++                continue;
++            };
++            match commits {
++                Ok(v) => if let Some(list) = v.as_array() { dashboard.commits.extend(list.iter().filter_map(|c| GitHubCommit::parse(&repo, c))); },
++                Err(409) => {}, // Empty repository.
++                Err(_) => dashboard.commits_unavailable += 1,
++            }
++            match runs {
++                Ok(v) => if let Some(list) = v["workflow_runs"].as_array() { dashboard.pipelines.extend(list.iter().filter_map(|r| GitHubPipeline::parse(&repo, r))); },
++                Err(_) => dashboard.pipelines_unavailable += 1,
++            }
++        }
++    }
++    dashboard.commits.sort_by(|a,b| b.date.cmp(&a.date));
++    dashboard.commits.truncate(20);
++    dashboard.pipelines.sort_by(|a,b| b.started_at.cmp(&a.started_at));
++    dashboard.fetched_at = now_ms();
++    {
++        let mut cache = GITHUB.cache.lock().unwrap();
++        if GITHUB.generation.load(Ordering::SeqCst) != generation { return; }
++        cache.stats = Some((public + private, stars));
++        cache.dashboard = Some(dashboard);
++    }
+     emit_github(&app);
+ }
+ 
++async fn github_rest(http: &reqwest::Client, token: &str, path: &str) -> Result<Value, u16> {
++    let response = http.get(format!("https://api.github.com{path}"))
++        .bearer_auth(token).header("Accept", "application/vnd.github+json")
++        .header("User-Agent", "Coucou").send().await.map_err(|_| 0u16)?;
++    let status = response.status().as_u16();
++    if !response.status().is_success() { return Err(status); }
++    response.json().await.map_err(|_| 0u16)
++}
++
+ // ── GitHub pulse and activity (GithubPoller.swift) ────────────────────────────
+ //
+ // Two more loops next to the stats above, with the Mac cadence: the pulse (my
+@@ -348,6 +394,7 @@ struct GitHubCache {
+     stats: Option<(i64, i64)>,
+     pulse: Option<GitHubPulse>,
+     activity: Option<GitHubActivity>,
++    dashboard: Option<GitHubDashboard>,
+ }
+ 
+ struct GitHubLoops {
+@@ -358,6 +405,8 @@ struct GitHubLoops {
+     activity_wake: Notify,
+     pulse_busy: AtomicBool,
+     activity_busy: AtomicBool,
++    dashboard_wake: Notify,
++    dashboard_busy: AtomicBool,
+ }
+ 
+ static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| GitHubLoops {
+@@ -367,6 +416,8 @@ static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| Gi
+     activity_wake: Notify::new(),
+     pulse_busy: AtomicBool::new(false),
+     activity_busy: AtomicBool::new(false),
++    dashboard_wake: Notify::new(),
++    dashboard_busy: AtomicBool::new(false),
+ });
+ 
+ fn now_ms() -> u64 {
+@@ -389,6 +440,9 @@ fn github_card_data(cache: &GitHubCache) -> Value {
+     if let Some(activity) = &cache.activity {
+         data.insert("activity".into(), serde_json::to_value(activity).unwrap_or(Value::Null));
+     }
++    if let Some(dashboard) = &cache.dashboard {
++        data.insert("dashboard".into(), serde_json::to_value(dashboard).unwrap_or(Value::Null));
++    }
+     Value::Object(data)
+ }
+ 
+@@ -398,6 +452,23 @@ fn emit_github(app: &AppHandle) {
+ }
+ 
+ fn spawn_github_loops(app: AppHandle) {
++    let dashboard_app = app.clone();
++    tauri::async_runtime::spawn(async move {
++        let mut wait = Duration::from_secs(7);
++        loop {
++            let _ = tokio::time::timeout(wait, GITHUB.dashboard_wake.notified()).await;
++            if !PAUSED.load(Ordering::Relaxed) && enabled(&dashboard_app, GITHUB_ID)
++                && !GITHUB.dashboard_busy.swap(true, Ordering::SeqCst) {
++                poll_github(dashboard_app.clone()).await;
++                GITHUB.dashboard_busy.store(false, Ordering::SeqCst);
++            }
++            let cache = GITHUB.cache.lock().unwrap();
++            wait = Duration::from_secs(match &cache.dashboard {
++                Some(d) => (d.repositories.len() as u64 * 2).max(if d.pipelines.is_empty() { 300 } else { 60 }),
++                None => 300,
++            });
++        }
++    });
+     let pulse_app = app.clone();
+     tauri::async_runtime::spawn(async move {
+         let mut wait = Duration::from_secs(10);
+@@ -510,6 +581,10 @@ pub fn github_refresh_if_stale(section: &str) {
+     let cache = GITHUB.cache.lock().unwrap();
+     match section {
+         "pulse" => {
++            let fetched = cache.dashboard.as_ref().map(|d| d.fetched_at);
++            if !GITHUB.dashboard_busy.load(Ordering::SeqCst) && github::is_stale(fetched, now, 60) {
++                GITHUB.dashboard_wake.notify_one();
++            }
+             let fetched = cache.pulse.as_ref().map(|p| p.fetched_at);
+             if !GITHUB.pulse_busy.load(Ordering::SeqCst) && github::is_stale(fetched, now, 60) {
+                 GITHUB.pulse_wake.notify_one();
+@@ -534,6 +609,7 @@ pub fn github_token_changed(app: &AppHandle) {
+         let mut cache = GITHUB.cache.lock().unwrap();
+         cache.pulse = None;
+         cache.activity = None;
++        cache.dashboard = None;
+         if !has_token {
+             cache.stats = None;
+         }
+@@ -542,7 +618,7 @@ pub fn github_token_changed(app: &AppHandle) {
+     GITHUB.pulse_wake.notify_one();
+     GITHUB.activity_wake.notify_one();
+     if has_token && !PAUSED.load(Ordering::Relaxed) && enabled(app, GITHUB_ID) {
+-        tauri::async_runtime::spawn(poll_github(app.clone()));
++        GITHUB.dashboard_wake.notify_one();
+     }
+ }
+ 
+@@ -552,11 +628,13 @@ pub fn settings_saved(app: &AppHandle, active_integrations: &[String]) {
+     if active_integrations.iter().any(|id| id == GITHUB_ID) {
+         return;
+     }
++    GITHUB.generation.fetch_add(1, Ordering::SeqCst);
+     let had_data = {
+         let mut cache = GITHUB.cache.lock().unwrap();
+-        let had = cache.pulse.is_some() || cache.activity.is_some();
++        let had = cache.pulse.is_some() || cache.activity.is_some() || cache.dashboard.is_some();
+         cache.pulse = None;
+         cache.activity = None;
++        cache.dashboard = None;
+         had
+     };
+     if had_data {
+diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
+index 84b8af8..78bde18 100644
+--- a/windows/src-tauri/tauri.conf.json
++++ b/windows/src-tauri/tauri.conf.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "https://schema.tauri.app/config/2",
+   "productName": "Coucou",
+-  "version": "0.3.0",
++  "version": "0.3.0-sendoa.2",
+   "identifier": "fr.louisraille.coucou",
+   "build": {
+     "beforeDevCommand": "npm run dev",
+@@ -41,14 +41,19 @@
+   },
+   "bundle": {
+     "active": true,
+-    "targets": ["nsis", "msi"],
++    "targets": [
++      "nsis",
++      "msi"
++    ],
+     "icon": [
+       "icons/32x32.png",
+       "icons/128x128.png",
+       "icons/128x128@2x.png",
+       "icons/icon.ico"
+     ],
+-    "resources": { "../target/release/coucou-hook.exe": "coucou-hook.exe" },
++    "resources": {
++      "../target/release/coucou-hook.exe": "coucou-hook.exe"
++    },
+     "copyright": "© Louis Raille",
+     "category": "DeveloperTool",
+     "shortDescription": "Mochi lives at the top of your screen",
+@@ -56,7 +61,10 @@
+     "windows": {
+       "nsis": {
+         "installMode": "currentUser",
+-        "languages": ["English", "French"],
++        "languages": [
++          "English",
++          "French"
++        ],
+         "installerHooks": "nsis/hooks.nsh"
+       }
+     }
+diff --git a/windows/src/core/github.ts b/windows/src/core/github.ts
+index 866f8f1..e70a2a8 100644
+--- a/windows/src/core/github.ts
++++ b/windows/src/core/github.ts
+@@ -10,7 +10,22 @@ import { dayMonth, t, tn } from "../i18n/i18n";
+ 
+ export type CIState = "pending" | "success" | "failure" | "unknown";
+ export type ReviewState = "approved" | "changesRequested" | "pending" | "unknown";
+-export type GitHubSection = "myPRs" | "toReview" | "mainCI" | "activity";
++export type GitHubSection = "myPRs" | "toReview" | "mainCI" | "activity" | "repositories" | "commits" | "pipelines";
++
++export interface GitHubRepository {
++  repo: string; url: string; description: string; private: boolean;
++  archived: boolean; branch: string; pushedAt: string;
++}
++export interface GitHubCommit {
++  repo: string; url: string; sha: string; message: string; author: string; date: string;
++}
++export interface GitHubPipeline {
++  repo: string; url: string; name: string; branch: string; status: "in_progress"; startedAt: string;
++}
++export interface GitHubDashboard {
++  login: string; repositories: GitHubRepository[]; commits: GitHubCommit[]; pipelines: GitHubPipeline[];
++  commitsUnavailable: number; pipelinesUnavailable: number; truncated: boolean; fetchedAt: number;
++}
+ 
+ export interface GitHubPR {
+   /** "owner/repo#number" */
+@@ -75,6 +90,8 @@ export const GH_STRINGS = {
+   get overview() { return t("Overview"); },
+   get totalStars() { return t("Total stars"); },
+   get repositories() { return t("Repositories"); },
++  get commits() { return t("Latest commits"); },
++  get pipelines() { return t("Running pipelines"); },
+   get myPRs() { return t("My PRs"); },
+   get toReview() { return t("To review"); },
+   get mainCI() { return t("Default branch CI"); },
+@@ -125,6 +142,13 @@ export function readPulse(data: Record<string, unknown>): GitHubPulse | null {
+   return p as unknown as GitHubPulse;
+ }
+ 
++export function readDashboard(data: Record<string, unknown>): GitHubDashboard | null {
++  const d = data.dashboard;
++  if (!isObj(d) || typeof d.login !== "string" || !Array.isArray(d.repositories)
++    || !Array.isArray(d.commits) || !Array.isArray(d.pipelines)) return null;
++  return d as unknown as GitHubDashboard;
++}
++
+ export function readActivity(data: Record<string, unknown>): GitHubActivity | null {
+   const a = data.activity;
+   if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
+diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
+index 7de4fe3..6c36343 100644
+--- a/windows/src/i18n/extra.json
++++ b/windows/src/i18n/extra.json
+@@ -3360,6 +3360,36 @@
+    "pt-BR": "Só um arquivo solto na ilha pode ser enviado com uma pergunta.",
+    "ru": "С вопросом можно отправить только файл, перетащенный на остров.",
+    "id": "Hanya file yang dijatuhkan ke pulau yang bisa dikirim bersama pertanyaan."
++  },
++  "Latest commits": {
++   "es": "Últimos commits"
++  },
++  "Running pipelines": {
++   "es": "Pipelines activos"
++  },
++  "No repositories visible. Check token access.": {
++   "es": "Sin repositorios visibles. Revisa el acceso del token."
++  },
++  "No commits available.": {
++   "es": "Sin commits disponibles."
++  },
++  "No pipelines running.": {
++   "es": "No hay pipelines en ejecución."
++  },
++  "Check token permissions to load this section.": {
++   "es": "Revisa los permisos del token para ver este apartado."
++  },
++  "Partial": {
++   "es": "Parcial"
++  },
++  "Private": {
++   "es": "Privado"
++  },
++  "Last updated": {
++   "es": "Última actualización"
++  },
++  "Reviews": {
++   "es": "Revisiones"
+   }
+  }
+ }
+diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
+index 63e5cb0..f5d12f6 100644
+--- a/windows/src/island/hooks.ts
++++ b/windows/src/island/hooks.ts
+@@ -154,7 +154,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
+       return `${tool} · ${value.trim()}`;
+     }
+   }
+-  return tool;
++  // MCP permission requests often carry paths and scopes in nested arguments.
++  // Showing only the tool name hides what the user is authorising.
++  return Object.keys(input).length ? `${tool} · ${JSON.stringify(input)}` : tool;
+ }
+ 
+ /**
+diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
+index 2ef6fb9..d1e5f9f 100644
+--- a/windows/src/island/island.ts
++++ b/windows/src/island/island.ts
+@@ -427,6 +427,9 @@ export class Island {
+     this.fsm.pinned = State.isPinned;
+     this.fsm.forceHome();
+     this.expand(view);
++    // forceHome cancels timers even when already home (no new transition).
++    // A second completion alert must rearm auto-close while the pointer is away.
++    if (!this.wasInIsland) this.fsm.mouseLeft();
+   }
+ 
+   reveal() {
+diff --git a/windows/src/views/github.ts b/windows/src/views/github.ts
+index 86fba2f..f8be7d3 100644
+--- a/windows/src/views/github.ts
++++ b/windows/src/views/github.ts
+@@ -14,8 +14,9 @@ import {
+   formatCount, lastDays, lastWeeks, mainCISummary, myPRsValue, profileUrl, safeGitHubUrl,
+   sectionTitle, shortRepo, weekColumn, worstCI,
+   type ContributionDay, type GitHubActivity, type GitHubPR, type GitHubPulse, type GitHubRepoCI,
+-  type GitHubSection, type GitHubStats,
++  type GitHubSection, type GitHubStats, type GitHubDashboard, type GitHubRepository, type GitHubCommit, type GitHubPipeline,
+ } from "../core/github";
++import { t, language } from "../i18n/i18n";
+ 
+ const GITHUB_RED = "#F4505E";
+ 
+@@ -49,10 +50,11 @@ function statButton(icon: SVGSVGElement, color: string, label: string, value: st
+ // ── Card ──────────────────────────────────────────────────────────────────────
+ 
+ export function githubPulseCard(
+-  pulse: GitHubPulse,
++  pulse: GitHubPulse | null,
+   stats: GitHubStats | null,
+   activity: GitHubActivity | null,
+   openDetail: () => void,
++  dashboard: GitHubDashboard | null = null,
+ ): HTMLElement {
+   const show = (section: GitHubSection) => {
+     openSection = section;
+@@ -70,9 +72,27 @@ export function githubPulseCard(
+     head.append(h("span", { text: GH_STRINGS.overview }));
+   }
+ 
+-  const prColor = CI_COLORS[worstCI(pulse.myPRs.map((p) => p.ci))];
+-  const reviews = pulse.toReview.length;
+-  const main = mainCISummary(pulse.mainCI);
++  const prColor = CI_COLORS[worstCI((pulse?.myPRs ?? []).map((p) => p.ci))];
++  const reviews = pulse?.toReview.length ?? 0;
++  const main = mainCISummary(pulse?.mainCI ?? []);
++
++  if (dashboard) {
++    const count = (n: number, unavailable: number) => String(n) + (unavailable ? " · ?" : "");
++    const body = h("div", { class: "int-stats gh-rows" },
++      statButton(svg(ICONS.stack, 10), "#8AB4F8", GH_STRINGS.repositories,
++        String(dashboard.repositories.length) + (dashboard.truncated ? "+" : ""), () => show("repositories")),
++      statButton(svg(ICONS.doc, 10), "#22C55E", GH_STRINGS.commits,
++        count(dashboard.commits.length, dashboard.commitsUnavailable), () => show("commits")),
++      statButton(svg(ICONS.play, 10), dashboard.pipelines.length ? "#F5A524" : "#6B7079", GH_STRINGS.pipelines,
++        count(dashboard.pipelines.length, dashboard.pipelinesUnavailable), () => show("pipelines")),
++    );
++    const links = h("div", { class: "int-actions", style: "gap:10px;margin-top:2px;padding-top:2px" });
++    for (const section of ["myPRs", "toReview", "mainCI"] as const) {
++      const label = section === "myPRs" ? "PR" : section === "toReview" ? t("Reviews") : "CI";
++      links.append(h("button", { class: "link-btn", text: label, title: sectionTitle(section), onclick: () => show(section) }));
++    }
++    return h("div", { class: "int-card" }, head, body, links);
++  }
+ 
+   return h(
+     "div",
+@@ -81,7 +101,7 @@ export function githubPulseCard(
+     h(
+       "div",
+       { class: "int-stats gh-rows" },
+-      statButton(svg(ICONS.pull, 10, { stroke: 2.2 }), prColor, GH_STRINGS.myPRs, myPRsValue(pulse.myPRs),
++      statButton(svg(ICONS.pull, 10, { stroke: 2.2 }), prColor, GH_STRINGS.myPRs, myPRsValue(pulse?.myPRs ?? []),
+         () => show("myPRs")),
+       statButton(svg(ICONS.eye, 10, { stroke: 2.2 }), reviews > 0 ? "#8AB4F8" : "#6B7079", GH_STRINGS.toReview,
+         String(reviews), () => show("toReview")),
+@@ -161,7 +181,7 @@ export function openRow(el: HTMLElement | undefined) {
+   if (el) rowOpens.get(el)?.();
+ }
+ 
+-function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPulse, onBack: () => void): HTMLElement {
++function listDetail(section: "myPRs" | "toReview" | "mainCI", pulse: GitHubPulse, onBack: () => void): HTMLElement {
+   const rows: HTMLElement[] =
+     section === "mainCI"
+       ? pulse.mainCI.map(repoRow)
+@@ -179,6 +199,54 @@ function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPu
+   );
+ }
+ 
++function timestamp(raw: string): string {
++  const date = new Date(raw);
++  return Number.isFinite(date.getTime())
++    ? date.toLocaleString(language(), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
++}
++
++function repositoryRow(repo: GitHubRepository): HTMLElement {
++  const el = row(() => open(repo.url), dot("#8AB4F8", 5),
++    h("span", { class: "gh-title", text: shortRepo(repo.repo) }),
++    h("span", { class: "gh-word", text: repo.private ? t("Private") : repo.branch }));
++  el.title = `${repo.repo} · ${repo.branch}\n${repo.description}\n${timestamp(repo.pushedAt)}`;
++  return el;
++}
++
++function commitRow(commit: GitHubCommit): HTMLElement {
++  const el = row(() => open(commit.url), dot("#22C55E", 5),
++    h("span", { class: "gh-ref", style: "max-width:76px;overflow:hidden;text-overflow:ellipsis", text: shortRepo(commit.repo) }),
++    h("span", { class: "gh-title", text: commit.message }));
++  el.title = `${commit.repo} · ${commit.sha.slice(0,7)}\n${commit.message}\n${commit.author} · ${timestamp(commit.date)}`;
++  return el;
++}
++
++function pipelineRow(run: GitHubPipeline): HTMLElement {
++  const el = row(() => open(run.url), dot("#F5A524", 5),
++    h("span", { class: "gh-ref", style: "max-width:76px;overflow:hidden;text-overflow:ellipsis", text: shortRepo(run.repo) }),
++    h("span", { class: "gh-title", text: run.name }));
++  el.title = `${run.repo} · ${run.branch}\n${run.name} · ${GH_STRINGS.running}\n${timestamp(run.startedAt)}`;
++  return el;
++}
++
++function dashboardDetail(section: "repositories" | "commits" | "pipelines", dashboard: GitHubDashboard, onBack: () => void): HTMLElement {
++  const unavailable = section === "commits" ? dashboard.commitsUnavailable
++    : section === "pipelines" ? dashboard.pipelinesUnavailable : 0;
++  const rows = section === "repositories" ? dashboard.repositories.map(repositoryRow)
++    : section === "commits" ? dashboard.commits.map(commitRow)
++    : dashboard.pipelines.filter(run => run.status === "in_progress").map(pipelineRow);
++  const empty = section === "repositories" ? t("No repositories visible. Check token access.")
++    : section === "commits" ? t("No commits available.") : t("No pipelines running.");
++  const body = rows.length ? h("div", { class: rows.length > 3 ? "gh-list fade" : "gh-list" }, ...rows)
++    : h("div", { class: "gh-empty", text: unavailable ? t("Check token permissions to load this section.") : empty });
++  const head = h("div", { class: "gh-detail-head" }, backButton(sectionTitle(section), onBack));
++  head.title = `${t("Last updated")}: ${timestamp(new Date(dashboard.fetchedAt).toISOString())}`;
++  if (rows.length && (unavailable || dashboard.truncated)) {
++    head.append(h("span", { class: "gh-head-right", text: t("Partial"), title: t("Check token permissions to load this section.") }));
++  }
++  return h("div", { class: "int-card" }, head, body);
++}
++
+ // ── Detail: contribution grid ─────────────────────────────────────────────────
+ 
+ function activityDetail(
+@@ -226,12 +294,18 @@ function activityDetail(
+ }
+ 
+ export function githubDetail(
+-  pulse: GitHubPulse,
++  pulse: GitHubPulse | null,
+   stats: GitHubStats | null,
+   activity: GitHubActivity | null,
+   onBack: () => void,
++  dashboard: GitHubDashboard | null = null,
+ ): HTMLElement {
++  if (openSection === "repositories" || openSection === "commits" || openSection === "pipelines") {
++    return dashboard ? dashboardDetail(openSection, dashboard, onBack)
++      : h("div", { class: "int-card" }, backButton(sectionTitle(openSection), onBack), h("div", { class: "gh-empty", text: GH_STRINGS.loading }));
++  }
+   return openSection === "activity"
+-    ? activityDetail(activity, stats, pulse.login, onBack)
+-    : listDetail(openSection, pulse, onBack);
++    ? activityDetail(activity, stats, dashboard?.login ?? pulse?.login ?? "", onBack)
++    : pulse ? listDetail(openSection, pulse, onBack)
++      : h("div", { class: "int-card" }, backButton(sectionTitle(openSection), onBack), h("div", { class: "gh-empty", text: t("Check token permissions to load this section.") }));
+ }
+diff --git a/windows/src/views/integrations.ts b/windows/src/views/integrations.ts
+index 2317d9c..c39c9f5 100644
+--- a/windows/src/views/integrations.ts
++++ b/windows/src/views/integrations.ts
+@@ -10,7 +10,7 @@ import { State, type AgentTask } from "../core/state";
+ import { Bridge } from "../core/bridge";
+ import { isComingSoon, pillDefinition } from "../core/pills";
+ import { refreshHookPills } from "../island/integrations";
+-import { readActivity, readPulse, readStats } from "../core/github";
++import { readActivity, readPulse, readStats, readDashboard } from "../core/github";
+ import { githubDetail, githubPulseCard } from "./github";
+ import { N_, language, t } from "../i18n/i18n";
+ 
+@@ -461,10 +461,11 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
+   if (task.id === "integration_github") {
+     const d = get(task.id);
+     const pulse = readPulse(d);
+-    if (pulse) {
++    const dashboard = readDashboard(d);
++    if (pulse || dashboard) {
+       return hooks.detailOpen
+-        ? githubDetail(pulse, readStats(d), readActivity(d), hooks.closeDetail)
+-        : githubPulseCard(pulse, readStats(d), readActivity(d), hooks.openDetail);
++        ? githubDetail(pulse, readStats(d), readActivity(d), hooks.closeDetail, dashboard)
++        : githubPulseCard(pulse, readStats(d), readActivity(d), hooks.openDetail, dashboard);
+     }
+   }
+ 
+diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
+index 9a40ae0..c30a079 100644
+--- a/windows/src/views/views.ts
++++ b/windows/src/views/views.ts
+@@ -532,6 +532,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+       // is the command, the file path or the URL being authorised, not just the
+       // name of the tool asking.
+       code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
++      code.title = code.textContent;
+       // Two buttons, built once. Rebuilding them between a mouse-down and a
+       // mouse-up would swallow the click, and there is nothing left to vary:
+       // "Always" is gone until the remembered-rules list exists to back it.
+diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
+index ce9f49d..46d1d4d 100644
+--- a/windows/tests/hooks.test.mjs
++++ b/windows/tests/hooks.test.mjs
+@@ -251,6 +251,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
+   }
+ });
+ 
++test("Codex MCP requests show the paths and scopes being authorised", () => {
++  const input = { permissions: { file_system: { write: ["/home/me/project"] }, network: { enabled: true } } };
++  hook({ hook_event_name: "PermissionRequest", request_id: "nested", session_id: "s1", coucou_agent: "codex", tool_name: "mcp__permissions__request", tool_input: input });
++  assert.equal(State.pendingApproval.command, `mcp__permissions__request · ${JSON.stringify(input)}`);
++  assert.deepEqual(sent("approval_ack"), [{ requestId: "nested" }]);
++  assert.deepEqual(sent("approval_decision"), [], "showing a request never approves it");
++});
++
+ test("Codex, Copilot CLI and Muse Code get the card on their own pill", () => {
+   for (const agent of ["codex", "copilot", "muse"]) {
+     State.pendingApproval = null;
+@@ -430,7 +438,7 @@ test("the card names the most specific thing the tool carries", () => {
+   assert.equal(target("Bash", { command: "rm -rf build", file_path: "x" }), "Bash · rm -rf build");
+   assert.equal(target("WebFetch", { url: "https://example.com" }), "WebFetch · https://example.com");
+   assert.equal(target("Task", { prompt: "do it" }), "Task · do it");
+-  assert.equal(target("Odd", { command: "   ", count: 3 }), "Odd");
++  assert.equal(target("Odd", { command: "   ", count: 3 }), 'Odd · {"command":"   ","count":3}');
+   assert.equal(target(undefined, undefined), "Tool");
+ });
+ 
+diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs
+new file mode 100644
+index 0000000..bd3cc66
+--- /dev/null
++++ b/windows/tests/github-dashboard.test.mjs
+@@ -0,0 +1,50 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readDashboard, sectionTitle, safeGitHubUrl } from '../src/core/github.ts';
++import { setLanguage } from '../src/i18n/i18n.ts';
++import { calls, sent } from './tauri.mjs';
++
++test('personal dashboard is available without a GraphQL PR pulse', () => {
++  const dashboard = { login:'me', repositories:[], commits:[], pipelines:[], commitsUnavailable:0, pipelinesUnavailable:0, truncated:false, fetchedAt:123 };
++  assert.deepEqual(readDashboard({dashboard}), dashboard);
++  assert.equal(readDashboard({}), null);
++  assert.equal(readDashboard({dashboard:{login:'me', repositories:[]}}), null);
++});
++
++test('repository, commit and running pipeline sections open their actual GitHub targets', async () => {
++  const { installFakeDom } = await import('./fakedom.mjs');
++  installFakeDom();
++  const { githubPulseCard, githubDetail, listRows, openRow } = await import('../src/views/github.ts');
++  const dashboard = {
++    login:'me', repositories:[{repo:'me/private',url:'https://github.com/me/private',private:true,branch:'main',description:'Private project',pushedAt:''}],
++    commits:[{repo:'me/private',url:'https://github.com/me/private/commit/abc',sha:'abc',message:'Fix <script> as plain text',author:'Me',date:'2026-10-09T00:00:00Z'}],
++    pipelines:[{repo:'me/private',url:'https://github.com/me/private/actions/runs/1',name:'Build',branch:'main',status:'in_progress',startedAt:''},
++      {repo:'me/private',url:'https://github.com/me/private/actions/runs/2',name:'Old',branch:'main',status:'completed',startedAt:''}],
++    commitsUnavailable:0,pipelinesUnavailable:0,truncated:false,fetchedAt:1,
++  };
++  const card = githubPulseCard(null,null,null,()=>{},dashboard);
++  const buttons = card.querySelector('.gh-rows').children;
++  const targets = [dashboard.repositories[0].url, dashboard.commits[0].url, dashboard.pipelines[0].url];
++  for (let i=0; i<3; i++) {
++    buttons[i].fire('click');
++    const detail = githubDetail(null,null,null,()=>{},dashboard);
++    const rows = listRows(detail);
++    assert.equal(rows.length,1);
++    calls.length=0;
++    openRow(rows[0]);
++    assert.deepEqual(sent('open_url'),[{url:targets[i]}]);
++    if(i===1) assert.ok(detail.textContent.includes('Fix <script> as plain text'));
++  }
++  dashboard.pipelines=[];
++  dashboard.pipelinesUnavailable=1;
++  assert.ok(githubDetail(null,null,null,()=>{},dashboard).textContent.includes('Check token permissions'));
++});
++
++test('new sections have Spanish labels and links retain GitHub-only validation', () => {
++  setLanguage('es');
++  assert.equal(sectionTitle('commits'), 'Últimos commits');
++  assert.equal(sectionTitle('pipelines'), 'Pipelines activos');
++  assert.equal(safeGitHubUrl('https://evil.example/commit/abc'), null);
++  assert.equal(safeGitHubUrl('https://github.com/me/repo/commit/abc'), 'https://github.com/me/repo/commit/abc');
++  setLanguage('en');
++});
+diff --git a/windows/tests/github-rust/Cargo.toml b/windows/tests/github-rust/Cargo.toml
+new file mode 100644
+index 0000000..b944148
+--- /dev/null
++++ b/windows/tests/github-rust/Cargo.toml
+@@ -0,0 +1,13 @@
++[workspace]
++
++[package]
++name = "coucou-github-regression"
++version = "0.1.0"
++edition = "2021"
++
++[lib]
++path = "../../src-tauri/src/github.rs"
++
++[dependencies]
++serde = { version = "1", features = ["derive"] }
++serde_json = { version = "1", features = ["preserve_order"] }

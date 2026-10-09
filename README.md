@@ -1,10 +1,18 @@
 # Coucou con Codex, GitHub y Spotify
 
-Instalación reproducible de mi configuración de Coucou en Linux. Perfil exportado el 9 de octubre de 2026: Coucou 0.3.0, Codex como agente principal, GitHub y Spotify, sonido desactivado y autocierre del panel a los 10 segundos. Usa la pantalla del cursor y arranca al iniciar sesión. El muñeco de escritorio está desactivado.
+Setup de **Coucou 0.3.0-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.3.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+
+Incluye:
+
+- Autocierre corregido tras avisos consecutivos, manteniendo los avisos al terminar. Panel a 10 segundos, sonido desactivado y pantalla del cursor.
+- GitHub: repositorios propios, últimos commits y pipelines de Actions en ejecución; enlaces a cada elemento y textos en español.
+- Codex como agente principal, plan y límites, diez hooks y solicitudes de aprobación desde la isla, con respuesta explícita del usuario. Las herramientas MCP muestran sus parámetros cuando hace falta.
+- Spotify mediante el reproductor local MPRIS; muñeco de escritorio desactivado.
+- Inicio automático y acceso del menú apuntando al **binario personalizado**, con copias previas y restauración.
 
 ## Clonar e instalar
 
-Ubuntu/Debian de 64 bits (amd64), Python 3 y una sesión gráfica. KDE Plasma con Wayland y layer-shell es el entorno comprobado. No modifica la barra de tareas ni la configuración de pantallas.
+Requiere una sesión gráfica de Ubuntu/Debian **x86_64/amd64**, Python 3, acceso a Internet y espacio para la compilación Docker. KDE Plasma con Wayland y layer-shell es el entorno comprobado. La primera compilación puede tardar varios minutos. No modifica la barra de tareas ni las pantallas.
 
 ```bash
 git clone https://github.com/XFunBox/coucou-setup.git
@@ -12,50 +20,78 @@ cd coucou-setup
 bash install.sh
 ```
 
-Como el repositorio es privado, GitHub pedirá autenticación al clonar. Si tienes acceso SSH configurado, también puedes usar `git@github.com:XFunBox/coucou-setup.git`.
+El repositorio privado requiere autenticación de GitHub. Si tienes SSH configurado, puedes clonar `git@github.com:XFunBox/coucou-setup.git`.
 
-El instalador solicita `sudo` únicamente para instalar el paquete de Coucou y sus dependencias. Verifica los SHA-256 publicados de Coucou 0.3.0 y Codex CLI 0.159.2. Si ya tienes Codex, reutiliza su ejecutable; si tienes la app de escritorio, crea un enlace a su ejecutable; en un equipo sin Codex descarga el CLI oficial para tu usuario. Conserva los otros hooks, guarda copias antes de aplicar ajustes y reinicia solo Coucou.
+El instalador solicita `sudo` para las dependencias de ejecución y compilación. Si falta Docker, instala `docker.io`; si tu usuario no puede acceder al daemon, solicita `sudo` para ejecutar Docker. Node y Rust se usan dentro del contenedor. Codex existente se reutiliza; la app de escritorio se detecta en `/usr/lib/chatgpt/resources/codex`. Si falta Codex, se descarga el CLI oficial 0.159.2 con SHA-256 fijado.
 
-Para ver el plan sin modificar nada:
+La aplicación oficial, si existe, se conserva. La versión compilada se instala para tu usuario en `~/.local/share/coucou-local/bin/`. El setup no se ha probado mediante una instalación completa de apt en un equipo limpio.
 
 ```bash
+# Ver el plan sin descargar, instalar ni modificar nada:
 bash install.sh --dry-run
-```
 
-Si los programas ya están instalados:
+# Compilar y comprobar, sin tocar la configuración ni cerrar Coucou:
+bash install.sh --build-only
 
-```bash
+# Aplicar la compilación que ya exista en .build/release:
 bash install.sh --configure-only
 ```
 
-## Autenticación del equipo nuevo
+`--configure-only` verifica versión, fuente, parche y hashes antes de cerrar Coucou o cambiar archivos. No acepta una compilación antigua ni usa `/usr/bin/coucou` como sustituto.
 
-Los ajustes quedan preparados, pero las cuentas se autentican en cada equipo:
+## Autenticación y aprobaciones
 
-1. Abre Codex y entra con tu cuenta ChatGPT; desde terminal puedes ejecutar `~/.local/bin/codex login` si se instaló ahí. Si se reutilizó otro ejecutable, usa `codex login` desde su ruta habitual.
-2. En Codex, abre `/hooks`, revisa las entradas de Coucou y autorízalas. El instalador no copia la confianza de otro equipo ni evita esa revisión. Abre una conversación nueva para comprobar los eventos.
-3. En Coucou → Settings → Integrations → GitHub, introduce un token personal con lectura de Pull requests, Commit statuses y Actions en los repositorios que elijas. Se guarda en el llavero local, no en este repositorio.
-4. Abre Spotify para que su tarjeta detecte el reproductor local mediante MPRIS.
+Las preferencias se preparan automáticamente; las cuentas se autentican en cada equipo:
 
-La tarjeta Codex recibe actividad y puede mostrar límites de uso. El chat propio de Coucou es una conversación aparte: no permite enviar mensajes a un chat existente de Codex. El perfil conserva Anthropic como proveedor del chat; para usarlo requiere su propia clave, que tampoco se distribuye.
+1. Entra en Codex con tu cuenta ChatGPT (`codex login`, o abre su app).
+2. Revisa y autoriza los hooks de Coucou desde `/hooks`. No se copia la confianza de otro equipo. Abre un chat nuevo para comprobar los eventos.
+3. Selecciona **Pedir aprobación / Ask for approval** en Codex para recibir las solicitudes que requieran tu decisión. En Coucou puedes pulsar **Permitir** o rechazar. La tarjeta no aprueba automáticamente ni todas las herramientas requieren aprobación. La prueba realizada fue controlada: el clic humano devolvió `allow` y el comando mostrado no se ejecutó.
+4. En Coucou → Settings → Integrations → GitHub, introduce un token granular con acceso a tus repositorios y permisos **de lectura**: Contents, Actions, Commit statuses, Pull requests y Metadata. Estos permisos no se conceden desde el instalador. El token se guarda en el llavero del equipo.
+5. Abre Spotify para que la tarjeta detecte el reproductor.
 
-## Copias y comprobación
+GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de los diez repositorios con actividad más reciente y Actions `in_progress` de los repositorios listados no archivados. Los errores de acceso se indican como datos parciales. Se renueva cada cinco minutos sin ejecuciones activas y cada minuto con ejecuciones, adaptándose a cuentas grandes; abrir la sección y refrescar también permite actualizar.
 
-Las copias están en `~/.local/share/coucou-setup/backups/FECHA/` y conservan las rutas relativas al directorio personal. `manifest.json` indica qué archivos existían antes. Para deshacer, cierra Coucou, restaura los archivos anteriores que necesites y vuelve a abrirlo. No se eliminan archivos automáticamente; comprueba los cambios locales posteriores antes de restaurar.
+El chat propio de Coucou es independiente de los chats de Codex. El perfil actual usa OpenAI para ese chat y requiere su propia clave de API; iniciar sesión en Codex no configura esa clave. No se incluyen credenciales, sesiones, historial ni confianza de hooks.
 
-```bash
-python3 -m unittest -v test_install.py
-tail -n 20 ~/.local/share/coucou/coucou.log
+## Copias y deshacer
+
+Antes de escribir, el setup guarda ajustes, hooks, accesos y los binarios anteriores en:
+
+```text
+~/.local/share/coucou-setup/backups/FECHA/
 ```
 
-Pruebas automáticas: fusión de hooks ajenos, repetición sin duplicados, rutas con espacios, rechazo de JSON inesperado, copias y conservación de ajustes locales. El perfil se aplicó en un directorio temporal durante la preparación; no se ha probado una instalación completa de apt en un equipo limpio.
+`manifest.json` distingue archivos previos de los creados. Si la aplicación de archivos falla, se intenta restaurar esa copia. Para deshacer después, cierra Coucou desde su icono, elige la copia adecuada y revisa primero:
 
-El perfil público del instalador contiene preferencias, no credenciales, sesiones, proyectos ni historiales. Los indicadores de instalación de Claude Code se conservan localmente; no se instala su integración.
+```bash
+python3 restore.py ~/.local/share/coucou-setup/backups/FECHA --dry-run
+python3 restore.py ~/.local/share/coucou-setup/backups/FECHA
+```
 
-## Procedencia
+La restauración recupera los archivos anteriores y elimina los que esa instalación creó. Ten en cuenta los cambios locales hechos después de la copia. Abre Coucou desde el acceso restaurado o al iniciar sesión.
 
-- [Coucou Linux 0.3.0](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.3.0) y [documentación de sus integraciones](https://github.com/Louis-CFM/coucou/blob/linux-v0.3.0/windows/README.md).
+## Fuente y compilación
+
+`source-lock.json` fija el commit oficial, la suma del archivo fuente, la suma del parche y las versiones de las imágenes de Node/Rust. El Dockerfile instala las dependencias, ejecuta las regresiones y compila aplicación y relé. Los paquetes npm y la aplicación Rust usan los lockfiles del código fuente.
+
+```bash
+# Solo preparar la fuente verificada y aplicar el parche:
+bash build.sh --prepare-only
+
+# Compilar directamente, con Docker y las herramientas ya disponibles:
+bash build.sh
+
+# Comprobar el instalador sin tocar tu configuración:
+python3 -m unittest -v test_install.py
+bash -n install.sh build.sh
+```
+
+Los resultados están en `.build/release/`, que Git ignora. No se suben binarios, archivos fuente descargados, credenciales ni imágenes Docker. El parche incluye el código de las mejoras, sus regresiones y las versiones de los lockfiles. `LICENSE` conserva la licencia MIT del código de Coucou; `LICENSE-ASSETS.md` recoge las condiciones del autor para nombre y recursos. El instalador descarga los recursos originales para la compilación personal.
+
+Procedencia:
+
+Resultados y límites de las pruebas: [VERIFICATION.md](VERIFICATION.md).
+
+- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/637b576a7c5261f7fee11edf3fb75b1ab92c8ab6).
 - [Codex CLI 0.159.2](https://github.com/openai/codex/releases/tag/rust-v0.159.2).
-- [Hooks de Codex y revisión de confianza](https://learn.chatgpt.com/docs/hooks).
-
-Este repositorio contiene el instalador y las preferencias. Descarga los programas oficiales, sin redistribuir sus binarios ni modificar su código.
+- [Hooks de Codex](https://learn.chatgpt.com/docs/hooks).
