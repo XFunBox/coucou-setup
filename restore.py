@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Restaurar una copia del setup con Coucou cerrado."""
+import argparse
+import os
+from pathlib import Path
+import subprocess
+from configure import restore
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('backup', type=Path)
+    parser.add_argument('--home', type=Path, default=Path.home())
+    parser.add_argument('--dry-run', action='store_true')
+    args = parser.parse_args()
+    if not args.dry_run and subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', 'coucou'],
+                                          stdout=subprocess.DEVNULL).returncode == 0:
+        parser.error('Cierra Coucou desde su icono antes de restaurar.')
+    paths = restore(args.home, args.backup, args.dry_run)
+    print(('Restauraría' if args.dry_run else 'Restaurados') + f' {len(paths)} archivos.')
+
+if __name__ == '__main__':
+    main()

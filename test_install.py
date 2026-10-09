@@ -2,7 +2,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from configure import apply, merge_hooks, validate_hooks
+from unittest.mock import patch
+from configure import apply, merge_hooks, validate_hooks, restore, desktop_entry
 
 class InstallerTests(unittest.TestCase):
     def test_preserves_other_hooks_and_metadata(self):
@@ -34,7 +35,7 @@ class InstallerTests(unittest.TestCase):
             relay.write_text('relay-fixture')
             profile = Path(temp) / 'profile.json'
             profile.write_text('{"mainPill":"agent_codex", "hooksInstalled":false}')
-            backup = apply(home, relay, profile)
+            backup = apply(home, relay, profile, binary=relay)
             result = json.loads(settings.read_text())
             self.assertEqual(result['localSetting'], 42)
             self.assertTrue(result['hooksInstalled'])
@@ -42,6 +43,67 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue((home / '.local/share/coucou/bin/coucou-hook').stat().st_mode & 0o111)
             self.assertEqual(len(json.loads((home / '.codex/hooks.json').read_text())['hooks']), 10)
             self.assertFalse((home / '.codex/config.toml').exists())
+            binary = home / '.local/share/coucou-local/bin/coucou'
+            self.assertEqual(binary.read_text(), 'relay-fixture')
+            for entry in (home/'.config/autostart/Coucou.desktop', home/'.local/share/applications/Coucou.desktop'):
+                self.assertIn(str(binary), entry.read_text())
+                self.assertNotIn('/usr/bin/coucou', entry.read_text())
+
+    def test_restore_previous_binaries_and_remove_new_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)/'home'
+            old_binary = home/'.local/share/coucou-local/bin/coucou'
+            old_binary.parent.mkdir(parents=True)
+            old_binary.write_text('old-version')
+            source = Path(temp)/'new'; source.write_text('new-version')
+            profile = Path(temp)/'profile.json'; profile.write_text('{}')
+            backup = apply(home, source, profile, binary=source)
+            self.assertEqual(old_binary.read_text(), 'new-version')
+            self.assertEqual(len(restore(home, backup, dry_run=True)), 7)
+            self.assertEqual(old_binary.read_text(), 'new-version')
+            restore(home, backup)
+            self.assertEqual(old_binary.read_text(), 'old-version')
+            self.assertFalse((home/'.codex/hooks.json').exists())
+            self.assertFalse((home/'.local/share/applications/Coucou.desktop').exists())
+
+    def test_failed_write_restores_previous_version(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)/'home'
+            old_binary = home/'.local/share/coucou-local/bin/coucou'
+            old_binary.parent.mkdir(parents=True); old_binary.write_text('old-version')
+            source = Path(temp)/'new'; source.write_text('new-version')
+            profile = Path(temp)/'profile.json'; profile.write_text('{}')
+            import configure
+            real_write = configure.atomic_write
+            def fail_settings(path, content, mode=0o600):
+                if path == home/'.config/coucou/settings.json':
+                    raise OSError('Simulated failure')
+                return real_write(path, content, mode)
+            with patch('configure.atomic_write', side_effect=fail_settings):
+                with self.assertRaises(OSError):
+                    apply(home, source, profile, binary=source)
+            self.assertEqual(old_binary.read_text(), 'old-version')
+            self.assertFalse((home/'.local/share/coucou/bin/coucou-hook').exists())
+
+    def test_missing_custom_binary_does_not_modify_home(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)/'home'
+            source = Path(temp)/'relay'; source.write_text('relay')
+            profile = Path(temp)/'profile.json'; profile.write_text('{}')
+            with self.assertRaises(ValueError):
+                apply(home, source, profile, binary=Path(temp)/'missing')
+            self.assertFalse(home.exists())
+
+    def test_desktop_entry_handles_spaces_and_field_codes(self):
+        entry = desktop_entry(Path('/tmp/home with spaces/%user/coucou'))
+        self.assertIn('Exec="/tmp/home with spaces/%%user/coucou"', entry)
+
+    def test_restore_rejects_paths_outside_home(self):
+        with tempfile.TemporaryDirectory() as temp:
+            backup = Path(temp)/'backup'; backup.mkdir()
+            (backup/'manifest.json').write_text('{"../outside":false}')
+            with self.assertRaises(ValueError):
+                restore(Path(temp)/'home', backup)
 
     def test_invalid_hooks_leave_existing_settings_untouched(self):
         with tempfile.TemporaryDirectory() as temp:
