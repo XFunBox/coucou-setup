@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.deb
+*.tar.gz
+*.log
+.env*
+auth.json
+credentials*
