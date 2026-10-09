@@ -28,3 +28,4 @@ RUN mkdir -p /out && cp target/release/coucou target/release/coucou-hook /out/ \
  && cd /out && sha256sum coucou coucou-hook > SHA256SUMS
 FROM scratch
 COPY --from=build /out/ /
+
