@@ -1,67 +1,67 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 24ec823..4861030 100644
+index e58918b..30e8278 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -610,7 +610,7 @@ dependencies = [
  
  [[package]]
  name = "coucou"
--version = "0.3.0"
-+version = "0.3.0-sendoa.2"
+-version = "0.4.0"
++version = "0.4.0-sendoa.1"
  dependencies = [
   "dbus",
-  "gtk",
-@@ -633,7 +633,7 @@ dependencies = [
+  "futures-util",
+@@ -642,7 +642,7 @@ dependencies = [
  
  [[package]]
  name = "coucou-hook"
--version = "0.3.0"
-+version = "0.3.0-sendoa.2"
+-version = "0.4.0"
++version = "0.4.0-sendoa.1"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 548a7fb..68098ef 100644
+index f76a8ba..d47ec38 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
  resolver = "2"
  
  [workspace.package]
--version = "0.3.0"
-+version = "0.3.0-sendoa.2"
+-version = "0.4.0"
++version = "0.4.0-sendoa.1"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index ab3c90f..0eb37fc 100644
+index 5f391e3..4c8f7d8 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
--  "version": "0.3.0",
-+  "version": "0.3.0-sendoa.2",
+-  "version": "0.4.0",
++  "version": "0.4.0-sendoa.1",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
--      "version": "0.3.0",
-+      "version": "0.3.0-sendoa.2",
+-      "version": "0.4.0",
++      "version": "0.4.0-sendoa.1",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index bdd559e..5ff49a2 100644
+index 1efd47d..66d2470 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,7 +1,7 @@
  {
    "name": "coucou-windows",
    "private": true,
--  "version": "0.3.0",
-+  "version": "0.3.0-sendoa.2",
+-  "version": "0.4.0",
++  "version": "0.4.0-sendoa.1",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -432,52 +432,18 @@ index 14969e4..ec537c0 100644
      };
      if had_data {
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 84b8af8..78bde18 100644
+index 39799eb..8752880 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
  {
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
--  "version": "0.3.0",
-+  "version": "0.3.0-sendoa.2",
+-  "version": "0.4.0",
++  "version": "0.4.0-sendoa.1",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
-@@ -41,14 +41,19 @@
-   },
-   "bundle": {
-     "active": true,
--    "targets": ["nsis", "msi"],
-+    "targets": [
-+      "nsis",
-+      "msi"
-+    ],
-     "icon": [
-       "icons/32x32.png",
-       "icons/128x128.png",
-       "icons/128x128@2x.png",
-       "icons/icon.ico"
-     ],
--    "resources": { "../target/release/coucou-hook.exe": "coucou-hook.exe" },
-+    "resources": {
-+      "../target/release/coucou-hook.exe": "coucou-hook.exe"
-+    },
-     "copyright": "© Louis Raille",
-     "category": "DeveloperTool",
-     "shortDescription": "Mochi lives at the top of your screen",
-@@ -56,7 +61,10 @@
-     "windows": {
-       "nsis": {
-         "installMode": "currentUser",
--        "languages": ["English", "French"],
-+        "languages": [
-+          "English",
-+          "French"
-+        ],
-         "installerHooks": "nsis/hooks.nsh"
-       }
-     }
 diff --git a/windows/src/core/github.ts b/windows/src/core/github.ts
 index 866f8f1..e70a2a8 100644
 --- a/windows/src/core/github.ts
@@ -530,48 +496,128 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 7de4fe3..6c36343 100644
+index 9ba0b6a..cde30b6 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
-@@ -3360,6 +3360,36 @@
-    "pt-BR": "Só um arquivo solto na ilha pode ser enviado com uma pergunta.",
-    "ru": "С вопросом можно отправить только файл, перетащенный на остров.",
-    "id": "Hanya file yang dijatuhkan ke pulau yang bisa dikirim bersama pertanyaan."
+@@ -3899,6 +3899,116 @@
+    "pt-BR": "Este código também inclui a chave de acesso e a chave de ponta a ponta do relay {host}. «Parear de novo» cria uma chave e uma sala novas.",
+    "ru": "Этот код также содержит ключ доступа и сквозной ключ для ретранслятора {host}. «Сопрячь заново» создаёт новый ключ и новую комнату.",
+    "id": "Kode ini juga memuat kunci akses dan kunci ujung ke ujung untuk relay {host}. «Sandingkan ulang» membuat kunci dan ruang baru."
 +  },
 +  "Latest commits": {
-+   "es": "Últimos commits"
++   "es": "Últimos commits",
++   "zh-Hans": "最新提交",
++   "hi": "नवीनतम कमिट",
++   "ar": "أحدث عمليات الإيداع",
++   "fr": "Derniers commits",
++   "bn": "সর্বশেষ কমিট",
++   "pt-BR": "Últimos commits",
++   "ru": "Последние коммиты",
++   "id": "Commit terbaru"
 +  },
 +  "Running pipelines": {
-+   "es": "Pipelines activos"
++   "es": "Pipelines activos",
++   "zh-Hans": "运行中的流水线",
++   "hi": "चल रही पाइपलाइन",
++   "ar": "خطوط التنفيذ النشطة",
++   "fr": "Pipelines en cours",
++   "bn": "চলমান পাইপলাইন",
++   "pt-BR": "Pipelines em execução",
++   "ru": "Выполняющиеся пайплайны",
++   "id": "Pipeline yang berjalan"
 +  },
 +  "No repositories visible. Check token access.": {
-+   "es": "Sin repositorios visibles. Revisa el acceso del token."
++   "es": "Sin repositorios visibles. Revisa el acceso del token.",
++   "zh-Hans": "没有可见的仓库。请检查令牌的访问权限。",
++   "hi": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। टोकन की पहुँच जाँचें।",
++   "ar": "لا توجد مستودعات مرئية. تحقق من وصول الرمز.",
++   "fr": "Aucun dépôt visible. Vérifiez les accès du jeton.",
++   "bn": "কোনো রিপোজিটরি দেখা যাচ্ছে না। টোকেনের অ্যাক্সেস পরীক্ষা করুন।",
++   "pt-BR": "Nenhum repositório visível. Verifique o acesso do token.",
++   "ru": "Нет доступных репозиториев. Проверьте доступ токена.",
++   "id": "Tidak ada repositori yang terlihat. Periksa akses token."
 +  },
 +  "No commits available.": {
-+   "es": "Sin commits disponibles."
++   "es": "Sin commits disponibles.",
++   "zh-Hans": "没有可用的提交。",
++   "hi": "कोई कमिट उपलब्ध नहीं है।",
++   "ar": "لا توجد عمليات إيداع متاحة.",
++   "fr": "Aucun commit disponible.",
++   "bn": "কোনো কমিট পাওয়া যায়নি।",
++   "pt-BR": "Nenhum commit disponível.",
++   "ru": "Нет доступных коммитов.",
++   "id": "Tidak ada commit yang tersedia."
 +  },
 +  "No pipelines running.": {
-+   "es": "No hay pipelines en ejecución."
++   "es": "No hay pipelines en ejecución.",
++   "zh-Hans": "没有正在运行的流水线。",
++   "hi": "कोई पाइपलाइन नहीं चल रही।",
++   "ar": "لا توجد خطوط تنفيذ نشطة.",
++   "fr": "Aucun pipeline en cours.",
++   "bn": "কোনো পাইপলাইন চলছে না।",
++   "pt-BR": "Nenhum pipeline em execução.",
++   "ru": "Нет выполняющихся пайплайнов.",
++   "id": "Tidak ada pipeline yang berjalan."
 +  },
 +  "Check token permissions to load this section.": {
-+   "es": "Revisa los permisos del token para ver este apartado."
++   "es": "Revisa los permisos del token para ver este apartado.",
++   "zh-Hans": "请检查令牌权限以加载此部分。",
++   "hi": "यह अनुभाग लोड करने के लिए टोकन की अनुमतियाँ जाँचें।",
++   "ar": "تحقق من أذونات الرمز لتحميل هذا القسم.",
++   "fr": "Vérifiez les permissions du jeton pour charger cette section.",
++   "bn": "এই বিভাগ লোড করতে টোকেনের অনুমতি পরীক্ষা করুন।",
++   "pt-BR": "Verifique as permissões do token para carregar esta seção.",
++   "ru": "Проверьте разрешения токена для загрузки этого раздела.",
++   "id": "Periksa izin token untuk memuat bagian ini."
 +  },
 +  "Partial": {
-+   "es": "Parcial"
++   "es": "Parcial",
++   "zh-Hans": "部分",
++   "hi": "आंशिक",
++   "ar": "جزئي",
++   "fr": "Partiel",
++   "bn": "আংশিক",
++   "pt-BR": "Parcial",
++   "ru": "Частично",
++   "id": "Sebagian"
 +  },
 +  "Private": {
-+   "es": "Privado"
++   "es": "Privado",
++   "zh-Hans": "私有",
++   "hi": "निजी",
++   "ar": "خاص",
++   "fr": "Privé",
++   "bn": "ব্যক্তিগত",
++   "pt-BR": "Privado",
++   "ru": "Приватный",
++   "id": "Pribadi"
 +  },
 +  "Last updated": {
-+   "es": "Última actualización"
++   "es": "Última actualización",
++   "zh-Hans": "最后更新",
++   "hi": "अंतिम अपडेट",
++   "ar": "آخر تحديث",
++   "fr": "Dernière mise à jour",
++   "bn": "সর্বশেষ আপডেট",
++   "pt-BR": "Última atualização",
++   "ru": "Последнее обновление",
++   "id": "Terakhir diperbarui"
 +  },
 +  "Reviews": {
-+   "es": "Revisiones"
++   "es": "Revisiones",
++   "zh-Hans": "审查",
++   "hi": "समीक्षाएँ",
++   "ar": "المراجعات",
++   "fr": "Revues",
++   "bn": "পর্যালোচনা",
++   "pt-BR": "Revisões",
++   "ru": "Проверки",
++   "id": "Ulasan"
    }
   }
  }
 diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
-index 63e5cb0..f5d12f6 100644
+index ad01493..9f69cca 100644
 --- a/windows/src/island/hooks.ts
 +++ b/windows/src/island/hooks.ts
 @@ -154,7 +154,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
@@ -793,34 +839,6 @@ index 9a40ae0..c30a079 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
-diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
-index ce9f49d..46d1d4d 100644
---- a/windows/tests/hooks.test.mjs
-+++ b/windows/tests/hooks.test.mjs
-@@ -251,6 +251,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
-   }
- });
- 
-+test("Codex MCP requests show the paths and scopes being authorised", () => {
-+  const input = { permissions: { file_system: { write: ["/home/me/project"] }, network: { enabled: true } } };
-+  hook({ hook_event_name: "PermissionRequest", request_id: "nested", session_id: "s1", coucou_agent: "codex", tool_name: "mcp__permissions__request", tool_input: input });
-+  assert.equal(State.pendingApproval.command, `mcp__permissions__request · ${JSON.stringify(input)}`);
-+  assert.deepEqual(sent("approval_ack"), [{ requestId: "nested" }]);
-+  assert.deepEqual(sent("approval_decision"), [], "showing a request never approves it");
-+});
-+
- test("Codex, Copilot CLI and Muse Code get the card on their own pill", () => {
-   for (const agent of ["codex", "copilot", "muse"]) {
-     State.pendingApproval = null;
-@@ -430,7 +438,7 @@ test("the card names the most specific thing the tool carries", () => {
-   assert.equal(target("Bash", { command: "rm -rf build", file_path: "x" }), "Bash · rm -rf build");
-   assert.equal(target("WebFetch", { url: "https://example.com" }), "WebFetch · https://example.com");
-   assert.equal(target("Task", { prompt: "do it" }), "Task · do it");
--  assert.equal(target("Odd", { command: "   ", count: 3 }), "Odd");
-+  assert.equal(target("Odd", { command: "   ", count: 3 }), 'Odd · {"command":"   ","count":3}');
-   assert.equal(target(undefined, undefined), "Tool");
- });
- 
 diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs
 new file mode 100644
 index 0000000..bd3cc66
@@ -896,3 +914,31 @@ index 0000000..b944148
 +[dependencies]
 +serde = { version = "1", features = ["derive"] }
 +serde_json = { version = "1", features = ["preserve_order"] }
+diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
+index ce9f49d..46d1d4d 100644
+--- a/windows/tests/hooks.test.mjs
++++ b/windows/tests/hooks.test.mjs
+@@ -251,6 +251,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
+   }
+ });
+ 
++test("Codex MCP requests show the paths and scopes being authorised", () => {
++  const input = { permissions: { file_system: { write: ["/home/me/project"] }, network: { enabled: true } } };
++  hook({ hook_event_name: "PermissionRequest", request_id: "nested", session_id: "s1", coucou_agent: "codex", tool_name: "mcp__permissions__request", tool_input: input });
++  assert.equal(State.pendingApproval.command, `mcp__permissions__request · ${JSON.stringify(input)}`);
++  assert.deepEqual(sent("approval_ack"), [{ requestId: "nested" }]);
++  assert.deepEqual(sent("approval_decision"), [], "showing a request never approves it");
++});
++
+ test("Codex, Copilot CLI and Muse Code get the card on their own pill", () => {
+   for (const agent of ["codex", "copilot", "muse"]) {
+     State.pendingApproval = null;
+@@ -430,7 +438,7 @@ test("the card names the most specific thing the tool carries", () => {
+   assert.equal(target("Bash", { command: "rm -rf build", file_path: "x" }), "Bash · rm -rf build");
+   assert.equal(target("WebFetch", { url: "https://example.com" }), "WebFetch · https://example.com");
+   assert.equal(target("Task", { prompt: "do it" }), "Task · do it");
+-  assert.equal(target("Odd", { command: "   ", count: 3 }), "Odd");
++  assert.equal(target("Odd", { command: "   ", count: 3 }), 'Odd · {"command":"   ","count":3}');
+   assert.equal(target(undefined, undefined), "Tool");
+ });
+ 

@@ -1,12 +1,13 @@
 # Coucou con Codex, GitHub y Spotify
 
-Setup de **Coucou 0.3.0-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.3.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.4.0-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.4.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
 - Autocierre corregido tras avisos consecutivos, manteniendo los avisos al terminar. Panel a 10 segundos, sonido desactivado y pantalla del cursor.
 - GitHub: repositorios propios, últimos commits y pipelines de Actions en ejecución; enlaces a cada elemento y textos en español.
 - Codex como agente principal, plan y límites, diez hooks y solicitudes de aprobación desde la isla, con respuesta explícita del usuario. Las herramientas MCP muestran sus parámetros cuando hace falta.
+- Enlace opcional con Coucou para Android desde Settings → Android phone: desactivado por defecto, sin servidor escuchando hasta activarlo. Emparejamiento QR con certificado fijado, controles separados para detalles, preguntas, chat, diffs, uso y servicios; «Pair again» desconecta los móviles anteriores. El APK se obtiene o compila por separado y no se instala con este setup.
 - Spotify mediante el reproductor local MPRIS; muñeco de escritorio desactivado.
 - Inicio automático y acceso del menú apuntando al **binario personalizado**, con copias previas y restauración.
 
@@ -24,6 +25,8 @@ El repositorio privado requiere autenticación de GitHub. Si tienes SSH configur
 
 El instalador solicita `sudo` para las dependencias de ejecución y compilación. Si falta Docker, instala `docker.io`; si tu usuario no puede acceder al daemon, solicita `sudo` para ejecutar Docker. Node y Rust se usan dentro del contenedor. Codex existente se reutiliza; la app de escritorio se detecta en `/usr/lib/chatgpt/resources/codex`. Si falta Codex, se descarga el CLI oficial 0.159.2 con SHA-256 fijado.
 
+El perfil del setup para instalaciones nuevas fija autocierre a 10 segundos, chat OpenAI y pantalla del cursor. Tanto la instalación completa como `--configure-only` aplican ese perfil: las claves que contiene sustituyen sus valores actuales; las demás claves y los hooks ajenos se conservan. Si actualizas una instalación personalizada y quieres conservar todos sus ajustes, guarda la configuración y sustituye únicamente los binarios verificados; este setup no ofrece un modo de actualización solo de binarios.
+
 La aplicación oficial, si existe, se conserva. La versión compilada se instala para tu usuario en `~/.local/share/coucou-local/bin/`. El setup no se ha probado mediante una instalación completa de apt en un equipo limpio.
 
 ```bash
@@ -33,7 +36,7 @@ bash install.sh --dry-run
 # Compilar y comprobar, sin tocar la configuración ni cerrar Coucou:
 bash install.sh --build-only
 
-# Aplicar la compilación que ya exista en .build/release:
+# Aplicar la compilación y el perfil base que ya existan en .build/release:
 bash install.sh --configure-only
 ```
 
@@ -51,7 +54,7 @@ Las preferencias se preparan automáticamente; las cuentas se autentican en cada
 
 GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de los diez repositorios con actividad más reciente y Actions `in_progress` de los repositorios listados no archivados. Los errores de acceso se indican como datos parciales. Se renueva cada cinco minutos sin ejecuciones activas y cada minuto con ejecuciones, adaptándose a cuentas grandes; abrir la sección y refrescar también permite actualizar.
 
-El chat propio de Coucou es independiente de los chats de Codex. El perfil actual usa OpenAI para ese chat y requiere su propia clave de API; iniciar sesión en Codex no configura esa clave. No se incluyen credenciales, sesiones, historial ni confianza de hooks.
+El chat propio de Coucou es independiente de los chats de Codex. El perfil base del setup usa OpenAI para ese chat y requiere su propia clave de API; iniciar sesión en Codex no configura esa clave. No se incluyen credenciales, sesiones, historial ni confianza de hooks.
 
 ## Copias y deshacer
 
@@ -86,12 +89,12 @@ python3 -m unittest -v test_install.py
 bash -n install.sh build.sh
 ```
 
-Los resultados están en `.build/release/`, que Git ignora. No se suben binarios, archivos fuente descargados, credenciales ni imágenes Docker. El parche incluye el código de las mejoras, sus regresiones y las versiones de los lockfiles. `LICENSE` conserva la licencia MIT del código de Coucou; `LICENSE-ASSETS.md` recoge las condiciones del autor para nombre y recursos. El instalador descarga los recursos originales para la compilación personal.
+Los resultados están en `.build/release/`, que Git ignora. No se suben binarios, archivos fuente descargados, credenciales ni imágenes Docker. El parche incluye el código de las mejoras, sus regresiones y las versiones de los lockfiles. `LICENSE` conserva la licencia MIT del código de Coucou y `LICENSE-ANDROID` la del enlace al móvil, de Rhytam Biswas; `LICENSE-ASSETS.md` recoge las condiciones del autor para nombre y recursos. El instalador descarga los recursos originales para la compilación personal.
 
 Procedencia:
 
 Resultados y límites de las pruebas: [VERIFICATION.md](VERIFICATION.md).
 
-- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/637b576a7c5261f7fee11edf3fb75b1ab92c8ab6).
+- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/e1b2cfdfd684a312fc0d7db26be97d6269615a31).
 - [Codex CLI 0.159.2](https://github.com/openai/codex/releases/tag/rust-v0.159.2).
 - [Hooks de Codex](https://learn.chatgpt.com/docs/hooks).
