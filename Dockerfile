@@ -16,15 +16,19 @@ COPY windows/package.json windows/package-lock.json ./
 RUN npm ci --include=optional
 COPY windows ./
 COPY NotchBuddy/Resources/sounds /app/NotchBuddy/Resources/sounds
+COPY NotchBuddy/Resources/Localizable.xcstrings /app/NotchBuddy/Resources/Localizable.xcstrings
 COPY LICENSE LICENSE-ASSETS.md /app/
+COPY android/LICENSE /app/LICENSE-ANDROID
 ENV CARGO_BUILD_JOBS=2
 RUN node --import ./tests/setup.mjs --test tests/github.test.mjs \
-    tests/github-dashboard.test.mjs tests/hooks.test.mjs tests/fsm.test.mjs
+    tests/github-dashboard.test.mjs tests/hooks.test.mjs tests/fsm.test.mjs \
+    tests/i18n.test.mjs tests/phone-link.test.mjs tests/phone-pairing-hint.test.mjs \
+    tests/phone-chat.test.mjs tests/phone-relay.test.mjs
 RUN cargo test --manifest-path tests/github-rust/Cargo.toml --target-dir /app/github-test-target
 RUN cargo build --locked --release -p coucou-hook
 RUN npm run tauri -- build --config src-tauri/tauri.linux.conf.json --no-bundle
 RUN mkdir -p /out && cp target/release/coucou target/release/coucou-hook /out/ \
- && cp /app/LICENSE /app/LICENSE-ASSETS.md /out/ \
+ && cp /app/LICENSE /app/LICENSE-ASSETS.md /app/LICENSE-ANDROID /out/ \
  && cd /out && sha256sum coucou coucou-hook > SHA256SUMS
 FROM scratch
 COPY --from=build /out/ /

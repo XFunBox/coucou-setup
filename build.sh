@@ -64,7 +64,7 @@ IMAGE="coucou-setup-local:$VERSION"
   -t "$IMAGE" "$TASK_TMP/context"
 EXPORT_TMP=$(mktemp -d "$ROOT/.build/export.XXXXXXXX")
 TASK_CONTAINER=$("${DOCKER[@]}" create "$IMAGE" /coucou)
-for file in coucou coucou-hook LICENSE LICENSE-ASSETS.md SHA256SUMS; do
+for file in coucou coucou-hook LICENSE LICENSE-ASSETS.md LICENSE-ANDROID SHA256SUMS; do
   "${DOCKER[@]}" cp "$TASK_CONTAINER:/$file" "$EXPORT_TMP/$file"
 done
 "${DOCKER[@]}" rm "$TASK_CONTAINER" >/dev/null
@@ -76,6 +76,8 @@ import json, shutil, sys
 from pathlib import Path
 root, export = map(Path, sys.argv[1:])
 shutil.copy2(root/'source-lock.json', export/'source-lock.json')
+# El documento del setup enlaza la licencia Android exportada en la misma carpeta.
+shutil.copy2(root/'LICENSE-ASSETS.md', export/'LICENSE-ASSETS.md')
 PY
 rm -rf -- "$ROOT/.build/release"
 mv "$EXPORT_TMP" "$ROOT/.build/release"
