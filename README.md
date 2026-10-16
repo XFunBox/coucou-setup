@@ -21,7 +21,7 @@ cd coucou-setup
 bash install.sh
 ```
 
-El repositorio privado requiere autenticación de GitHub. Si tienes SSH configurado, puedes clonar `git@github.com:XFunBox/coucou-setup.git`.
+El repositorio es público y se puede clonar por HTTPS sin iniciar sesión. Si tienes SSH configurado, también puedes usar `git@github.com:XFunBox/coucou-setup.git`.
 
 El instalador solicita `sudo` para las dependencias de ejecución y compilación. Si falta Docker, instala `docker.io`; si tu usuario no puede acceder al daemon, solicita `sudo` para ejecutar Docker. Node y Rust se usan dentro del contenedor. Codex existente se reutiliza; la app de escritorio se detecta en `/usr/lib/chatgpt/resources/codex`. Si falta Codex, se descarga el CLI oficial 0.159.2 con SHA-256 fijado.
 
