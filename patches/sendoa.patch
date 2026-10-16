@@ -1,5 +1,5 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index b161fd0..b4e001c 100644
+index b161fd0..55637c5 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index b161fd0..b4e001c 100644
  [[package]]
  name = "coucou"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.1"
++version = "0.5.0-sendoa.2"
  dependencies = [
   "arboard",
   "cpal",
@@ -16,12 +16,12 @@ index b161fd0..b4e001c 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.1"
++version = "0.5.0-sendoa.2"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index aa82ca8..49d7684 100644
+index aa82ca8..3a39a99 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -29,31 +29,31 @@ index aa82ca8..49d7684 100644
  
  [workspace.package]
 -version = "0.5.0"
-+version = "0.5.0-sendoa.1"
++version = "0.5.0-sendoa.2"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1b260d3..98af0d5 100644
+index 1b260d3..267e919 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.1",
++  "version": "0.5.0-sendoa.2",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.0",
-+      "version": "0.5.0-sendoa.1",
++      "version": "0.5.0-sendoa.2",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 4f905eb..02e88e1 100644
+index 4f905eb..19ac4de 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,7 +1,7 @@
@@ -61,7 +61,7 @@ index 4f905eb..02e88e1 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.1",
++  "version": "0.5.0-sendoa.2",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -447,8 +447,727 @@ index 14969e4..ec537c0 100644
          had
      };
      if had_data {
+diff --git a/windows/src-tauri/src/spotify.rs b/windows/src-tauri/src/spotify.rs
+index cb008bf..0744673 100644
+--- a/windows/src-tauri/src/spotify.rs
++++ b/windows/src-tauri/src/spotify.rs
+@@ -2,7 +2,8 @@
+ //
+ // The Mac listens to Spotify's distributed notification and drives it over
+ // AppleScript. Linux has MPRIS instead: Spotify owns
+-// `org.mpris.MediaPlayer2.spotify` on the session bus, publishes its track,
++// `org.mpris.MediaPlayer2.spotify` on the session bus. Spotifast is preferred
++// when `org.mpris.MediaPlayer2.spotifast` is owned. The selected player publishes its track,
+ // playback status, shuffle, loop status and volume as properties, and takes
+ // PlayPause, Next, Previous, SetPosition… as method calls.
+ //
+@@ -107,6 +108,8 @@ pub struct Track {
+ #[derive(Serialize, Clone, Debug, PartialEq)]
+ #[serde(rename_all = "camelCase")]
+ pub struct PlayerState {
++    /// Display name of the selected Linux player (the pill id stays compatible).
++    pub player_name: String,
+     /// Spotify owns its name on the bus.
+     pub running: bool,
+     /// A `spotify` (or the Flatpak / Snap) is there to launch.
+@@ -127,6 +130,7 @@ pub struct PlayerState {
+ impl Default for PlayerState {
+     fn default() -> Self {
+         PlayerState {
++            player_name: "Spotify".into(),
+             running: false,
+             installed: false,
+             track: None,
+@@ -290,6 +294,10 @@ pub fn spotify_id(trackid: &str, url: Option<&str>) -> String {
+             return format!("spotify:{}:{}", parts[0], parts[1..].join(":"));
+         }
+     }
++    // Spotifast uses a generic MPRIS object path and supplies the real Spotify URI here.
++    if let Some(uri) = url.filter(|u| u.starts_with("spotify:")) {
++        return uri.to_string();
++    }
+     if let Some(rest) = url.and_then(|u| u.strip_prefix("https://open.spotify.com/")) {
+         let parts: Vec<&str> = rest.split(['/', '?']).collect();
+         if parts.len() >= 2 && !parts[0].is_empty() && !parts[1].is_empty() {
+@@ -524,6 +532,7 @@ mod linux {
+     use tauri::Emitter;
+ 
+     const BUS: &str = "org.mpris.MediaPlayer2.spotify";
++    const SPOTIFAST_BUS: &str = "org.mpris.MediaPlayer2.spotifast";
+     const PATH: &str = "/org/mpris/MediaPlayer2";
+     const ROOT: &str = "org.mpris.MediaPlayer2";
+     const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
+@@ -535,10 +544,13 @@ mod linux {
+     const IDLE_WAIT: Duration = Duration::from_secs(3600);
+     const FLATPAK_ID: &str = "com.spotify.Client";
+ 
+-    const RULES: [&str; 3] = [
++    const RULES: [&str; 6] = [
+         "type='signal',sender='org.freedesktop.DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.mpris.MediaPlayer2.spotify'",
+         "type='signal',sender='org.mpris.MediaPlayer2.spotify',path='/org/mpris/MediaPlayer2',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged'",
+         "type='signal',sender='org.mpris.MediaPlayer2.spotify',path='/org/mpris/MediaPlayer2',interface='org.mpris.MediaPlayer2.Player',member='Seeked'",
++        "type='signal',sender='org.freedesktop.DBus',interface='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.mpris.MediaPlayer2.spotifast'",
++        "type='signal',sender='org.mpris.MediaPlayer2.spotifast',path='/org/mpris/MediaPlayer2',interface='org.freedesktop.DBus.Properties',member='PropertiesChanged'",
++        "type='signal',sender='org.mpris.MediaPlayer2.spotifast',path='/org/mpris/MediaPlayer2',interface='org.mpris.MediaPlayer2.Player',member='Seeked'",
+     ];
+ 
+     struct Shared {
+@@ -549,11 +561,14 @@ mod linux {
+         listener: Option<String>,
+         /// Spotify's unique name while it runs: signals from anyone else are ignored.
+         owner: Option<String>,
++        bus: &'static str,
++        /// Number reads before I/O: a newer fallback must outlive an older response.
++        revision: u64,
+         state: PlayerState,
+     }
+ 
+     static SHARED: LazyLock<Mutex<Shared>> = LazyLock::new(|| {
+-        Mutex::new(Shared { generation: 0, active: false, listener: None, owner: None, state: PlayerState::default() })
++        Mutex::new(Shared { generation: 0, active: false, listener: None, owner: None, bus: BUS, revision: 0, state: PlayerState::default() })
+     });
+ 
+     /// The connection the controls and reads go through, made on first use.
+@@ -650,6 +665,8 @@ mod linux {
+             s.active = on;
+             s.generation += 1;
+             s.owner = None;
++            s.bus = BUS;
++            s.revision += 1;
+             s.state = PlayerState { installed: installed(), ..PlayerState::default() };
+             s.listener.take()
+         };
+@@ -744,23 +761,11 @@ mod linux {
+ 
+         match (interface.as_str(), member.as_str()) {
+             (DBUS, "NameOwnerChanged") => {
+-                let Ok((name, _old, new)) = msg.read3::<String, String, String>() else { return };
+-                if name != BUS {
+-                    return;
+-                }
+-                if new.is_empty() {
+-                    // Spotify quit: nothing is playing anymore.
+-                    let state = {
+-                        let mut s = SHARED.lock().unwrap();
+-                        s.owner = None;
+-                        s.state.running = false;
+-                        s.state.clear(now_ms());
+-                        s.state.clone()
+-                    };
+-                    out.state(&state);
+-                } else {
+-                    read_everything(conn, out, generation);
+-                }
++                let Ok((name, _old, _new)) = msg.read3::<String, String, String>() else { return };
++                if name != BUS && name != SPOTIFAST_BUS { return; }
++                // Query both current owners: disappearance can mean fallback, and
++                // queued owner-change messages must never restore a departed owner.
++                read_everything(conn, out, generation);
+             }
+             (PROPERTIES, "PropertiesChanged") => {
+                 if !from_owner(sender.as_deref()) {
+@@ -773,18 +778,18 @@ mod linux {
+                 let mut props = props_of(&changed);
+                 // Properties that changed without their value: read them.
+                 for name in invalidated {
+-                    if let Some(v) = get_property(conn, &name) {
++                    if let Some(v) = get_property(conn, sender.as_deref().unwrap(), &name) {
+                         props.push((name, v));
+                     }
+                 }
+-                apply_and_emit(conn, out, &props);
++                apply_and_emit(conn, out, generation, sender.as_deref().unwrap(), &props);
+             }
+             (PLAYER, "Seeked") => {
+                 if !from_owner(sender.as_deref()) {
+                     return;
+                 }
+                 let Ok(us) = msg.read1::<i64>() else { return };
+-                apply_and_emit(conn, out, &[("Position".into(), Value::Int(us))]);
++                apply_and_emit(conn, out, generation, sender.as_deref().unwrap(), &[("Position".into(), Value::Int(us))]);
+             }
+             _ => {}
+         }
+@@ -794,62 +799,83 @@ mod linux {
+         let s = SHARED.lock().unwrap();
+         match (&s.owner, sender) {
+             (Some(owner), Some(sender)) => owner == sender,
+-            // The owner isn't known yet: the bus only routes Spotify's to us.
+-            (None, _) => true,
++            // Never accept an event until a selected unique owner is known.
++            (None, _) => false,
+             _ => false,
+         }
+     }
+ 
+     /// Applies a change; when the status or the track moved, reads the
+     /// position (never signalled), then tells the island.
+-    fn apply_and_emit(conn: &Connection, out: &Out, props: &[(String, Value)]) {
+-        let applied = SHARED.lock().unwrap().state.apply(props, now_ms());
+-        if (applied.status_changed || applied.track_changed) && !applied.position_set {
+-            if let Some(position) = get_property(conn, "Position") {
+-                SHARED.lock().unwrap().state.apply(&[("Position".into(), position)], now_ms());
+-            }
+-        }
+-        let state = SHARED.lock().unwrap().state.clone();
+-        out.state(&state);
+-    }
+-
+-    fn get_property(conn: &Connection, name: &str) -> Option<Value> {
+-        let proxy = conn.with_proxy(BUS, PATH, CALL);
++    fn apply_and_emit(conn: &Connection, out: &Out, generation: u64, owner: &str, props: &[(String, Value)]) {
++        let applied = {
++            let mut s = SHARED.lock().unwrap();
++            if !s.active || s.generation != generation || s.owner.as_deref() != Some(owner) { return; }
++            s.state.apply(props, now_ms())
++        };
++        let position = if (applied.status_changed || applied.track_changed) && !applied.position_set {
++            get_property(conn, owner, "Position")
++        } else { None };
++        let mut s = SHARED.lock().unwrap();
++        if !s.active || s.generation != generation || s.owner.as_deref() != Some(owner) { return; }
++        if let Some(position) = position { s.state.apply(&[("Position".into(), position)], now_ms()); }
++        // Keep state emission ordered with selection changes from refresh/control.
++        out.state(&s.state);
++    }
++
++    fn get_property(conn: &Connection, owner: &str, name: &str) -> Option<Value> {
++        let proxy = conn.with_proxy(owner, PATH, CALL);
+         let v: Box<dyn RefArg> = proxy.get(PLAYER, name).ok()?;
+         Some(value_of(&v))
+     }
+ 
+-    fn name_owner(conn: &Connection) -> Option<String> {
++    fn name_owner(conn: &Connection, bus: &str) -> Option<String> {
+         let proxy = conn.with_proxy(DBUS, "/org/freedesktop/DBus", CALL);
+-        let (owner,): (String,) = proxy.method_call(DBUS, "GetNameOwner", (BUS,)).ok()?;
++        let (owner,): (String,) = proxy.method_call(DBUS, "GetNameOwner", (bus,)).ok()?;
+         Some(owner)
+     }
+ 
+-    /// Whom Spotify is, and all of its Player properties.
+-    fn read_everything(conn: &Connection, out: &Out, generation: u64) {
+-        let owner = name_owner(conn);
+-        let props = owner.as_ref().and_then(|_| {
+-            let proxy = conn.with_proxy(BUS, PATH, CALL);
+-            proxy.get_all(PLAYER).ok().map(|m| props_of(&m))
+-        });
+-        let state = {
++    fn selected_owner(conn: &Connection) -> Option<(&'static str, String)> {
++        name_owner(conn, SPOTIFAST_BUS).map(|o| (SPOTIFAST_BUS, o))
++            .or_else(|| name_owner(conn, BUS).map(|o| (BUS, o)))
++    }
++
++    /// All reads and controls use the unique owner, so a replacement process
++    /// cannot receive a command intended for an earlier instance of the player.
++    fn read_everything(conn: &Connection, out: &Out, generation: u64) -> Option<PlayerState> {
++        let revision = {
+             let mut s = SHARED.lock().unwrap();
+-            if !(s.active && s.generation == generation) {
+-                return;
+-            }
+-            s.owner = owner.clone();
+-            s.state.running = owner.is_some();
+-            s.state.installed = owner.is_some() || installed();
+-            let now = now_ms();
+-            match props {
+-                Some(props) => {
+-                    s.state.apply(&props, now);
+-                }
+-                None => s.state.clear(now),
+-            }
+-            s.state.clone()
++            if !s.active || s.generation != generation { return None; }
++            s.revision += 1;
++            s.revision
+         };
+-        out.state(&state);
++        let selected = selected_owner(conn);
++        let bus = selected.as_ref().map(|(bus, _)| *bus).unwrap_or(BUS);
++        let owner = selected.map(|(_, owner)| owner);
++        let props = owner.as_ref().and_then(|owner| {
++            conn.with_proxy(owner.as_str(), PATH, CALL).get_all(PLAYER).ok().map(|m| props_of(&m))
++        });
++        let mut s = SHARED.lock().unwrap();
++        if !s.active || s.generation != generation { return None; }
++        if s.revision != revision { return Some(s.state.clone()); }
++        if s.owner != owner || s.bus != bus {
++            s.state = PlayerState::default();
++            crate::log::line(format!("spotify: selected {}", if owner.is_some() { bus } else { "none" }));
++        }
++        s.owner = owner;
++        s.bus = bus;
++        s.state.running = s.owner.is_some();
++        s.state.installed = s.state.running || installed();
++        s.state.player_name = if (s.state.running && bus == SPOTIFAST_BUS) ||
++            (!s.state.running && launcher_for(Some(SPOTIFAST_BUS)).is_some()) {
++            "Spotifast / EVA-01".into()
++        } else { "Spotify".into() };
++        match props {
++            Some(props) => { s.state.apply(&props, now_ms()); }
++            None => s.state.clear(now_ms()),
++        }
++        out.state(&s.state);
++        Some(s.state.clone())
+     }
+ 
+     /// Runs `f` on the control connection, made (again) when needed.
+@@ -865,54 +891,23 @@ mod linux {
+     pub fn refresh(out: &Out) -> Option<PlayerState> {
+         let generation = {
+             let s = SHARED.lock().unwrap();
+-            if !s.active {
+-                return None;
+-            }
++            if !s.active { return None; }
+             s.generation
+         };
+-        let read = with_control(|c| {
+-            let owner = name_owner(c);
+-            let props = match owner {
+-                Some(_) => Some(props_of(&c.with_proxy(BUS, PATH, CALL).get_all(PLAYER)?)),
+-                None => None,
+-            };
+-            Ok((owner, props))
+-        });
+-        let state = {
+-            let mut s = SHARED.lock().unwrap();
+-            if !(s.active && s.generation == generation) {
+-                return None;
+-            }
+-            if let Some((owner, props)) = read {
+-                s.owner = owner.clone();
+-                s.state.running = owner.is_some();
+-                s.state.installed = owner.is_some() || installed();
+-                let now = now_ms();
+-                match props {
+-                    Some(props) => {
+-                        s.state.apply(&props, now);
+-                    }
+-                    None => s.state.clear(now),
+-                }
+-            }
+-            s.state.clone()
+-        };
+-        out.state(&state);
+-        Some(state)
++        with_control(|c| Ok(read_everything(c, out, generation))).flatten()
+     }
+ 
+     pub fn control(out: &Out, action: &str, value: Option<f64>) -> bool {
+-        let (active, state) = {
++        let (owner, generation, state) = {
+             let s = SHARED.lock().unwrap();
+-            (s.active && s.owner.is_some(), s.state.clone())
++            if !s.active { return false; }
++            (s.owner.clone(), s.generation, s.state.clone())
+         };
+-        if !active {
+-            return false;
+-        }
++        let Some(owner) = owner else { return false; };
+         let v = value.unwrap_or(0.0);
+         let now = now_ms();
+         let done = with_control(|c| {
+-            let p = c.with_proxy(BUS, PATH, CALL);
++            let p = c.with_proxy(owner.as_str(), PATH, CALL);
+             match action {
+                 "playPause" => p.method_call(PLAYER, "PlayPause", ()),
+                 "next" => p.method_call(PLAYER, "Next", ()),
+@@ -954,10 +949,12 @@ mod linux {
+         if let Some(prop) = optimistic {
+             let state = {
+                 let mut s = SHARED.lock().unwrap();
++                if !s.active || s.generation != generation || s.owner.as_deref() != Some(owner.as_str()) { return true; }
+                 s.state.apply(&[prop], now_ms());
++                out.state(&s.state);
+                 s.state.clone()
+             };
+-            out.state(&state);
++            let _ = state;
+         }
+         true
+     }
+@@ -965,7 +962,21 @@ mod linux {
+     // ── Launching ─────────────────────────────────────────────────────────────
+ 
+     /// How to start Spotify: the `spotify` on PATH, else the Flatpak, else the Snap.
+-    fn launcher() -> Option<Vec<std::ffi::OsString>> {
++    fn user_launcher(stem: &str) -> Option<PathBuf> {
++        use std::os::unix::fs::PermissionsExt;
++        crate::platform::find_on_path(stem).or_else(|| {
++            let path = crate::platform::home_dir().join(".local/bin").join(stem);
++            std::fs::metadata(&path).ok().filter(|m| m.is_file() && m.permissions().mode() & 0o111 != 0).map(|_| path)
++        })
++    }
++
++    fn launcher_for(selected: Option<&str>) -> Option<Vec<std::ffi::OsString>> {
++        if selected.is_none() || selected == Some(SPOTIFAST_BUS) {
++            for stem in ["eva-01-audio", "spotifast"] {
++                if let Some(bin) = user_launcher(stem) { return Some(vec![bin.into()]); }
++            }
++            if selected == Some(SPOTIFAST_BUS) { return None; }
++        }
+         if let Some(bin) = crate::platform::find_on_path("spotify") {
+             return Some(vec![bin.into()]);
+         }
+@@ -987,28 +998,23 @@ mod linux {
+     }
+ 
+     pub fn installed() -> bool {
+-        launcher().is_some()
++        launcher_for(None).is_some()
+     }
+ 
+     pub fn open() -> bool {
+-        // Running: bring it forward when it says it can.
+-        let raised = with_control(|c| {
+-            if name_owner(c).is_none() {
+-                return Ok(false);
+-            }
+-            let p = c.with_proxy(BUS, PATH, CALL);
+-            let can: bool = p.get(ROOT, "CanRaise").unwrap_or(false);
+-            if can {
+-                p.method_call::<(), _, _, _>(ROOT, "Raise", ())?;
+-            }
+-            Ok(can)
+-        })
+-        .unwrap_or(false);
+-        if raised {
+-            return true;
+-        }
+-        // Otherwise start it; a second `spotify` brings the running one forward.
+-        if let Some(argv) = launcher() {
++        // Resolve both players even when the pill is disabled. Bring the
++        // preferred running owner forward; don't launch the other player's app.
++        let selected = with_control(|c| Ok(selected_owner(c))).flatten();
++        let raised = selected.as_ref().is_some_and(|(_, owner)| {
++            with_control(|c| {
++                let p = c.with_proxy(owner.as_str(), PATH, CALL);
++                let can: bool = p.get(ROOT, "CanRaise").unwrap_or(false);
++                if can { p.method_call::<(), _, _, _>(ROOT, "Raise", ())?; }
++                Ok(can)
++            }).unwrap_or(false)
++        });
++        if raised { return true; }
++        if let Some(argv) = launcher_for(selected.as_ref().map(|(bus, _)| *bus)) {
+             use std::os::unix::process::CommandExt;
+             let mut cmd = Command::new(&argv[0]);
+             cmd.args(&argv[1..])
+@@ -1029,7 +1035,7 @@ mod linux {
+                 Err(err) => crate::log::line(format!("spotify: could not start it: {err}")),
+             }
+         }
+-        crate::platform::open_url(DOWNLOAD_URL);
++        if selected.is_none() { crate::platform::open_url(DOWNLOAD_URL); }
+         false
+     }
+ 
+@@ -1333,6 +1339,302 @@ mod linux {
+             conn.channel().flush();
+         }
+ 
++        // A fixed Spotify-only bus destination would leave this on the first
++        // player's track; accepting any sender would let the stale event through.
++        #[test]
++        #[ignore = "needs a private dbus-run-session; never use the user's bus"]
++        fn spotifast_is_preferred_and_controls_follow_owners_on_a_private_bus() {
++            let mut spotify = TestPlayer::start("org.mpris.MediaPlayer2.spotify", "spotify1", "Spotify Song");
++            let (tx, rx) = std::sync::mpsc::channel();
++            let out = Out::Test(tx);
++            set_active(out.clone(), true);
++            struct ActiveGuard(Out);
++            impl Drop for ActiveGuard { fn drop(&mut self) { set_active(self.0.clone(), false); let deadline=std::time::Instant::now()+Duration::from_secs(3); while ALIVE.load(Ordering::SeqCst)>0 && std::time::Instant::now()<deadline { std::thread::sleep(Duration::from_millis(10)); } } }
++            let _active=ActiveGuard(out.clone());
++            let first = rx.recv_timeout(Duration::from_secs(3)).unwrap();
++            assert_eq!(first.track.unwrap().title, "Spotify Song");
++            // Owner changes publish asynchronously. A refresh superseded by the
++            // listener can return the previous state while that read completes.
++            let wait_for = |expected: Option<&str>| {
++                let deadline = std::time::Instant::now() + Duration::from_secs(3);
++                loop {
++                    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
++                    let state = rx.recv_timeout(remaining).expect("player state was not published before the deadline");
++                    let matches = match expected {
++                        Some(title) => state.track.as_ref().is_some_and(|track| track.title == title),
++                        None => !state.running,
++                    };
++                    if matches { break state; }
++                }
++            };
++            let mut spotifast = TestPlayer::start("org.mpris.MediaPlayer2.spotifast", "eva1", "EVA Song");
++            wait_for(Some("EVA Song"));
++            let state = refresh(&out).unwrap();
++            assert_eq!(state.track.as_ref().unwrap().title, "EVA Song", "Spotifast must take precedence over Spotify");
++            assert_eq!(state.track.as_ref().unwrap().id, "spotify:track:eva1");
++            assert_eq!(state.track.as_ref().unwrap().art_url.as_deref(), Some("https://i.scdn.co/image/eva1"));
++            assert_eq!(serde_json::to_value(&state).unwrap()["playerName"], "Spotifast / EVA-01");
++            assert!(control(&out, "playPause", None));
++            assert!(control(&out, "next", None));
++            assert!(control(&out, "previous", None));
++            assert!(control(&out, "seek", Some(60.0)));
++            assert!(control(&out, "shuffle", Some(1.0)));
++            assert!(control(&out, "repeat", Some(1.0)));
++            assert!(control(&out, "volume", Some(25.0)));
++            assert!(open(), "Raise must target Spotifast rather than start another player");
++            let eva_calls = spotifast.calls.lock().unwrap().clone();
++            for call in ["GetAll", "Get Position", "PlayPause", "Next", "Previous", "SetPosition /org/mpris/MediaPlayer2/Track/eva1 60000000", "Set Shuffle", "Set LoopStatus", "Set Volume", "Get CanRaise", "Raise"] {
++                assert!(eva_calls.iter().any(|got| got == call), "missing Spotifast call: {call}, got {eva_calls:?}");
++            }
++            assert!(!spotify.calls.lock().unwrap().iter().any(|call| call == "PlayPause" || call == "Raise" || call.starts_with("Set")), "Spotify must receive no Spotifast controls");
++            // Drain legitimate updates, then have the unselected owner emit both
++            // a new track and a seek. Neither may alter the selected player's state.
++            std::thread::sleep(Duration::from_millis(100));
++            while rx.try_recv().is_ok() {}
++            spotify.send_stale();
++            assert!(rx.recv_timeout(Duration::from_millis(200)).is_err(), "unselected player's signal emitted state");
++            assert_eq!(SHARED.lock().unwrap().state.track.as_ref().unwrap().title, "EVA Song");
++            assert_ne!(SHARED.lock().unwrap().state.position, 99.0);
++            // Spotifast disappears: still-running Spotify is selected again.
++            spotifast.stop();
++            let fallback = wait_for(Some("Spotify Song"));
++            assert!(fallback.running);
++            assert!(control(&out, "next", None));
++            assert!(spotify.calls.lock().unwrap().iter().any(|c| c == "Next"));
++            // A newly owned Spotifast is preferred again after Spotify alone.
++            let mut again = TestPlayer::start("org.mpris.MediaPlayer2.spotifast", "eva2", "EVA Again");
++            wait_for(Some("EVA Again"));
++            assert_eq!(refresh(&out).unwrap().track.unwrap().title, "EVA Again");
++            spotify.stop();
++            assert_eq!(refresh(&out).unwrap().track.unwrap().title, "EVA Again", "nonselected disappearance must not clear Spotifast");
++            again.stop();
++            wait_for(None);
++            assert!(!refresh(&out).unwrap().running);
++            assert!(!control(&out, "next", None));
++            set_active(out, false);
++        }
++
++        #[test]
++        fn an_unknown_owner_never_authorises_a_player_signal() {
++            SHARED.lock().unwrap().owner = None;
++            assert!(!from_owner(Some(":1.999")));
++            assert!(!from_owner(None));
++        }
++
++        // A launcher test runs actual harmless scripts, rather than checking
++        // that a string occurs in the implementation. Reverting its priority
++        // makes the marker read "spotify" instead of "eva-01-audio".
++        #[test]
++        #[ignore = "runs harmless launchers on a private bus with no players"]
++        fn opening_without_a_player_prefers_the_eva_launcher_then_spotifast() {
++            use std::os::unix::fs::PermissionsExt;
++            let dir = std::env::temp_dir().join(format!("coucou-launch-test-{}", std::process::id()));
++            std::fs::create_dir_all(&dir).unwrap();
++            struct TempCleanup(PathBuf);
++            impl Drop for TempCleanup { fn drop(&mut self) { let _=std::fs::remove_dir_all(&self.0); } }
++            let _cleanup=TempCleanup(dir.clone());
++            let marker = dir.join("launched");
++            for name in ["eva-01-audio", "spotifast", "spotify"] {
++                let p = dir.join(name);
++                std::fs::write(&p, format!("#!/bin/sh\nprintf '%s' '{name}' > '{}'\n", marker.display())).unwrap();
++                std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
++            }
++            let saved_path = std::env::var_os("PATH");
++            struct PathGuard(Option<std::ffi::OsString>);
++            impl Drop for PathGuard { fn drop(&mut self) { match &self.0 { Some(p) => std::env::set_var("PATH", p), None => std::env::remove_var("PATH") } } }
++            let _guard = PathGuard(saved_path);
++            std::env::set_var("PATH", &dir);
++            for expected in ["eva-01-audio", "spotifast", "spotify"] {
++                assert!(open());
++                let deadline = std::time::Instant::now() + Duration::from_secs(3);
++                while !marker.is_file() && std::time::Instant::now() < deadline { std::thread::sleep(Duration::from_millis(10)); }
++                assert_eq!(std::fs::read_to_string(&marker).unwrap(), expected);
++                std::fs::remove_file(&marker).unwrap();
++                std::fs::remove_file(dir.join(expected)).unwrap();
++            }
++            std::fs::remove_dir(&dir).unwrap();
++        }
++
++        #[test]
++        #[ignore = "uses the disposable container's user bin and private bus"]
++        fn desktop_launch_finds_eva_in_user_bin_even_without_it_on_path() {
++            use std::os::unix::fs::PermissionsExt;
++            // Run only inside the disposable test container: its home is not the
++            // user's. No HOME or desktop environment setting is changed.
++            let user_bin = crate::platform::home_dir().join(".local/bin");
++            std::fs::create_dir_all(&user_bin).unwrap();
++            let eva = user_bin.join("eva-01-audio");
++            assert!(!eva.exists(), "requires a disposable home without an existing launcher");
++            let dir = std::env::temp_dir().join(format!("coucou-desktop-launch-{}",std::process::id()));
++            std::fs::create_dir_all(&dir).unwrap();
++            let marker = dir.join("launched");
++            for (path, name) in [(&eva,"eva-01-audio"),( &dir.join("spotify"),"spotify")] {
++                std::fs::write(path,format!("#!/bin/sh\nprintf '%s' '{name}' > '{}'\n",marker.display())).unwrap();
++                std::fs::set_permissions(path,std::fs::Permissions::from_mode(0o755)).unwrap();
++            }
++            struct Cleanup { path: Option<std::ffi::OsString>, eva: PathBuf, dir: PathBuf }
++            impl Drop for Cleanup { fn drop(&mut self) { match &self.path {Some(p)=>std::env::set_var("PATH",p),None=>std::env::remove_var("PATH")}; let _=std::fs::remove_file(&self.eva); let _=std::fs::remove_dir_all(&self.dir); } }
++            let _cleanup=Cleanup {path:std::env::var_os("PATH"),eva,dir:dir.clone()};
++            std::env::set_var("PATH",&dir);
++            assert!(open());
++            let deadline=std::time::Instant::now()+Duration::from_secs(3);
++            while !marker.is_file() && std::time::Instant::now()<deadline {std::thread::sleep(Duration::from_millis(10));}
++            assert_eq!(std::fs::read_to_string(marker).unwrap(),"eva-01-audio");
++        }
++
++        // An older GetAll completing first must not invalidate a later fallback
++        // read: the Spotifast owner has already gone when that read begins.
++        #[test]
++        #[ignore = "requires a private bus; deterministic GetAll response barriers"]
++        fn a_fallback_read_started_after_spotifast_disappears_wins_concurrent_getall() {
++            let _spotify = TestPlayer::start("org.mpris.MediaPlayer2.spotify", "fallback", "Spotify Fallback");
++            let spotifast = TestPlayer::start("org.mpris.MediaPlayer2.spotifast", "departed", "Departed EVA");
++            let (tx, _rx) = std::sync::mpsc::channel();
++            let out = Out::Test(tx);
++            let generation = {
++                let mut s = SHARED.lock().unwrap();
++                assert!(!s.active, "requires no listener from another test");
++                s.active = true;
++                s.generation += 1;
++                s.owner = None;
++                s.bus = BUS;
++                s.revision += 1;
++                s.state = PlayerState::default();
++                s.generation
++            };
++            struct ActiveCleanup(Out);
++            impl Drop for ActiveCleanup { fn drop(&mut self) { set_active(self.0.clone(), false); } }
++            let _cleanup = ActiveCleanup(out.clone());
++            let (a_entered, a_release) = spotifast.hold_next_get_all(true);
++            let a_out = out.clone();
++            let a = std::thread::spawn(move || {
++                let conn = Connection::new_session().unwrap();
++                read_everything(&conn, &a_out, generation)
++            });
++            // The server has released Spotifast's well-known name, while A's
++            // old GetAll response is held back on its still-connected unique name.
++            a_entered.recv_timeout(Duration::from_secs(3)).unwrap();
++            let (b_entered, b_release) = _spotify.hold_next_get_all(false);
++            let b_out = out.clone();
++            let b = std::thread::spawn(move || {
++                let conn = Connection::new_session().unwrap();
++                read_everything(&conn, &b_out, generation)
++            });
++            b_entered.recv_timeout(Duration::from_secs(3)).unwrap();
++            // Force the older completion to precede the later fallback completion.
++            a_release.send(()).unwrap();
++            a.join().unwrap();
++            b_release.send(()).unwrap();
++            b.join().unwrap();
++            let (state, bus) = {
++                let s = SHARED.lock().unwrap();
++                (s.state.clone(), s.bus)
++            };
++            assert_eq!(state.track.as_ref().unwrap().title, "Spotify Fallback");
++            assert_eq!(bus, "org.mpris.MediaPlayer2.spotify");
++            assert!(state.running);
++        }
++
++        struct GetAllBarrier { entered: std::sync::mpsc::Sender<()>, release: std::sync::mpsc::Receiver<()>, drop_name: bool }
++        enum TestSignal { Stale(std::sync::mpsc::Sender<()>), HoldGetAll(GetAllBarrier, std::sync::mpsc::Sender<()>), Stop }
++        struct TestPlayer {
++            calls: Arc<Mutex<Vec<String>>>,
++            tx: std::sync::mpsc::Sender<TestSignal>,
++            thread: Option<std::thread::JoinHandle<()>>,
++        }
++        impl TestPlayer {
++            fn start(bus: &'static str, id: &'static str, title: &'static str) -> Self {
++                let calls = Arc::new(Mutex::new(Vec::new()));
++                let (tx, rx) = std::sync::mpsc::channel();
++                let (ready_tx, ready_rx) = std::sync::mpsc::channel();
++                let recorded = calls.clone();
++                let thread = std::thread::spawn(move || {
++                    let conn = Connection::new_session().unwrap();
++                    conn.request_name(bus, false, true, true).unwrap();
++                    ready_tx.send(()).unwrap();
++                    let mut playing = true;
++                    let mut get_all_barrier: Option<GetAllBarrier> = None;
++                    let player = |playing: bool| {
++                        let mut meta: PropMap = HashMap::new();
++                        meta.insert("mpris:trackid".into(), var(dbus::Path::new(format!("/org/mpris/MediaPlayer2/Track/{id}")).unwrap()));
++                        meta.insert("mpris:length".into(), var(180_000_000i64));
++                        meta.insert("xesam:url".into(), var(format!("spotify:track:{id}")));
++                        meta.insert("mpris:artUrl".into(), var(format!("https://i.scdn.co/image/{id}")));
++                        meta.insert("xesam:title".into(), var(title.to_string()));
++                        meta.insert("xesam:artist".into(), var(vec!["EVA Artist".to_string()]));
++                        meta.insert("xesam:album".into(), var("EVA Album".to_string()));
++                        let mut props: PropMap = HashMap::new();
++                        props.insert("Metadata".into(), var(meta));
++                        props.insert("PlaybackStatus".into(), var(if playing { "Playing" } else { "Paused" }.to_string()));
++                        props.insert("Position".into(), var(31_000_000i64));
++                        props.insert("Volume".into(), var(0.8f64));
++                        props
++                    };
++                    loop {
++                        match rx.try_recv() {
++                            Ok(TestSignal::Stop) => break,
++                            Ok(TestSignal::HoldGetAll(barrier, ack)) => { get_all_barrier = Some(barrier); ack.send(()).unwrap(); },
++                            Ok(TestSignal::Stale(ack)) => {
++                                let mut changed: PropMap = HashMap::new();
++                                changed.insert("Metadata".into(), var({ let mut p: PropMap = HashMap::new(); p.insert("xesam:title".into(), var("Stale Song".to_string())); p.insert("mpris:trackid".into(), var(dbus::Path::new("/stale").unwrap())); p }));
++                                conn.channel().send(Message::new_signal(PATH, PROPERTIES, "PropertiesChanged").unwrap().append3(PLAYER, changed, Vec::<String>::new())).unwrap();
++                                conn.channel().send(Message::new_signal(PATH, PLAYER, "Seeked").unwrap().append1(99_000_000i64)).unwrap();
++                                conn.channel().flush(); ack.send(()).unwrap();
++                            }
++                            _ => {}
++                        }
++                        let Ok(Some(msg)) = conn.channel().blocking_pop_message(Duration::from_millis(20)) else { continue };
++                        if msg.msg_type() != MessageType::MethodCall { continue }
++                        let member = msg.member().unwrap().to_string();
++                        let record = match member.as_str() {
++                            "Get" | "Set" => { let (_, name): (String, String) = msg.read2().unwrap(); format!("{member} {name}") },
++                            "SetPosition" => { let (p,n): (dbus::Path,i64)=msg.read2().unwrap(); format!("SetPosition {p} {n}") },
++                            _ => member.clone(),
++                        };
++                        recorded.lock().unwrap().push(record);
++                        let reply = match member.as_str() {
++                            "GetAll" => {
++                                let props = player(playing);
++                                if let Some(barrier) = get_all_barrier.take() {
++                                    if barrier.drop_name { conn.release_name(bus).unwrap(); conn.channel().flush(); }
++                                    barrier.entered.send(()).unwrap();
++                                    barrier.release.recv_timeout(Duration::from_secs(5)).unwrap();
++                                }
++                                msg.method_return().append1(props)
++                            },
++                            "Get" => {
++                                let (_, name): (String, String)=msg.read2().unwrap();
++                                if name=="CanRaise" { msg.method_return().append1(var(true)) }
++                                else { msg.method_return().append1(var(value_box(&player(playing)[&name].0))) }
++                            },
++                            "PlayPause" => {
++                                playing=!playing;
++                                let mut changed: PropMap=HashMap::new(); changed.insert("PlaybackStatus".into(),var(if playing {"Playing"} else {"Paused"}.to_string()));
++                                conn.channel().send(Message::new_signal(PATH, PROPERTIES, "PropertiesChanged").unwrap().append3(PLAYER,changed,Vec::<String>::new())).unwrap();
++                                msg.method_return()
++                            },
++                            _ => msg.method_return(),
++                        };
++                        conn.channel().send(reply).unwrap(); conn.channel().flush();
++                    }
++                    conn.release_name(bus).unwrap(); conn.channel().flush();
++                });
++                ready_rx.recv_timeout(Duration::from_secs(3)).unwrap();
++                Self {calls, tx, thread: Some(thread)}
++            }
++            fn hold_next_get_all(&self, drop_name: bool) -> (std::sync::mpsc::Receiver<()>, std::sync::mpsc::Sender<()>) {
++                let (entered, observed) = std::sync::mpsc::channel();
++                let (release, released) = std::sync::mpsc::channel();
++                let (ack, ready) = std::sync::mpsc::channel();
++                self.tx.send(TestSignal::HoldGetAll(GetAllBarrier { entered, release: released, drop_name }, ack)).unwrap();
++                ready.recv_timeout(Duration::from_secs(3)).unwrap();
++                (observed, release)
++            }
++            fn send_stale(&self) { let(tx,rx)=std::sync::mpsc::channel(); self.tx.send(TestSignal::Stale(tx)).unwrap(); rx.recv_timeout(Duration::from_secs(3)).unwrap(); }
++            fn stop(&mut self) { if let Some(t)=self.thread.take() { let _=self.tx.send(TestSignal::Stop); t.join().unwrap(); } }
++        }
++        impl Drop for TestPlayer { fn drop(&mut self) { self.stop(); } }
++
+         fn value_box(v: &Box<dyn RefArg>) -> Box<dyn RefArg> {
+             v.box_clone()
+         }
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index b9d01d4..a932b5e 100644
+index b9d01d4..51a489d 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -456,7 +1175,7 @@ index b9d01d4..a932b5e 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.1",
++  "version": "0.5.0-sendoa.2",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -511,11 +1230,24 @@ index 866f8f1..e70a2a8 100644
  export function readActivity(data: Record<string, unknown>): GitHubActivity | null {
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
+diff --git a/windows/src/core/spotify.ts b/windows/src/core/spotify.ts
+index 47d7c20..95b8331 100644
+--- a/windows/src/core/spotify.ts
++++ b/windows/src/core/spotify.ts
+@@ -21,6 +21,8 @@ export interface SpotifyTrack {
+ }
+ 
+ export interface SpotifyState {
++  /** Selected Linux player; absent in older reports. */
++  playerName?: string;
+   /** Spotify is running. */
+   running: boolean;
+   /** There is a Spotify to launch. */
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 2035662..0c530b1 100644
+index 2035662..a6d8482 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
-@@ -4394,6 +4394,116 @@
+@@ -4394,6 +4394,138 @@
     "pt-BR": "O Coucou não conseguiu responder: verifique sua chave do Claude em Notch → Chat.",
     "ru": "Coucou не смог ответить: проверьте ключ Claude в Notch → Чат.",
     "id": "Coucou tidak bisa menjawab: periksa kunci Claude-mu di Notch → Obrolan."
@@ -629,6 +1361,28 @@ index 2035662..0c530b1 100644
 +   "pt-BR": "Revisões",
 +   "ru": "Проверки",
 +   "id": "Ulasan"
++  },
++  "Open {player}": {
++   "zh-Hans": "打开 {player}",
++   "hi": "{player} खोलें",
++   "es": "Abrir {player}",
++   "ar": "فتح {player}",
++   "fr": "Ouvrir {player}",
++   "bn": "{player} খুলুন",
++   "pt-BR": "Abrir o {player}",
++   "ru": "Открыть {player}",
++   "id": "Buka {player}"
++  },
++  "{0} — open {player}": {
++   "zh-Hans": "{0} — 打开 {player}",
++   "hi": "{0} — {player} खोलें",
++   "es": "{0} — abrir {player}",
++   "ar": "{0} — فتح {player}",
++   "fr": "{0} — ouvrir {player}",
++   "bn": "{0} — {player} খুলুন",
++   "pt-BR": "{0} — abrir o {player}",
++   "ru": "{0} — открыть {player}",
++   "id": "{0} — buka {player}"
    }
   }
  }
@@ -843,6 +1597,57 @@ index 4f448b5..4446d00 100644
      }
    }
  
+diff --git a/windows/src/views/spotify.ts b/windows/src/views/spotify.ts
+index 27fc2e5..9eaa3bf 100644
+--- a/windows/src/views/spotify.ts
++++ b/windows/src/views/spotify.ts
+@@ -127,7 +127,7 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
+   const sync = () => {
+     const s = Spotify.state;
+     const current = State.tasks.find((x) => x.id === task.id);
+-    const name = current?.name ?? task.name;
++    const name = (s.track ? undefined : s.playerName) ?? current?.name ?? task.name;
+     if (label.textContent !== name) label.textContent = name;
+     const show = hovered && s.track != null;
+     pill.classList.toggle("controls", show);
+@@ -313,8 +313,9 @@ export function buildSpotifyCard(): SpotifyCardHost {
+   const idleAction = h("button", { class: "link-btn", style: `color:${green}d9` });
+   idleAction.addEventListener("click", () => void Bridge.spotifyOpen());
+   const idleSub = h("span");
++  const idleName = h("b", { text: "Spotify" });
+   const idleEl = h("div", { class: "int-card" },
+-    h("div", { class: "int-head" }, dot(green, 7), h("b", { text: "Spotify" }), idleSub),
++    h("div", { class: "int-head" }, dot(green, 7), idleName, idleSub),
+     h("div", { class: "int-status" }, idleDot, idleText),
+     h("div", { class: "int-actions" }, idleAction),
+   );
+@@ -366,7 +367,10 @@ export function buildSpotifyCard(): SpotifyCardHost {
+     } else if (isAd(track)) {
+       title.textContent = t("Advertisement");
+     }
+-    art.title = track.album ? t("{0} — open Spotify", { 0: track.album }) : t("Open Spotify");
++    const player = s.playerName ?? "Spotify";
++    art.title = player === "Spotify"
++      ? (track.album ? t("{0} — open Spotify", { 0: track.album }) : t("Open Spotify"))
++      : (track.album ? t("{0} — open {player}", { 0: track.album, player }) : t("Open {player}", { player }));
+     const cover = currentArtwork(s);
+     if (cover) {
+       if (artImg.getAttribute("src") !== cover) artImg.setAttribute("src", cover);
+@@ -406,9 +410,13 @@ export function buildSpotifyCard(): SpotifyCardHost {
+ 
+   function syncIdle() {
+     const installed = Spotify.state.installed || Spotify.state.running;
++    const player = Spotify.state.playerName ?? "Spotify";
++    idleName.textContent = player;
+     idleDot.style.background = installed ? "#22C55E" : "#F4505E";
+     idleText.textContent = installed ? t("Not playing") : t("Spotify not installed");
+-    idleAction.textContent = installed ? t("Open Spotify") : t("Get Spotify");
++    idleAction.textContent = installed
++      ? (player === "Spotify" ? t("Open Spotify") : t("Open {player}", { player }))
++      : t("Get Spotify");
+     idleSub.textContent = t(pillDefinition(SPOTIFY_ID)?.subtitle ?? N_("Integration"));
+   }
+ 
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
 index 5f866dd..b54edb3 100644
 --- a/windows/src/views/views.ts
@@ -958,3 +1763,42 @@ index 6e965ef..89bd089 100644
    assert.equal(target(undefined, undefined), "Tool");
  });
  
+diff --git a/windows/tests/spotify.test.mjs b/windows/tests/spotify.test.mjs
+index 36cd5d4..5cc17f8 100644
+--- a/windows/tests/spotify.test.mjs
++++ b/windows/tests/spotify.test.mjs
+@@ -302,3 +302,34 @@ test("the pill shows play/pause and next on hover, only with a track", () => {
+   pill.el.fire("mouseleave");
+   assert.ok(!pill.el.classList.contains("controls"));
+ });
++
++
++// A stale Spotify-only label would misidentify the selected player.
++test("the selected Spotifast player labels the pill and the idle card", () => {
++  Spotify.state = { ...IDLE_SPOTIFY, running: true, installed: true, playerName: "Spotifast / EVA-01" };
++  const card = buildSpotifyCard(); card.sync();
++  assert.match(card.el.textContent, /Spotifast \/ EVA-01/);
++  assert.ok(!card.el.textContent.includes("Open Spotify"));
++  const pill = buildSpotifyPill(spotifyTask(), () => {}); pill.sync();
++  assert.match(pill.el.textContent, /Spotifast \/ EVA-01/);
++});
++
++test("Spotifast artwork opens the selected player without changing playback controls", () => {
++  Spotify.state = playing({ playerName: "Spotifast / EVA-01" });
++  const card = buildSpotifyCard(); card.sync();
++  assert.match(card.el.querySelector("np-art").title, /Spotifast \/ EVA-01/);
++  const before = sent("spotify_open").length;
++  card.el.querySelector("np-art").fire("click");
++  assert.equal(sent("spotify_open").length, before + 1);
++});
++
++
++test("a player name does not replace the rendered track title or advertisement", () => {
++  const pill = buildSpotifyPill(spotifyTask(), () => {});
++  emit("spotify", playing({ playerName: "Spotifast / EVA-01" }));
++  pill.sync();
++  assert.equal(pill.el.querySelector("lbl").textContent, "Get Lucky");
++  emit("spotify", playing({ playerName: "Spotifast / EVA-01", track: track({ id: "spotify:ad:1", title: "" }) }));
++  pill.sync();
++  assert.equal(pill.el.querySelector("lbl").textContent, "Advertisement");
++});
