@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.5.0-sendoa.2 — 2026-10-16
+
+- Integración Spotifast/EVA-01 separada de la actualización principal: detección y preferencia MPRIS, reconexión y filtrado de señales por propietario, controles y lanzadores compatibles con Spotify.
+- Reconocimiento de URI Spotify en los metadatos de Spotifast y textos de reposo en los nueve idiomas.
+- Se conservan los títulos de canciones y la identificación de anuncios cuando el backend proporciona el nombre del reproductor.
+- Regresiones de interfaz y pruebas D-Bus en una sesión privada del contenedor.
+
 ## 0.5.0-sendoa.1 — 2026-10-16
 
 - Actualización a Linux 0.5.0, commit oficial `841a81ce1d75b65882b30139e6b716d0837dce30`, con fuente y parche fijados por SHA-256.

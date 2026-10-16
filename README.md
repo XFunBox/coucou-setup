@@ -1,6 +1,6 @@
 # Coucou con Codex, GitHub y Spotify
 
-Setup de **Coucou 0.5.0-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.0-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
@@ -8,7 +8,7 @@ Incluye:
 - GitHub: repositorios propios, últimos commits y pipelines de Actions en ejecución; enlaces a cada elemento y textos en español.
 - Codex como agente principal, plan y límites, diez hooks y solicitudes de aprobación desde la isla, con respuesta explícita del usuario. Las herramientas MCP muestran sus parámetros cuando hace falta.
 - Enlace opcional con Coucou para Android desde Settings → Android phone: desactivado por defecto, sin servidor escuchando hasta activarlo. Emparejamiento QR con certificado fijado, controles separados para detalles, preguntas, chat, diffs, uso y servicios; «Pair again» desconecta los móviles anteriores. El APK se obtiene o compila por separado y no se instala con este setup.
-- Spotify mediante el reproductor local MPRIS; muñeco de escritorio desactivado.
+- Spotify o Spotifast/EVA-01 mediante MPRIS: se prefiere Spotifast si ambos están abiertos, los controles siguen al propietario activo y se reconoce el lanzador `eva-01-audio`. Muñeco de escritorio desactivado.
 - Inicio automático y acceso del menú apuntando al **binario personalizado**, con copias previas y restauración.
 
 ## Clonar e instalar
@@ -50,7 +50,7 @@ Las preferencias se preparan automáticamente; las cuentas se autentican en cada
 2. Revisa y autoriza los hooks de Coucou desde `/hooks`. No se copia la confianza de otro equipo. Abre un chat nuevo para comprobar los eventos.
 3. Selecciona **Pedir aprobación / Ask for approval** en Codex para recibir las solicitudes que requieran tu decisión. En Coucou puedes pulsar **Permitir** o rechazar. La tarjeta no aprueba automáticamente ni todas las herramientas requieren aprobación. La prueba realizada fue controlada: el clic humano devolvió `allow` y el comando mostrado no se ejecutó.
 4. En Coucou → Settings → Integrations → GitHub, introduce un token granular con acceso a tus repositorios y permisos **de lectura**: Contents, Actions, Commit statuses, Pull requests y Metadata. Estos permisos no se conceden desde el instalador. El token se guarda en el llavero del equipo.
-5. Abre Spotify para que la tarjeta detecte el reproductor.
+5. Abre Spotifast/EVA-01 Audio o Spotify para que la tarjeta detecte el reproductor. La tarjeta conserva el título de la canción y la etiqueta de anuncio; en reposo identifica el reproductor.
 
 GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de los diez repositorios con actividad más reciente y Actions `in_progress` de los repositorios listados no archivados. Los errores de acceso se indican como datos parciales. Se renueva cada cinco minutos sin ejecuciones activas y cada minuto con ejecuciones, adaptándose a cuentas grandes; abrir la sección y refrescar también permite actualizar.
 
@@ -77,7 +77,7 @@ La restauración recupera los archivos anteriores y elimina los que esa instalac
 
 ## Fuente y compilación
 
-`source-lock.json` fija el commit oficial, la suma del archivo fuente, la suma del parche y las versiones de las imágenes de Node/Rust. El Dockerfile instala las dependencias, ejecuta las regresiones y compila aplicación y relé. Los paquetes npm y la aplicación Rust usan los lockfiles del código fuente.
+`source-lock.json` fija el commit oficial, la suma del archivo fuente, la suma del parche y las versiones de las imágenes de Node/Rust. El Dockerfile instala las dependencias, ejecuta las regresiones y compila aplicación y relé. Las pruebas de integración MPRIS usan `dbus-run-session` dentro del contenedor, sin acceder al bus ni a los reproductores de tu sesión. Los paquetes npm y la aplicación Rust usan los lockfiles del código fuente.
 
 ```bash
 # Solo preparar la fuente verificada y aplicar el parche:

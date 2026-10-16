@@ -1,24 +1,33 @@
 # Verificación — 2026-10-16
 
-Actualización principal a **0.5.0-sendoa.1**, base oficial Linux 0.5.0 `841a81ce1d75b65882b30139e6b716d0837dce30`. La integración Spotifast se reserva para un commit posterior.
+Versión final **0.5.0-sendoa.2**, base oficial Linux 0.5.0 `841a81ce1d75b65882b30139e6b716d0837dce30`. Dos cambios separados: primero la actualización principal a 0.5.0-sendoa.1, después Spotifast/EVA-01.
 
 ## Fuente y compilación
 
-- Fuente, parche y versión fijados en `source-lock.json`; parche aplicado y reversión textual comprobada. Los paquetes externos de Cargo.lock conservan las versiones de upstream.
-- Docker completo con Node 22.23.3 y Rust 1.99: dependencias de audio incluidas, aplicación y relé release compilados. TypeScript y Vite correctos.
-- Node: **403/403**. GitHub Rust: **26/26**. Workspace Rust release: **481 de aplicación y 34 de relé**, sin fallos; seis pruebas upstream ignoradas que requieren modelos o un bus privado. Python instalador: **10/10**. Sintaxis Bash y `git diff --check` correctos.
-- SHA-256 de los dos binarios comprobados antes de instalar y después del arranque. `ldd` sin bibliotecas ausentes en este Ubuntu.
-- Se conservan autocierre, repositorios/commits/pipelines y aprobaciones Codex/MCP; traducciones propias fusionadas dentro de `strings`, manteniendo el catálogo nuevo. Revisión independiente y correcciones verificadas con la suite.
-- En Linux se prioriza el relé hermano del ejecutable personalizado sobre el recurso de un paquete oficial antiguo. En Windows se mantiene el orden anterior.
+- Fuente, parche y versión fijados en `source-lock.json`; aplicación y reversión textual del parche comprobadas. Los paquetes externos de Cargo.lock conservan las versiones upstream.
+- Compilación principal Docker completa con Node 22.23.3, Rust 1.99 y ALSA. Aplicación y relé release, TypeScript y Vite correctos.
+- Principal: **403 Node, 26 GitHub Rust, 481 aplicación Rust y 34 relé**, sin fallos; seis pruebas upstream ignoradas por necesitar modelos o bus privado. Instalador: **10 Python**; sintaxis Bash y `git diff --check` correctos.
+- Spotifast: **406 Node, 482 aplicación Rust y 34 relé**, sin fallos; 10 ignoradas en la pasada general. **Cinco pruebas MPRIS adicionales ejecutadas con éxito en un bus D-Bus privado**, incluidas las ignoradas que corresponden a Spotify/Spotifast. La prueba de reconexión se repitió además diez veces sin fallos. Se corrigió su sincronización para esperar los eventos asíncronos con un plazo máximo. Los modelos de voz y el portal de escritorio no se prueban aquí.
+- La segunda compilación reutiliza la imagen principal y sus cachés de dependencias; vuelve a ejecutar Node, Rust, MPRIS privado y Tauri con el código .2. El Dockerfile del repositorio conserva la receta completa desde las imágenes públicas. No se repitió una segunda compilación desde cero.
+- SHA-256 de aplicación/relé comprobados antes de cada instalación y después de cada arranque. `ldd` sin bibliotecas ausentes en este Ubuntu. Revisión independiente, hallazgos corregidos y regresiones ejecutadas.
 
-## Instalación real
+## Funciones conservadas e integración
 
-- Sustitución exclusiva de aplicación y dos copias del relé, con copia de seguridad previa. Reinicio de `app-Coucou@autostart.service`; servicio activo, log con versión nueva y overlay layer-shell.
-- Todos los valores existentes de ajustes conservados; hooks Codex y acceso del menú idénticos byte a byte. La migración upstream del inicio automático solo añade `--autostart` al mismo ejecutable. No se aplica el perfil base del instalador.
-- No se cambian credenciales, confianza de hooks, pantallas ni barra de tareas. La instalación oficial permanece.
+- Se mantienen autocierre, repositorios/commits/pipelines GitHub y aprobaciones Codex/MCP. Traducciones propias fusionadas dentro de `strings`, sin perder las nuevas entradas upstream.
+- En Linux el relé hermano del ejecutable personalizado tiene prioridad sobre el de un paquete oficial antiguo; en Windows se conserva el orden previo.
+- Spotifast tiene preferencia MPRIS si ambos clientes están abiertos; señales y controles siguen al propietario seleccionado. Pruebas de desaparición, reconexión, señales ajenas, lectura obsoleta y lanzadores EVA-01/Spotify realizadas en el contenedor.
+- Regresión de interfaz: el nombre Spotifast/EVA-01 identifica el reposo y el acceso al reproductor; las canciones y los anuncios conservan su título.
+
+## Instalación real y conservación
+
+- Instaladas y arrancadas ambas fases, sustituyendo solo la aplicación y las dos copias del relé. Copias previas y reversión preparadas. Servicio final `active/running`, versión nueva y overlay layer-shell en el registro.
+- Ajustes existentes conservados y hooks Codex/acceso del menú idénticos byte a byte en ambas fases. La migración upstream del autostart mantiene el ejecutable y añade `--autostart`. No se aplica el perfil base del instalador.
+- Sesión real: reproductor seleccionado `org.mpris.MediaPlayer2.spotifast`, confirmado en log `True`; metadatos disponibles `True`. Solo se consultan nombres y propiedades, sin guardar canciones ni enviar controles de reproducción.
+- Eventos de hooks posteriores al arranque observados: `True`.
+- No se cambian credenciales, confianza de hooks, Spotifast, pantallas ni barra de tareas. El paquete oficial permanece instalado.
 
 ## Límites
 
-No se verificaron visualmente la ventana nativa ni una nueva aprobación humana. No se descargaron modelos ni probaron micrófono, dictado, notas de llamadas, emparejamiento Android o una instalación apt en un equipo limpio. Las funciones de voz y el enlace Android conservan sus valores existentes; el setup no los activa automáticamente. Spotify mantiene aquí la implementación previa; Spotifast se prueba por separado.
+No se verificaron visualmente la ventana nativa, una nueva aprobación humana ni clics de control sobre el reproductor real. Los controles se prueban con servidores MPRIS simulados en bus privado. No se descargaron modelos ni se probaron micrófono/dictado/notas de llamadas, emparejamiento Android o instalación apt en un equipo limpio. Voz y enlace Android conservan sus ajustes existentes; el setup no los activa automáticamente.
 
-Los resultados y la ruta de reversión de este equipo se registran en la nota de contexto Coucou. Los binarios y las copias locales se excluyen de Git.
+Resultados y rutas de reversión del equipo registrados en las notas de contexto Coucou. Los binarios y copias locales están excluidos de Git.
