@@ -1,5 +1,13 @@
 # Cambios
 
+## 0.5.0-sendoa.1 — 2026-10-16
+
+- Actualización a Linux 0.5.0, commit oficial `841a81ce1d75b65882b30139e6b716d0837dce30`, con fuente y parche fijados por SHA-256.
+- Se conservan autocierre, panel GitHub y aprobaciones Codex/MCP.
+- Se incorporan los cambios oficiales de Flow, notas de voz y activación por voz; no se activan automáticamente.
+- Compilación con las nuevas dependencias de audio y suite Node completa.
+- En Linux, el relé junto al binario tiene prioridad sobre el de un paquete oficial antiguo.
+
 ## 0.4.0-sendoa.1 — 2026-10-14
 
 - Actualización al commit oficial Linux 0.4.0 `e1b2cfdfd684a312fc0d7db26be97d6269615a31`, con fuente y parche verificados por SHA-256.
