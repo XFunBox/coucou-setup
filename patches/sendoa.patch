@@ -1,67 +1,67 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index e58918b..30e8278 100644
+index b161fd0..b4e001c 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
-@@ -610,7 +610,7 @@ dependencies = [
+@@ -719,7 +719,7 @@ dependencies = [
  
  [[package]]
  name = "coucou"
--version = "0.4.0"
-+version = "0.4.0-sendoa.1"
+-version = "0.5.0"
++version = "0.5.0-sendoa.1"
  dependencies = [
-  "dbus",
-  "futures-util",
-@@ -642,7 +642,7 @@ dependencies = [
+  "arboard",
+  "cpal",
+@@ -754,7 +754,7 @@ dependencies = [
  
  [[package]]
  name = "coucou-hook"
--version = "0.4.0"
-+version = "0.4.0-sendoa.1"
+-version = "0.5.0"
++version = "0.5.0-sendoa.1"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index f76a8ba..d47ec38 100644
+index aa82ca8..49d7684 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
  resolver = "2"
  
  [workspace.package]
--version = "0.4.0"
-+version = "0.4.0-sendoa.1"
+-version = "0.5.0"
++version = "0.5.0-sendoa.1"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 5f391e3..4c8f7d8 100644
+index 1b260d3..98af0d5 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
--  "version": "0.4.0",
-+  "version": "0.4.0-sendoa.1",
+-  "version": "0.5.0",
++  "version": "0.5.0-sendoa.1",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
--      "version": "0.4.0",
-+      "version": "0.4.0-sendoa.1",
+-      "version": "0.5.0",
++      "version": "0.5.0-sendoa.1",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 1efd47d..66d2470 100644
+index 4f905eb..02e88e1 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,7 +1,7 @@
  {
    "name": "coucou-windows",
    "private": true,
--  "version": "0.4.0",
-+  "version": "0.4.0-sendoa.1",
+-  "version": "0.5.0",
++  "version": "0.5.0-sendoa.1",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -188,6 +188,22 @@ index f1b2907..a59485e 100644
      fn valid_pulse() -> Value {
          json!({
            "data": {
+diff --git a/windows/src-tauri/src/hooks.rs b/windows/src-tauri/src/hooks.rs
+index 36aa761..49603b5 100644
+--- a/windows/src-tauri/src/hooks.rs
++++ b/windows/src-tauri/src/hooks.rs
+@@ -365,6 +365,11 @@ pub fn ensure_hook_exe(app: &AppHandle) {
+         if let Some(parent) = exe.parent() {
+             // Installed build, then `tauri dev` (target/debug) next to the
+             // release hook the pre-build step produces.
++            // A standalone Linux update carries its matching relay beside it;
++            // an older system package must not overwrite it on startup.
++            #[cfg(unix)]
++            candidates.insert(0, parent.join(platform::HOOK_EXE));
++            #[cfg(windows)]
+             candidates.push(parent.join(platform::HOOK_EXE));
+             candidates.push(parent.join("../release").join(platform::HOOK_EXE));
+             // Belt and braces: where the old glob form used to land it.
 diff --git a/windows/src-tauri/src/integrations.rs b/windows/src-tauri/src/integrations.rs
 index 14969e4..ec537c0 100644
 --- a/windows/src-tauri/src/integrations.rs
@@ -432,15 +448,15 @@ index 14969e4..ec537c0 100644
      };
      if had_data {
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 39799eb..8752880 100644
+index b9d01d4..a932b5e 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
  {
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
--  "version": "0.4.0",
-+  "version": "0.4.0-sendoa.1",
+-  "version": "0.5.0",
++  "version": "0.5.0-sendoa.1",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -496,13 +512,13 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 9ba0b6a..cde30b6 100644
+index 2035662..0c530b1 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
-@@ -3899,6 +3899,116 @@
-    "pt-BR": "Este código também inclui a chave de acesso e a chave de ponta a ponta do relay {host}. «Parear de novo» cria uma chave e uma sala novas.",
-    "ru": "Этот код также содержит ключ доступа и сквозной ключ для ретранслятора {host}. «Сопрячь заново» создаёт новый ключ и новую комнату.",
-    "id": "Kode ini juga memuat kunci akses dan kunci ujung ke ujung untuk relay {host}. «Sandingkan ulang» membuat kunci dan ruang baru."
+@@ -4394,6 +4394,116 @@
+    "pt-BR": "O Coucou não conseguiu responder: verifique sua chave do Claude em Notch → Chat.",
+    "ru": "Coucou не смог ответить: проверьте ключ Claude в Notch → Чат.",
+    "id": "Coucou tidak bisa menjawab: periksa kunci Claude-mu di Notch → Obrolan."
 +  },
 +  "Latest commits": {
 +   "es": "Últimos commits",
@@ -632,7 +648,7 @@ index ad01493..9f69cca 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index 2ef6fb9..d1e5f9f 100644
+index bca15aa..65ebd85 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -427,6 +427,9 @@ export class Island {
@@ -800,7 +816,7 @@ index 86fba2f..f8be7d3 100644
 +      : h("div", { class: "int-card" }, backButton(sectionTitle(openSection), onBack), h("div", { class: "gh-empty", text: t("Check token permissions to load this section.") }));
  }
 diff --git a/windows/src/views/integrations.ts b/windows/src/views/integrations.ts
-index 2317d9c..c39c9f5 100644
+index 4f448b5..4446d00 100644
 --- a/windows/src/views/integrations.ts
 +++ b/windows/src/views/integrations.ts
 @@ -10,7 +10,7 @@ import { State, type AgentTask } from "../core/state";
@@ -828,7 +844,7 @@ index 2317d9c..c39c9f5 100644
    }
  
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index 9a40ae0..c30a079 100644
+index 5f866dd..b54edb3 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
 @@ -532,6 +532,7 @@ function buildApproval(actions: ViewActions): ViewHost {
@@ -915,7 +931,7 @@ index 0000000..b944148
 +serde = { version = "1", features = ["derive"] }
 +serde_json = { version = "1", features = ["preserve_order"] }
 diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
-index ce9f49d..46d1d4d 100644
+index 6e965ef..89bd089 100644
 --- a/windows/tests/hooks.test.mjs
 +++ b/windows/tests/hooks.test.mjs
 @@ -251,6 +251,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",

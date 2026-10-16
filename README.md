@@ -1,6 +1,6 @@
 # Coucou con Codex, GitHub y Spotify
 
-Setup de **Coucou 0.4.0-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.4.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.0-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
@@ -56,6 +56,8 @@ GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de l
 
 El chat propio de Coucou es independiente de los chats de Codex. El perfil base del setup usa OpenAI para ese chat y requiere su propia clave de API; iniciar sesión en Codex no configura esa clave. No se incluyen credenciales, sesiones, historial ni confianza de hooks.
 
+La base 0.5.0 incorpora el hub, dictado Flow y notas de voz. El setup no activa la escucha ni descarga modelos de voz automáticamente. Al arrancar, upstream migra el acceso de inicio de sesión para añadir `--autostart` y mantener oculto el hub al entrar.
+
 ## Copias y deshacer
 
 Antes de escribir, el setup guarda ajustes, hooks, accesos y los binarios anteriores en:
@@ -95,6 +97,6 @@ Procedencia:
 
 Resultados y límites de las pruebas: [VERIFICATION.md](VERIFICATION.md).
 
-- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/e1b2cfdfd684a312fc0d7db26be97d6269615a31).
+- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/841a81ce1d75b65882b30139e6b716d0837dce30).
 - [Codex CLI 0.159.2](https://github.com/openai/codex/releases/tag/rust-v0.159.2).
 - [Hooks de Codex](https://learn.chatgpt.com/docs/hooks).
