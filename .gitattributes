@@ -1,8 +1,2 @@
 # Los espacios en líneas de contexto forman parte del formato unified diff.
 *.patch -whitespace
-*.patch text eol=lf
-*.sh text eol=lf
-*.py text eol=lf
-*.json text eol=lf
-*.ps1 text eol=lf
-Dockerfile text eol=lf

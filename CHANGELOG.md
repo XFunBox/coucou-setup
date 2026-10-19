@@ -1,12 +1,5 @@
 # Cambios
 
-## 0.5.0-sendoa.3 — 2026-10-19
-
-- Setup nativo Windows con compilación verificada, configuración por usuario, hooks con rutas seguras y copias/restauración; conserva el flujo Linux.
-- Oficina opcional del Hub para sesiones y subagentes reales, con gráficos propios, detalles por sesión y acceso a preguntas de la isla.
-- Puente explícito de sesiones Codex App Server: preguntas de opciones, aprobaciones humanas de comandos/archivos y cola correlacionada entre sesiones. No intercepta chats Desktop existentes.
-- Segundo parche con SHA-256 fijado y CI de frontend, instalador y relé en Linux/Windows, más compilación nativa Windows sin instalación.
-
 ## 0.5.0-sendoa.2 — 2026-10-16
 
 - Integración Spotifast/EVA-01 separada de la actualización principal: detección y preferencia MPRIS, reconexión y filtrado de señales por propietario, controles y lanzadores compatibles con Spotify.

@@ -48,14 +48,13 @@ lock = json.loads((root/'source-lock.json').read_text())
 assert (release/'VERSION').read_text().strip() == lock['version'], 'La versión compilada no coincide'
 assert json.loads((release/'source-lock.json').read_text()) == lock, 'La compilación corresponde a otro parche/fuente'
 assert hashlib.sha256((root/'patches/sendoa.patch').read_bytes()).hexdigest() == lock['patchSha256'], 'El parche ha cambiado'
-assert hashlib.sha256((root/'patches/desktop.patch').read_bytes()).hexdigest() == lock['desktopPatchSha256'], 'El parche de escritorio ha cambiado'
 seen = set()
 for line in (release/'SHA256SUMS').read_text().splitlines():
     checksum, name = line.split()
-    assert name in {'coucou','coucou-hook','codex-bridge.mjs'} and name not in seen, 'Nombre inesperado o duplicado en las sumas'
+    assert name in {'coucou','coucou-hook'} and name not in seen, 'Nombre inesperado o duplicado en las sumas'
     seen.add(name)
     assert hashlib.sha256((release/name).read_bytes()).hexdigest() == checksum, 'Binario modificado: '+name
-assert seen == {'coucou','coucou-hook','codex-bridge.mjs'}, 'Faltan sumas de los binarios y del puente'
+assert seen == {'coucou','coucou-hook'}, 'Faltan sumas de los binarios'
 PY
 if [[ "$MODE" == build ]]; then echo 'Compilación comprobada; no se aplicó configuración.'; exit 0; fi
 mkdir -p "$TARGET_HOME/.local/bin"
@@ -84,7 +83,7 @@ if pgrep -u "$(id -u)" -x coucou >/dev/null; then
     echo 'Cierra Coucou desde su icono y vuelve a ejecutar --configure-only.' >&2; exit 1
   fi
 fi
-python3 "$ROOT/configure.py" --home "$TARGET_HOME" --relay "$RELEASE/coucou-hook" --binary "$RELEASE/coucou" --bridge "$RELEASE/codex-bridge.mjs"
+python3 "$ROOT/configure.py" --home "$TARGET_HOME" --relay "$RELEASE/coucou-hook" --binary "$RELEASE/coucou"
 if [[ -n ${DISPLAY:-}${WAYLAND_DISPLAY:-} ]]; then
   nohup "$TARGET_HOME/.local/share/coucou-local/bin/coucou" >/dev/null 2>&1 &
   echo "Coucou $VERSION iniciado."

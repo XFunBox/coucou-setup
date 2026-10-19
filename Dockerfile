@@ -28,9 +28,8 @@ RUN cargo test --locked --workspace --release
 RUN dbus-run-session -- cargo test --locked --workspace --release spotify -- --ignored --test-threads=1
 RUN npm run tauri -- build --config src-tauri/tauri.linux.conf.json --no-bundle
 RUN mkdir -p /out && cp target/release/coucou target/release/coucou-hook /out/ \
- && cp scripts/codex-bridge.mjs /out/ \
  && cp /app/LICENSE /app/LICENSE-ASSETS.md /app/LICENSE-ANDROID /out/ \
- && cd /out && sha256sum coucou coucou-hook codex-bridge.mjs > SHA256SUMS
+ && cd /out && sha256sum coucou coucou-hook > SHA256SUMS
 FROM scratch
 COPY --from=build /out/ /
 

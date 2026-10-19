@@ -1,28 +1,4 @@
-# Verificación 0.5.0-sendoa.3 — 2026-10-19
-
-Implementación Windows y oficina de agentes preparada a partir de la misma fuente fijada, conservando el parche Sendoa original y añadiendo `patches/desktop.patch` con SHA-256 propio.
-
-## Comprobaciones de esta versión
-
-- **431 pruebas Node pasan**: regresiones existentes, sesiones/subagentes, oficina, navegación y localización, cola entre procesos, cancelación y preguntas/aprobaciones Codex.
-- **11 pruebas Python Windows pasan**, incluidas ejecución real de PowerShell, dry-run sin escrituras, opciones incompatibles, ida/vuelta UTF-8 a un ejecutable de prueba, rutas con espacios y caracteres especiales, fusión de hooks, instalación/restauración aisladas y rollback ante un archivo bloqueado.
-- TypeScript y compilación Vite correctos. La oficina utiliza el renderizador real del Hub; los tests DOM comprueban texto seguro, contexto por sesión, foco y liberación de listeners.
-- El E2E del puente inicia procesos separados de App Server y relé de prueba: valida el protocolo fijado de Codex, solicita una opción, devuelve la respuesta al request original y observa la continuación. No ejecuta inferencia ni sustituye una prueba con un agente autenticado.
-- Fuente original verificada y aplicación de ambos parches desde cero correctas; todos los archivos resultantes cambiados coinciden byte a byte con la fuente de trabajo. Preparación probada también con `core.autocrlf=true` global.
-- `install.ps1` y `build.ps1` analizados por PowerShell sin errores. El sandbox local bloquea el arranque de Git Bash, por lo que la sintaxis Bash y las regresiones Linux se ejecutan mediante CI.
-- Revisiones independientes corrigieron mezcla de contextos entre sesiones, rollback parcial, enum de sandbox de Codex, pérdida de `--cwd` y doble ACK de una solicitud encolada.
-
-## Comprobaciones pendientes
-
-El equipo de desarrollo no tiene Rust/MSVC. La compilación nativa Windows y las pruebas Rust del relé están configuradas en `.github/workflows/desktop.yml`, junto con las comprobaciones Linux. Consulta el resultado de Actions para el commit que vayas a utilizar; la presencia del workflow no acredita una compilación exitosa.
-
-No se ha instalado ni iniciado esta versión en el perfil real del usuario, ni se ha verificado visualmente el escritorio nativo Windows/Linux. El navegador de comprobación no pudo acceder al servidor local. No se probaron reproducción multimedia real, voz ni Android en esta versión. Las pruebas e instalación aisladas no contienen credenciales.
-
-El puente crea sesiones Codex propias, de un turno por invocación: no intercepta chats Desktop existentes. Solo admite preguntas con opciones y aprobaciones de comandos/archivos; texto libre, preguntas secretas y permisos adicionales requieren otro cliente. Las solicitudes caducadas/no compatibles no conceden permisos. Los subagentes aparecen únicamente si el origen envía identificadores concretos; no se deducen de texto libre.
-
----
-
-# Verificación histórica 0.5.0-sendoa.2 — 2026-10-16
+# Verificación — 2026-10-16
 
 Versión final **0.5.0-sendoa.2**, base oficial Linux 0.5.0 `841a81ce1d75b65882b30139e6b716d0837dce30`. Dos cambios separados: primero la actualización principal a 0.5.0-sendoa.1, después Spotifast/EVA-01.
 
