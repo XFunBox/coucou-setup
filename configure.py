@@ -31,7 +31,7 @@ def validate_hooks(root):
             raise ValueError(f'{event}: se esperaba una lista de grupos')
         for group in groups:
             if not isinstance(group, dict) or not isinstance(group.get('hooks'), list):
-                raise ValueError(f'{event}: grupo inesperado; no se modificará')
+                raise ValueError(f'{event}: grupo inesperado; no se modificarÃ¡')
             if any(not isinstance(handler, dict) for handler in group['hooks']):
                 raise ValueError(f'{event}: handler inesperado')
 
@@ -97,7 +97,7 @@ def atomic_copy(source, target, mode=0o755):
             os.unlink(name)
 
 def desktop_entry(binary):
-    # Exec usa comillas dobles según Desktop Entry; no es Bash.
+    # Exec usa comillas dobles segÃºn Desktop Entry; no es Bash.
     escaped = str(binary).replace('\\', '\\\\').replace('"', '\\"')
     escaped = escaped.replace('`', '\\`').replace('$', '\\$').replace('%', '%%')
     return ('[Desktop Entry]\nType=Application\nVersion=1.0\nName=Coucou\n'
@@ -116,7 +116,7 @@ def restore(home, backup, dry_run=False):
             raise ValueError('Ruta o valor inesperado en manifest.json')
         target = home / path
         if not target.resolve().is_relative_to(home):
-            raise ValueError('La ruta de restauración sale del directorio personal')
+            raise ValueError('La ruta de restauraciÃ³n sale del directorio personal')
         if existed and not (backup/path).resolve().is_relative_to(backup):
             raise ValueError('La copia sale del directorio de respaldo')
         if existed and not (backup / path).is_file():
@@ -136,7 +136,7 @@ def restore(home, backup, dry_run=False):
             # instead of leaving the main binary/config at the failed version.
             failures.append(f'{relative}: {error}')
     if failures:
-        raise OSError('Restauración incompleta; conserva la copia ' + str(backup) + ': ' + '; '.join(failures))
+        raise OSError('RestauraciÃ³n incompleta; conserva la copia ' + str(backup) + ': ' + '; '.join(failures))
     return list(manifest)
 
 def windows_paths(home):
@@ -193,8 +193,8 @@ def apply(home, relay, profile, binary=None, platform='linux', bridge=None):
         local_bin = local/'Coucou-local/bin'
         exe, relay_exe = 'coucou.exe', 'coucou-hook.exe'
         target_relay = local/'Coucou/bin'/relay_exe
-        entries = {roaming/'Microsoft/Windows/Start Menu/Programs/Startup/Coucou.vbs': windows_startup(local_bin/exe),
-                   roaming/'Microsoft/Windows/Start Menu/Programs/Coucou.vbs': windows_startup(local_bin/exe)}
+        # The desktop app owns login autostart and keeps it synchronized with its setting.
+        entries = {roaming/'Microsoft/Windows/Start Menu/Programs/Coucou Sendoa.vbs': windows_startup(local_bin/exe)}
         backup_root = local/'Coucou-setup/backups'
     else:
         local_bin = home / '.local/share/coucou-local/bin'
@@ -212,7 +212,7 @@ def apply(home, relay, profile, binary=None, platform='linux', bridge=None):
                              else '#!/bin/sh\nexec node ' + shlex.quote(str(local_bin/'codex-bridge.mjs')) + ' --hook ' + shlex.quote(str(local_bin/relay_exe)) + ' "$@"\n')
     hooks = merge_hooks(old_hooks, target_relay, platform)
     if not Path(relay).is_file():
-        raise ValueError(f'No se encuentra el relé: {relay}')
+        raise ValueError(f'No se encuentra el relÃ©: {relay}')
     binary = Path(binary) if binary else local_bin / exe
     if not binary.is_file():
         raise ValueError(f'No se encuentra el binario personalizado: {binary}')
@@ -223,7 +223,7 @@ def apply(home, relay, profile, binary=None, platform='linux', bridge=None):
         if not target.resolve().is_relative_to(home):
             raise ValueError(f'La ruta sale del directorio personal: {target}')
         if target.is_symlink():
-            raise ValueError(f'No se sobrescriben enlaces simbólicos: {target}')
+            raise ValueError(f'No se sobrescriben enlaces simbÃ³licos: {target}')
         if target.exists() and not target.is_file():
             raise ValueError(f'No es un archivo: {target}')
     backup = backup_root / datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
@@ -255,7 +255,7 @@ def apply(home, relay, profile, binary=None, platform='linux', bridge=None):
         try:
             restore(home, backup)
         except Exception as restore_error:
-            raise RuntimeError(f'Falló la instalación: {install_error}. {restore_error}') from install_error
+            raise RuntimeError(f'FallÃ³ la instalaciÃ³n: {install_error}. {restore_error}') from install_error
         raise
     print(f'Copias previas: {backup}')
     return backup
@@ -274,7 +274,7 @@ def main():
     read_object(settings_file(args.home, args.platform))
     validate_hooks(read_object(args.home / '.codex/hooks.json'))
     if args.check:
-        print('Archivos JSON válidos; no se ha escrito nada.')
+        print('Archivos JSON vÃ¡lidos; no se ha escrito nada.')
     elif not args.relay or not args.binary:
         parser.error('--relay y --binary son necesarios para aplicar')
     else:

@@ -14,7 +14,7 @@ if (-not $TargetHome) { throw 'USERPROFILE is missing; pass -TargetHome.' }
 if ($LASTEXITCODE -ne 0) { throw 'Settings validation failed.' }
 if ($DryRun) {
     & "$PSScriptRoot/build.ps1" -DryRun -Python $Python
-    Write-Output 'Would back up and install portable binaries, settings, Codex hooks and Start Menu/startup entries in this user profile.'
+    Write-Output 'Would back up and install portable binaries, settings, Codex hooks and a Start Menu launcher in this user profile.'
     exit 0
 }
 if ($env:OS -ne 'Windows_NT') { throw 'This installer requires native Windows.' }
@@ -26,5 +26,5 @@ if (Get-Process -Name coucou,coucou-hook -ErrorAction SilentlyContinue) { throw 
 $release = Join-Path $PSScriptRoot '.build/release-windows'
 & $Python "$PSScriptRoot/configure.py" --platform windows --home $TargetHome --relay "$release/coucou-hook.exe" --binary "$release/coucou.exe" --bridge "$release/codex-bridge.mjs"
 if ($LASTEXITCODE -ne 0) { throw 'Configuration failed.' }
-Write-Output 'Installed. Start Coucou from the Start Menu; it will also start at login. Review /hooks in Codex.'
+Write-Output 'Installed. Start Coucou from the Start Menu. Coucou manages login startup through its autostart setting after the first launch. Review /hooks in Codex.'
 Write-Output 'Restore with: python restore.py BACKUP_PATH --dry-run (then omit --dry-run with Coucou closed).'

@@ -10,7 +10,7 @@ class WindowsInstallerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="coucou O'Neil ") as temp:
             home = Path(temp)/'home'; source = Path(temp)/'source.exe'
             source.write_bytes(b'fixture')
-            profile = Path(temp)/'profile.json'; profile.write_text('{}')
+            profile = Path(temp)/'profile.json'; profile.write_text('{"autostart":true}')
             settings = home/'AppData/Roaming/Coucou/settings.json'
             settings.parent.mkdir(parents=True)
             settings.write_text('{"keep":42}')
@@ -19,16 +19,20 @@ class WindowsInstallerTests(unittest.TestCase):
             target = home/'AppData/Local/Coucou-local/bin/coucou.exe'
             self.assertEqual(target.read_bytes(), b'fixture')
             startup = home/'AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/Coucou.vbs'
-            self.assertIn('Run', startup.read_text())
+            self.assertFalse(startup.parent.exists(), 'the native app owns login startup')
+            menu = home/'AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Coucou Sendoa.vbs'
+            self.assertIn('Run', menu.read_text())
+            self.assertTrue(json.loads(settings.read_text())['autostart'])
             self.assertFalse((home/'.config').exists())
             hooks = json.loads((home/'.codex/hooks.json').read_text())
             command = hooks['hooks']['SessionStart'][0]['hooks'][0]['command']
             self.assertIn('-EncodedCommand', command)
-            self.assertEqual(len(restore(home, backup, True)), 7)
+            self.assertEqual(len(restore(home, backup, True)), 6)
             restore(home, backup)
             self.assertEqual(settings.read_text(), '{"keep":42}')
             self.assertFalse(target.exists())
             self.assertFalse(startup.exists())
+            self.assertFalse(menu.exists())
 
     def test_optional_bridge_is_backed_up_and_restored(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -39,7 +43,7 @@ class WindowsInstallerTests(unittest.TestCase):
             local_bin = home/'AppData/Local/Coucou-local/bin'
             self.assertEqual((local_bin/'codex-bridge.mjs').read_text(), '// bridge')
             self.assertIn('node', (local_bin/'coucou-codex.cmd').read_text())
-            self.assertEqual(len(restore(home, backup, True)), 9)
+            self.assertEqual(len(restore(home, backup, True)), 8)
             restore(home, backup)
             self.assertFalse((local_bin/'coucou-codex.cmd').exists())
 
