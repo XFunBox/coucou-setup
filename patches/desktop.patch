@@ -1,0 +1,1405 @@
+diff --git a/windows/Cargo.lock b/windows/Cargo.lock
+index 55637c5..e6917af 100644
+--- a/windows/Cargo.lock
++++ b/windows/Cargo.lock
+@@ -719,7 +719,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "coucou"
+-version = "0.5.0-sendoa.2"
++version = "0.5.0-sendoa.3"
+ dependencies = [
+  "arboard",
+  "cpal",
+@@ -754,7 +754,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "coucou-hook"
+-version = "0.5.0-sendoa.2"
++version = "0.5.0-sendoa.3"
+ dependencies = [
+  "libc",
+  "serde_json",
+diff --git a/windows/Cargo.toml b/windows/Cargo.toml
+index 3a39a99..17f12db 100644
+--- a/windows/Cargo.toml
++++ b/windows/Cargo.toml
+@@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
+ resolver = "2"
+ 
+ [workspace.package]
+-version = "0.5.0-sendoa.2"
++version = "0.5.0-sendoa.3"
+ edition = "2021"
+ license = "MIT"
+ 
+diff --git a/windows/hook/src/main.rs b/windows/hook/src/main.rs
+index 0768a80..693d34b 100644
+--- a/windows/hook/src/main.rs
++++ b/windows/hook/src/main.rs
+@@ -160,6 +160,9 @@ fn prepare(raw: &[u8], args: &Args, env: &dyn Fn(&str) -> Option<String>, cwd: &
+     if let Some(tag) = agent_tag(&args.agent, env) {
+         map.insert("coucou_agent".into(), Value::String(tag));
+     }
++    if args.agent == "codex-bridge" {
++        map.insert("coucou_question_bridge".into(), Value::Bool(true));
++    }
+     // Claude Code in Cursor's terminal goes on the Cursor pill (Mac #120).
+     if !map.contains_key("term_editor") {
+         if let Some(editor) = term_editor(env) {
+@@ -223,6 +226,9 @@ fn add_terminal_context(map: &mut Map<String, Value>, env: &dyn Fn(&str) -> Opti
+ /// CLAUDE_CODE_ENTRYPOINT — the same rule as the Mac's relay (#191). Nothing
+ /// for a plain Claude Code session.
+ fn agent_tag(arg: &str, env: &dyn Fn(&str) -> Option<String>) -> Option<String> {
++    if arg == "codex-bridge" {
++        return Some("codex".to_string());
++    }
+     if !arg.is_empty() {
+         return Some(arg.to_string());
+     }
+@@ -385,6 +391,14 @@ mod tests {
+         assert_eq!(agent_tag("", &env_of(&[])), None);
+     }
+ 
++    #[test]
++    fn explicit_bridge_is_a_codex_session_with_a_question_channel() {
++        let (v, _) = run(r#"{"hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","session_id":"thread-a"}"#, "codex-bridge", "");
++        assert_eq!(v["coucou_agent"], "codex");
++        assert_eq!(v["coucou_question_bridge"], true);
++        assert_eq!(v["session_id"], "thread-a");
++    }
++
+     #[test]
+     fn cursor_is_told_apart_from_vs_code() {
+         assert_eq!(term_editor(&env_of(&[("CURSOR_TRACE_ID", "abc")])), Some("cursor"));
+diff --git a/windows/hook/src/reply.rs b/windows/hook/src/reply.rs
+index 2e6bd23..196bf6a 100644
+--- a/windows/hook/src/reply.rs
++++ b/windows/hook/src/reply.rs
+@@ -12,7 +12,7 @@ use serde_json::{json, Map, Value};
+ /// (no `--agent`), Codex, Copilot CLI and Muse Code. Any decision for another
+ /// agent is ignored here too, whatever the app sent.
+ pub fn takes_decisions(agent: &str) -> bool {
+-    matches!(agent, "" | "codex" | "copilot" | "muse")
++    matches!(agent, "" | "codex" | "codex-bridge" | "copilot" | "muse")
+ }
+ 
+ /// Agents that read a JSON object on stdout after every hook and get `{}` —
+@@ -35,6 +35,20 @@ pub fn stdout(agent: &str, event: &str, decision: Option<&str>, question: Option
+     }
+     let decision = decision.filter(|_| takes_decisions(agent));
+     match agent {
++        // Private launcher protocol: preserve the answer map, never a tool allow.
++        // The bridge maps the validated question text back to App Server ids.
++        "codex-bridge" => {
++            if question.is_none() {
++                return match decision?.trim() {
++                    "allow" | "always" => Some(json!({ "decision": "allow" }).to_string()),
++                    "deny" => Some(json!({ "decision": "deny" }).to_string()),
++                    _ => None,
++                };
++            }
++            let reply = serde_json::from_str::<Value>(decision?).ok()?;
++            let answers = reply.get("answers")?.as_object()?;
++            answers_fit(question?, answers).then(|| reply.to_string())
++        }
+         // Copilot CLI and Muse Code read a bare permissionDecision. Copilot is
+         // fail-closed: it must always get valid JSON, so silence is an "ask".
+         "copilot" | "muse" => {
+@@ -132,6 +146,19 @@ fn answers_fit(question: &Value, answers: &Map<String, Value>) -> bool {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn explicit_codex_bridge_returns_only_valid_question_answers() {
++        let question = json!({ "questions": [{ "question": "Database?", "options": [{ "label": "SQLite" }, { "label": "PostgreSQL" }] }] });
++        let decision = r#"{"answers":{"Database?":"SQLite"}}"#;
++        let value: Value = serde_json::from_str(&stdout("codex-bridge", "PermissionRequest", Some(decision), Some(&question)).unwrap()).unwrap();
++        assert_eq!(value["answers"]["Database?"], "SQLite");
++        assert!(stdout("codex-bridge", "PermissionRequest", Some("allow"), Some(&question)).is_none());
++        assert!(stdout("codex-bridge", "PermissionRequest", Some(r#"{"answers":{"Database?":"bogus"}}"#), Some(&question)).is_none());
++        assert!(stdout("codex", "PermissionRequest", Some(decision), Some(&question)).is_none());
++        let allowed: Value = serde_json::from_str(&stdout("codex-bridge", "PermissionRequest", Some("allow"), None).unwrap()).unwrap();
++        assert_eq!(allowed["decision"], "allow");
++    }
++
+     const AGENTS: &[&str] = &[
+         "", "gemini", "antigravity", "cursor", "codex", "copilot", "muse", "opencode", "amp",
+         "hermes", "claude-desktop", "my-tool",
+diff --git a/windows/package-lock.json b/windows/package-lock.json
+index 267e919..d504a6a 100644
+--- a/windows/package-lock.json
++++ b/windows/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "coucou-windows",
+-  "version": "0.5.0-sendoa.2",
++  "version": "0.5.0-sendoa.3",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "coucou-windows",
+-      "version": "0.5.0-sendoa.2",
++      "version": "0.5.0-sendoa.3",
+       "dependencies": {
+         "@tauri-apps/api": "^2"
+       },
+diff --git a/windows/package.json b/windows/package.json
+index 19ac4de..1f0ea88 100644
+--- a/windows/package.json
++++ b/windows/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "coucou-windows",
+   "private": true,
+-  "version": "0.5.0-sendoa.2",
++  "version": "0.5.0-sendoa.3",
+   "type": "module",
+   "scripts": {
+     "dev": "vite",
+diff --git a/windows/scripts/codex-bridge.mjs b/windows/scripts/codex-bridge.mjs
+new file mode 100644
+index 0000000..b3d8439
+--- /dev/null
++++ b/windows/scripts/codex-bridge.mjs
+@@ -0,0 +1,206 @@
++#!/usr/bin/env node
++// Owned stdio App Server session. Never attaches to another client's Desktop chat.
++import { spawn } from 'node:child_process';
++import { createInterface } from 'node:readline';
++import { pathToFileURL } from 'node:url';
++
++function launch(executable, args, options) {
++  // npm installations may expose Codex as a JS entry point. Avoid a shell,
++  // preserving spaces and shell metacharacters in prompts and paths verbatim.
++  return /\.[cm]?js$/i.test(executable) ? spawn(process.execPath, [executable, ...args], options) : spawn(executable, args, options);
++}
++
++function questionsFor(params) {
++  const questions = params?.questions;
++  if (!Array.isArray(questions) || !questions.length || questions.length > 3) throw Error('Unsupported question count');
++  const ids = new Set(), texts = new Set();
++  for (const q of questions) {
++    if (!q || typeof q.id !== 'string' || !q.id || ids.has(q.id) || typeof q.question !== 'string' || !q.question || q.question.endsWith('…') || texts.has(q.question) || q.isSecret || !Array.isArray(q.options) || q.options.length < 2) throw Error('Unsupported or ambiguous question');
++    if (Buffer.byteLength(q.question) > 1900 || q.options.some(o => typeof o?.label !== 'string' || !o.label || Buffer.byteLength(o.label) > 1900 || o.label.endsWith('…')) || new Set(q.options.map(o => o.label)).size !== q.options.length) throw Error('Unsupported options');
++    ids.add(q.id); texts.add(q.question);
++  }
++  return questions;
++}
++
++/** One visible island card at a time, correlated to the server's original id. */
++export function createQuestionRouter({ ask, send, event = () => {}, timeoutMs = 105_000 }) {
++  const pending = new Map();
++  let tail = Promise.resolve();
++  function resolve({ threadId, requestId }) {
++    const entry = pending.get(requestId);
++    if (!entry || entry.params.threadId !== threadId) return;
++    entry.cancel();
++  }
++  function handle(message) {
++    if (pending.has(message.id)) return Promise.resolve();
++    const controller = new AbortController();
++    const expires = Math.min(timeoutMs, typeof message.params?.autoResolutionMs === 'number' ? Math.max(0, message.params.autoResolutionMs) : timeoutMs);
++    const entry = { params: message.params, deadline: Date.now() + expires, cancelled: false, cancel() { this.cancelled = true; controller.abort(); } };
++    pending.set(message.id, entry);
++    const run = async () => {
++      let timer;
++      const identity = { session_id: message.params?.threadId ?? '', coucou_agent: 'codex', coucou_question_id: String(message.id) };
++      try {
++        if (entry.cancelled) return;
++        const isQuestion = message.method === 'item/tool/requestUserInput';
++        const isCommand = message.method === 'item/commandExecution/requestApproval';
++        if (!isQuestion && !isCommand && message.method !== 'item/fileChange/requestApproval') throw Error('Unsupported request');
++        const questions = isQuestion ? questionsFor(message.params) : null;
++        const params = message.params;
++        if (!params?.threadId || !params.turnId || !params.itemId) throw Error('Missing request identity');
++        const approvalPreview = isQuestion ? '' : JSON.stringify(params);
++        if (Buffer.byteLength(approvalPreview) > 1900) throw Error('Approval context exceeds the island preview limit');
++        const remaining = entry.deadline - Date.now();
++        if (remaining <= 0) throw Error('Request expired while queued');
++        const payload = { ...identity, cwd: params.cwd ?? '', hook_event_name: 'PermissionRequest', coucou_question_bridge: true,
++          tool_name: isQuestion ? 'AskUserQuestion' : isCommand ? 'Bash' : 'Codex file change',
++          // One complete preview: the existing approval card prioritizes the
++          // command field, so keep requested access/reason in that field too.
++          tool_input: isQuestion ? { questions: questions.map(q => ({ question: q.question, options: q.options, multiSelect: false })) } : { command: approvalPreview },
++        };
++        const cancelled = new Promise((_, reject) => controller.signal.addEventListener('abort', () => reject(Error('Question cancelled')), { once: true }));
++        const answer = await Promise.race([
++          ask(payload, controller.signal),
++          new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Request timed out')), remaining); }), cancelled,
++        ]);
++        if (entry.cancelled) return;
++        if (!isQuestion) {
++          if (answer?.decision !== 'allow' && answer?.decision !== 'deny') throw Error('No explicit approval decision from Coucou');
++          const decision = answer.decision === 'allow' ? 'accept' : 'decline';
++          if (Array.isArray(params.availableDecisions) && !params.availableDecisions.includes(decision)) throw Error('Decision not offered by Codex');
++          send({ id: message.id, result: { decision } });
++          return;
++        }
++        if (!answer?.answers || Object.keys(answer.answers).length !== questions.length) throw Error('No complete answer from Coucou');
++        const answers = Object.create(null);
++        for (const q of questions) {
++          const label = answer.answers[q.question];
++          if (typeof label !== 'string' || !q.options.some(o => o.label === label)) throw Error('Answer is not an offered option');
++          answers[q.id] = { answers: [label] };
++        }
++        send({ id: message.id, result: { answers: { ...answers } } });
++      } catch (error) {
++        if (!entry.cancelled) send({ id: message.id, error: { code: -32000, message: error.message } });
++      } finally {
++        clearTimeout(timer);
++        controller.abort();
++        pending.delete(message.id);
++        event({ ...identity, hook_event_name: 'QuestionResolved' });
++      }
++    };
++    const result = tail.then(run);
++    tail = result.catch(() => {});
++    return result;
++  }
++  return { handle, resolve, cancelAll() { for (const entry of pending.values()) entry.cancel(); } };
++}
++
++export function relayEvent(executable, payload, signal) {
++  return new Promise((resolve, reject) => {
++    const child = launch(executable, ['--agent', 'codex-bridge', payload.hook_event_name], { windowsHide: true, stdio: ['pipe', 'pipe', 'inherit'], signal });
++    let output = '';
++    child.stdout.setEncoding('utf8');
++    child.stdout.on('data', text => { output += text; if (output.length > 256_000) child.kill(); });
++    child.on('error', reject);
++    child.on('close', () => { try { resolve(output.trim() ? JSON.parse(output) : null); } catch { reject(Error('Invalid Coucou relay response')); } });
++    child.stdin.on('error', () => {});
++    child.stdin.end(JSON.stringify(payload));
++  });
++}
++
++/** Small JSON-lines client, also exercised by the local protocol harness. */
++export function createClient(child, { relay, output = text => process.stdout.write(text), onComplete = () => {} }) {
++  const waiting = new Map();
++  const finalLines = new Map();
++  let nextId = 1;
++  const send = value => child.stdin.write(JSON.stringify(value) + '\n');
++  const event = payload => { void relay(payload).catch(() => {}); };
++  const router = createQuestionRouter({ ask: relay, send, event });
++  const rpc = (method, params) => new Promise((resolve, reject) => {
++    const id = nextId++;
++    const timer = setTimeout(() => { waiting.delete(id); reject(Error(`${method} timed out`)); }, 30_000);
++    waiting.set(id, { resolve, reject, timer }); send({ id, method, params });
++  });
++  const lines = createInterface({ input: child.stdout });
++  lines.on('line', line => {
++    let message;
++    try { message = JSON.parse(line); } catch { return; }
++    const p = message.params ?? {};
++    if (!message.method && waiting.has(message.id)) {
++      const entry = waiting.get(message.id); waiting.delete(message.id); clearTimeout(entry.timer);
++      if (message.error) entry.reject(Error(message.error.message)); else entry.resolve(message.result);
++      return;
++    }
++    if (message.id != null && message.method) {
++      if (message.method === 'item/tool/requestUserInput' || /^item\/(commandExecution|fileChange)\/requestApproval$/.test(message.method)) void router.handle(message);
++      else send({ id: message.id, error: { code: -32601, message: 'Unsupported Coucou client request' } });
++      return;
++    }
++    if (message.method === 'serverRequest/resolved') router.resolve(p);
++    const identity = { coucou_agent: 'codex', session_id: p.threadId ?? p.thread?.id ?? '', cwd: p.cwd ?? '' };
++    if (message.method === 'thread/started') event({ ...identity, hook_event_name: 'SessionStart', cwd: p.thread?.cwd ?? '' });
++    if (message.method === 'turn/started') { finalLines.delete(identity.session_id); event({ ...identity, hook_event_name: 'UserPromptSubmit' }); }
++    if (message.method === 'item/started' && p.item?.type !== 'agentMessage') event({ ...identity, hook_event_name: 'PreToolUse', tool_name: p.item?.type ?? 'Tool', tool_input: { command: p.item?.command ?? '' } });
++    if (message.method === 'item/agentMessage/delta') output(p.delta ?? '');
++    if (message.method === 'item/completed' && p.item?.type === 'agentMessage' && typeof p.item.text === 'string') finalLines.set(identity.session_id, p.item.text.slice(0, 1800));
++    if (message.method === 'turn/completed') {
++      router.cancelAll();
++      event({ ...identity, hook_event_name: p.turn?.status === 'failed' ? 'StopFailure' : p.turn?.status === 'interrupted' ? 'Interrupt' : 'Stop', last_assistant_message: finalLines.get(identity.session_id) ?? '' });
++      finalLines.delete(identity.session_id);
++      onComplete(p);
++    }
++  });
++  child.on('error', close);
++  child.on('exit', () => close(Error('Codex App Server exited')));
++  function close(error = Error('Codex bridge closed')) {
++    router.cancelAll(); lines.close();
++    for (const entry of waiting.values()) { clearTimeout(entry.timer); entry.reject(error); }
++    waiting.clear();
++  }
++  return { rpc, send, close };
++}
++
++async function main(args) {
++  if (args.includes('--help') || !args.length) {
++    console.log('Usage: node codex-bridge.mjs [--cwd DIR] [--codex EXE_OR_JS] [--hook EXE_OR_JS] [--model MODEL] [--plan] PROMPT\nCreates an independent Codex App Server session; Coucou must be open. Requires Node 22+, Codex CLI sign-in and coucou-hook. Supports fixed-choice questions and command/file approvals. Default sandbox: workspace-write, approval: on-request.');
++    return;
++  }
++  const config = { cwd: process.cwd(), codex: process.platform === 'win32' ? 'codex.exe' : 'codex', hook: process.platform === 'win32' ? 'coucou-hook.exe' : 'coucou-hook' };
++  const prompt = [];
++  for (let i = 0; i < args.length; i++) {
++    const key = args[i].slice(2);
++    if (['cwd', 'codex', 'hook', 'model'].includes(key) && args[i].startsWith('--')) { if (!args[i+1]) throw Error(`Missing ${args[i]}`); config[key] = args[++i]; }
++    else if (args[i] === '--plan') config.plan = true;
++    else if (args[i].startsWith('--')) throw Error(`Unknown option ${args[i]}`);
++    else prompt.push(args[i]);
++  }
++  if (!prompt.length) throw Error('A prompt is required');
++  const child = launch(config.codex, ['app-server'], { cwd: config.cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'inherit'] });
++  let complete;
++  const completed = new Promise(resolve => { complete = resolve; });
++  const client = createClient(child, { relay: (payload, signal) => relayEvent(config.hook, { ...payload, cwd: payload.cwd || config.cwd }, signal), onComplete: complete });
++  child.on('exit', code => complete({ turn: { status: 'failed', error: { message: `Codex exited (${code})` } } }));
++  child.on('error', error => complete({ turn: { status: 'failed', error } }));
++  const interrupt = () => { client.close(); child.kill(); };
++  process.once('SIGINT', interrupt);
++  try {
++    await client.rpc('initialize', { clientInfo: { name: 'coucou_bridge', version: '1' }, capabilities: { experimentalApi: true } });
++    client.send({ method: 'initialized', params: {} });
++    // Pinned wire enum (different from SandboxPolicy's camelCase variant):
++    // https://github.com/openai/codex/blob/rust-v0.159.2/codex-rs/app-server-protocol/schema/typescript/v2/SandboxMode.ts
++    const started = await client.rpc('thread/start', { cwd: config.cwd, approvalPolicy: 'on-request', sandbox: 'workspace-write', ...(config.model ? { model: config.model } : {}) });
++    console.error(`Coucou Codex thread: ${started.thread.id}`);
++    const turn = { threadId: started.thread.id, input: [{ type: 'text', text: prompt.join(' ') }] };
++    if (config.plan) {
++      const model = config.model ?? started.model;
++      if (!model) throw Error('--plan requires --model when server does not report its model');
++      turn.collaborationMode = { mode: 'plan', settings: { model, reasoning_effort: 'medium', developer_instructions: null } };
++    }
++    await client.rpc('turn/start', turn);
++    const result = await completed;
++    if (result.turn?.status === 'failed') throw Error(result.turn?.error?.message ?? 'Codex turn failed');
++    console.log();
++  } finally { process.removeListener('SIGINT', interrupt); client.close(); child.stdin.end(); child.kill(); }
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
+diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
+index 51a489d..e43475d 100644
+--- a/windows/src-tauri/tauri.conf.json
++++ b/windows/src-tauri/tauri.conf.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "https://schema.tauri.app/config/2",
+   "productName": "Coucou",
+-  "version": "0.5.0-sendoa.2",
++  "version": "0.5.0-sendoa.3",
+   "identifier": "fr.louisraille.coucou",
+   "build": {
+     "beforeDevCommand": "npm run dev",
+diff --git a/windows/src/core/state.ts b/windows/src/core/state.ts
+index 3c9c8aa..0dcd53a 100644
+--- a/windows/src/core/state.ts
++++ b/windows/src/core/state.ts
+@@ -17,6 +17,22 @@ import { Spotify, musicPlaying } from "./spotify";
+ export type AgentSource = "claudeCode" | "n8n" | "agent";
+ export type PillBadge = "approval" | "finished" | "error";
+ 
++/** Real hook sessions, separate from the stable integration pill catalogue. */
++export interface OfficeAgent {
++  id: string;
++  pillId: string;
++  sessionId: string;
++  subagentId?: string;
++  parentSessionId?: string;
++  name: string;
++  project: string;
++  cwd: string;
++  state: BotStateName;
++  step: string;
++  finalLine: string;
++  updatedAt: number;
++}
++
+ export interface AgentTask {
+   id: string;
+   name: string;
+@@ -50,6 +66,8 @@ export interface ApprovalInfo {
+   command: string;
+   /** Set when Claude Code is asking a question rather than for a permission. */
+   questions?: AskedQuestion[];
++  /** Original App Server request identity, distinct from the relay request id. */
++  bridgeQuestionId?: string;
+ }
+ 
+ /** One question of an AskUserQuestion call. */
+@@ -204,6 +222,7 @@ class AppState {
+   view: IslandViewName = "overview";
+ 
+   tasks: AgentTask[] = [];
++  officeAgents: OfficeAgent[] = [];
+   focusId: string | null = null;
+ 
+   stateOverride: BotStateName | null = null;
+diff --git a/windows/src/hub/pages.ts b/windows/src/hub/pages.ts
+index 469ca20..0b4beea 100644
+--- a/windows/src/hub/pages.ts
++++ b/windows/src/hub/pages.ts
+@@ -9,8 +9,11 @@ import { dictionaryPage, snippetsPage } from "./pages/words";
+ import { stylesPage } from "./pages/styles";
+ import { flowSettingsPage } from "./pages/flowsettings";
+ import { voicePage } from "./pages/voice";
++import { officePage } from "../office/page";
++import "../office/office.css";
+ 
+ export const FLOW_PAGE_RENDERERS: Partial<Record<PageId, FlowPageRenderer>> = {
++  office: officePage,
+   dictation: dictationPage,
+   notes: notesPage,
+   insights: insightsPage,
+diff --git a/windows/src/hub/shell.ts b/windows/src/hub/shell.ts
+index 6e1222c..a6eca58 100644
+--- a/windows/src/hub/shell.ts
++++ b/windows/src/hub/shell.ts
+@@ -13,7 +13,7 @@ import { icon, keyLabel } from "./ui";
+ 
+ export type PageId =
+   | "dictation" | "notes" | "insights" | "dictionary" | "snippets" | "styles" | "flowsettings"
+-  | "general" | "pills" | "agents" | "chat" | "voice" | "integrations" | "phone" | "shortcuts";
++  | "general" | "pills" | "agents" | "office" | "chat" | "voice" | "integrations" | "phone" | "shortcuts";
+ 
+ interface PageDef {
+   id: PageId;
+@@ -34,6 +34,7 @@ export const FLOW_PAGES: PageDef[] = [
+ ];
+ 
+ export const NOTCH_PAGES: PageDef[] = [
++  { id: "office", icon: "grid", title: () => t("Agent office") },
+   { id: "general", icon: "gear", title: () => t("General"), subtitle: () => t("Mochi, his sounds and how the island behaves.") },
+   { id: "pills", icon: "grid", title: () => t("Active pills"), subtitle: () => t("The pills shown in the island, their order and their colours.") },
+   { id: "agents", icon: "terminal", title: () => t("Agents"), subtitle: () => t("Claude Code, Codex and the other agents Mochi follows.") },
+diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
+index a6d8482..66102e6 100644
+--- a/windows/src/i18n/extra.json
++++ b/windows/src/i18n/extra.json
+@@ -1,6 +1,25 @@
+ {
+  "_about": "Strings only Windows and Linux show, keyed by their English text like the Mac's catalog, with every language but English. Written by hand; the Mac's strings are in strings.json (generated by scripts/gen-strings.mjs). See src/i18n/i18n.ts.",
+  "strings": {
++  "Agent office": { "es": "Oficina de agentes", "zh-Hans": "智能体办公室", "hi": "एजेंट कार्यालय", "ar": "مكتب الوكلاء", "fr": "Bureau des agents", "bn": "এজেন্ট অফিস", "pt-BR": "Escritório dos agentes", "ru": "Офис агентов", "id": "Kantor agen" },
++  "A live workspace for your agents. Select a desk for details or to answer a question.": {"es": "Tus agentes en directo. Selecciona un escritorio para ver sus detalles o responder una pregunta.", "zh-Hans": "实时查看智能体。选择桌位以查看详情或回答问题。", "hi": "अपने एजेंटों को लाइव देखें। विवरण देखने या सवाल का जवाब देने के लिए डेस्क चुनें।", "ar": "مساحة مباشرة لوكلائك. اختر مكتبًا لعرض التفاصيل أو الإجابة عن سؤال.", "fr": "Vos agents en direct. Sélectionnez un bureau pour voir ses détails ou répondre à une question.", "bn": "আপনার এজেন্টদের সরাসরি দেখুন। বিস্তারিত দেখতে বা প্রশ্নের উত্তর দিতে একটি ডেস্ক বেছে নিন।", "pt-BR": "Seus agentes ao vivo. Selecione uma mesa para ver detalhes ou responder a uma pergunta.", "ru": "Ваши агенты в реальном времени. Выберите стол для просмотра подробностей или ответа на вопрос.", "id": "Ruang kerja langsung untuk agen Anda. Pilih meja untuk melihat detail atau menjawab pertanyaan."},
++  "Live sessions": { "es": "Sesiones en directo", "zh-Hans": "实时会话", "hi": "लाइव सत्र", "ar": "الجلسات المباشرة", "fr": "Sessions en direct", "bn": "লাইভ সেশন", "pt-BR": "Sessões ao vivo", "ru": "Текущие сеансы", "id": "Sesi langsung" },
++  "live sessions": { "es": "sesiones en directo", "zh-Hans": "个实时会话", "hi": "लाइव सत्र", "ar": "جلسات مباشرة", "fr": "sessions en direct", "bn": "লাইভ সেশন", "pt-BR": "sessões ao vivo", "ru": "текущих сеансов", "id": "sesi langsung" },
++  "waiting for you": { "es": "esperando tu respuesta", "zh-Hans": "个等待回复", "hi": "आपके जवाब की प्रतीक्षा में", "ar": "بانتظار ردك", "fr": "en attente de votre réponse", "bn": "আপনার উত্তরের অপেক্ষায়", "pt-BR": "aguardando sua resposta", "ru": "ожидают вашего ответа", "id": "menunggu jawaban Anda" },
++  "Your office is ready": { "es": "Tu oficina está lista", "zh-Hans": "办公室已就绪", "hi": "आपका कार्यालय तैयार है", "ar": "مكتبك جاهز", "fr": "Votre bureau est prêt", "bn": "আপনার অফিস প্রস্তুত", "pt-BR": "Seu escritório está pronto", "ru": "Ваш офис готов", "id": "Kantor Anda siap" },
++  "Start an agent with Coucou hooks enabled. Real sessions and subagents will appear here.": { "es": "Inicia un agente con los hooks de Coucou activados. Sus sesiones y subagentes aparecerán aquí.", "zh-Hans": "启用 Coucou 钩子后启动智能体，真实会话和子智能体将显示在这里。", "hi": "Coucou हुक सक्षम करके एजेंट शुरू करें। वास्तविक सत्र और उप-एजेंट यहाँ दिखाई देंगे।", "ar": "ابدأ وكيلًا مع تفعيل خطافات Coucou. ستظهر الجلسات والوكلاء الفرعيون الحقيقيون هنا.", "fr": "Démarrez un agent avec les hooks Coucou activés. Les sessions et sous-agents réels apparaîtront ici.", "bn": "Coucou হুক সক্রিয় করে এজেন্ট চালু করুন। বাস্তব সেশন ও উপ-এজেন্ট এখানে দেখা যাবে।", "pt-BR": "Inicie um agente com os hooks do Coucou ativados. As sessões e os subagentes reais aparecerão aqui.", "ru": "Запустите агента с включёнными хуками Coucou. Здесь появятся реальные сеансы и субагенты.", "id": "Mulai agen dengan hook Coucou aktif. Sesi dan subagen nyata akan muncul di sini." },
++  "Open answer card": { "es": "Abrir tarjeta de respuesta", "zh-Hans": "打开回答卡片", "hi": "उत्तर कार्ड खोलें", "ar": "فتح بطاقة الرد", "fr": "Ouvrir la carte de réponse", "bn": "উত্তর কার্ড খুলুন", "pt-BR": "Abrir cartão de resposta", "ru": "Открыть карточку ответа", "id": "Buka kartu jawaban" },
++  "Needs an answer": { "es": "Necesita una respuesta", "zh-Hans": "等待回答", "hi": "उत्तर आवश्यक है", "ar": "يحتاج إلى رد", "fr": "Réponse attendue", "bn": "উত্তর প্রয়োজন", "pt-BR": "Precisa de uma resposta", "ru": "Ожидает ответа", "id": "Perlu jawaban" },
++  "Needs approval": { "es": "Necesita aprobación", "zh-Hans": "等待批准", "hi": "अनुमति आवश्यक है", "ar": "يحتاج إلى موافقة", "fr": "Autorisation attendue", "bn": "অনুমোদন প্রয়োজন", "pt-BR": "Precisa de aprovação", "ru": "Ожидает разрешения", "id": "Perlu persetujuan" },
++  "Writing": { "es": "Escribiendo", "zh-Hans": "正在编写", "hi": "लिख रहा है", "ar": "يكتب", "fr": "Écriture", "bn": "লিখছে", "pt-BR": "Escrevendo", "ru": "Пишет", "id": "Menulis" },
++  "Running": { "es": "Ejecutando", "zh-Hans": "正在执行", "hi": "चल रहा है", "ar": "قيد التنفيذ", "fr": "Exécution", "bn": "চলছে", "pt-BR": "Executando", "ru": "Выполняется", "id": "Menjalankan" },
++  "Thinking": { "es": "Pensando", "zh-Hans": "正在思考", "hi": "सोच रहा है", "ar": "يفكر", "fr": "Réflexion", "bn": "ভাবছে", "pt-BR": "Pensando", "ru": "Думает", "id": "Berpikir" },
++  "Finished": { "es": "Terminado", "zh-Hans": "已完成", "hi": "पूरा हुआ", "ar": "اكتمل", "fr": "Terminé", "bn": "সমাপ্ত", "pt-BR": "Concluído", "ru": "Завершено", "id": "Selesai" },
++  "Rate limited": { "es": "Límite de uso alcanzado", "zh-Hans": "已达到使用限制", "hi": "उपयोग सीमा पूरी हुई", "ar": "تم بلوغ حد الاستخدام", "fr": "Limite d’utilisation atteinte", "bn": "ব্যবহারের সীমা পূর্ণ", "pt-BR": "Limite de uso atingido", "ru": "Достигнут лимит использования", "id": "Batas penggunaan tercapai" },
++  "Idle": { "es": "En espera", "zh-Hans": "空闲", "hi": "निष्क्रिय", "ar": "خامل", "fr": "En attente", "bn": "নিষ্ক্রিয়", "pt-BR": "Ocioso", "ru": "Бездействует", "id": "Siaga" },
++  "Subagent": { "es": "Subagente", "zh-Hans": "子智能体", "hi": "उप-एजेंट", "ar": "وكيل فرعي", "fr": "Sous-agent", "bn": "উপ-এজেন্ট", "pt-BR": "Subagente", "ru": "Субагент", "id": "Subagen" },
++  "Session": { "es": "Sesión", "zh-Hans": "会话", "hi": "सत्र", "ar": "جلسة", "fr": "Session", "bn": "সেশন", "pt-BR": "Sessão", "ru": "Сеанс", "id": "Sesi" },
++  "Waiting for activity": { "es": "Esperando actividad", "zh-Hans": "等待活动", "hi": "गतिविधि की प्रतीक्षा में", "ar": "بانتظار النشاط", "fr": "En attente d’activité", "bn": "কার্যকলাপের অপেক্ষায়", "pt-BR": "Aguardando atividade", "ru": "Ожидание активности", "id": "Menunggu aktivitas" },
+   " · until {date}": {
+    "zh-Hans": " · 截至 {date}",
+    "hi": " · {date} तक",
+diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
+index 9f69cca..ffbefa9 100644
+--- a/windows/src/island/hooks.ts
++++ b/windows/src/island/hooks.ts
+@@ -22,6 +22,33 @@ const CURSOR_ID = "agent_cursor";
+ /** Clears the approval card if no decision was made before the hook gave up. */
+ let pendingTimeout: number | null = null;
+ 
++// Separate bridge processes share this FIFO. Ack while queued to keep the
++// relay alive, but never restart its original human-response deadline.
++const bridgeQueue = new Map<string, { island: Island; payload: HookPayload; deadline: number; timer: number }>();
++let drainScheduled = false;
++
++function scheduleBridgeQueue(): void {
++  if (State.pendingApproval || !bridgeQueue.size || drainScheduled) return;
++  drainScheduled = true;
++  queueMicrotask(() => {
++    drainScheduled = false;
++    if (State.pendingApproval) return;
++    const next = bridgeQueue.entries().next().value;
++    if (!next) return;
++    const [requestId, entry] = next;
++    bridgeQueue.delete(requestId);
++    window.clearTimeout(entry.timer);
++    handleHook(entry.island, entry.payload, entry.deadline);
++    scheduleBridgeQueue();
++  });
++}
++
++function officeBackToWork(payload: HookPayload): void {
++  const pillId = `agent_${payload.coucou_agent}`;
++  const agent = State.officeAgents.find(a => a.pillId === pillId && a.sessionId === (payload.session_id ?? "") && !a.subagentId);
++  if (agent) agent.state = "working";
++}
++
+ /** Takes the approval or question card down and gives the island back. */
+ export function dropPendingCard(island: Island): void {
+   if (!State.pendingApproval) return;
+@@ -51,6 +78,10 @@ interface HookPayload {
+   hook_event_name?: string;
+   request_id?: string;
+   session_id?: string;
++  agent_id?: string;
++  agent_type?: string;
++  coucou_question_bridge?: boolean;
++  coucou_question_id?: string;
+   cwd?: string;
+   message?: string;
+   /** UserPromptSubmit carries `prompt`; `message` belongs to Notification/Stop. */
+@@ -81,6 +112,43 @@ function aliasProjectName(name: string): string {
+   return PROJECT_ALIASES[name.toLowerCase()] ?? name;
+ }
+ 
++/** A missing session id stays one unattributed row per pill, never invented sessions. */
++function recordOfficeEvent(payload: HookPayload, pillId: string, name: string, project: string): void {
++  const event = payload.hook_event_name;
++  const sessionId = payload.session_id ?? "";
++  if (event === "SessionEnd") {
++    State.officeAgents = State.officeAgents.filter(a => a.pillId !== pillId || a.sessionId !== sessionId);
++    return;
++  }
++  const supported = new Set(["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest", "QuestionResolved", "Notification", "Stop", "StopFailure", "Interrupt", "SubagentStart", "SubagentStop"]);
++  if (!supported.has(event ?? "")) return;
++  const subagentId = payload.agent_id || undefined;
++  if ((event === "SubagentStart" || event === "SubagentStop") && !subagentId) return;
++  const id = JSON.stringify([pillId, sessionId, subagentId ?? ""]);
++  let agent = State.officeAgents.find(a => a.id === id);
++  if (!agent) {
++    agent = { id, pillId, sessionId, ...(subagentId ? { subagentId, parentSessionId: sessionId } : {}), name: subagentId ? payload.agent_type || `Subagent ${subagentId.slice(0, 8)}` : name, project, cwd: payload.cwd ?? "", state: "idle", step: "", finalLine: "", updatedAt: Date.now() };
++    if (State.officeAgents.length >= 100) {
++      const at = State.officeAgents.findIndex(a => a.state === "finished" || a.state === "idle");
++      State.officeAgents.splice(at < 0 ? 0 : at, 1);
++    }
++    State.officeAgents.push(agent);
++  }
++  if (payload.cwd) { agent.cwd = payload.cwd; agent.project = project; }
++  agent.updatedAt = Date.now();
++  if (event === "UserPromptSubmit") { agent.state = "thinking"; agent.step = (payload.prompt ?? payload.message ?? "").slice(0, 160); agent.finalLine = ""; }
++  if (event === "PreToolUse") { agent.state = "working"; agent.step = stepLabel(payload.tool_name ?? "Tool", payload.tool_input ?? {}); agent.finalLine = ""; }
++  if (event === "PostToolUse" || event === "PostToolUseFailure" || event === "QuestionResolved" || event === "SubagentStart") agent.state = "working";
++  if (event === "PermissionRequest") { agent.state = payload.tool_name === "AskUserQuestion" ? "question" : "approval"; agent.step = approvalTarget(payload.tool_name ?? "Tool", payload.tool_input ?? {}); }
++  if (event === "Stop" || event === "SubagentStop") { agent.state = "finished"; agent.finalLine = toOneLine(payload.last_assistant_message ?? payload.message ?? ""); if (agent.finalLine) agent.step = agent.finalLine; }
++  if (event === "StopFailure") agent.state = "error";
++  if (event === "Interrupt") agent.state = "idle";
++  if (event === "Notification") {
++    if (/rate limit|limite d/i.test(payload.message ?? "")) agent.state = "ratelimit";
++    else if (payload.message?.endsWith("?")) { agent.state = "question"; agent.step = payload.message; }
++  }
++}
++
+ function lastPathComponent(p: string): string {
+   const cleaned = p.replace(/[\\/]+$/, "");
+   const idx = Math.max(cleaned.lastIndexOf("\\"), cleaned.lastIndexOf("/"));
+@@ -230,9 +298,10 @@ export function registerHookHandlers(island: Island) {
+   // The last plan numbers seen survive a restart, as on the Mac.
+   State.planUsage ??= restorePlanUsage(storedClaudePlanUsage());
+   void onEvent<HookPayload>("hook", (payload) => handleHook(island, payload));
++  State.subscribe(scheduleBridgeQueue);
+ }
+ 
+-function handleHook(island: Island, payload: HookPayload) {
++function handleHook(island: Island, payload: HookPayload, bridgeDeadline?: number) {
+   // Account-wide numbers from the status line relay, not part of any session:
+   // keep the latest, nothing else (no reveal, no sound), paused or not.
+   if (payload.hook_event_name === "StatusLine") {
+@@ -246,13 +315,14 @@ function handleHook(island: Island, payload: HookPayload) {
+     // for a decision from an island that had already decided not to look. Say so,
+     // and the terminal takes the question immediately.
+     if (payload.request_id) void Bridge.approvalDecline(payload.request_id);
++    officeBackToWork(payload);
+     return;
+   }
+ 
+   const name = payload.hook_event_name ?? "";
+   const cwd = payload.cwd ?? "";
+   const raw = lastPathComponent(cwd);
+-  const projectName = aliasProjectName(raw || "Session");
++  const projectName = aliasProjectName(raw || t("Session"));
+ 
+   // Route to the right pill. Valid coucou_agent → dynamic "agent_<name>" pill.
+   // "claude" is reserved; absent or invalid → Claude Code's own pill: Cursor's
+@@ -263,6 +333,29 @@ function handleHook(island: Island, payload: HookPayload) {
+   const isExternalAgent = validAgent !== null;
+   const sessionId = payload.session_id ?? "";
+ 
++  recordOfficeEvent(payload, agentId, validAgent ? agentName(validAgent) : "Claude Code", projectName);
++  if (name === "QuestionResolved" || TURN_OVER.has(name)) {
++    for (const [requestId, queued] of bridgeQueue) {
++      if (queued.payload.session_id !== payload.session_id || queued.payload.coucou_agent !== payload.coucou_agent) continue;
++      if (name === "QuestionResolved" && queued.payload.coucou_question_id !== payload.coucou_question_id) continue;
++      bridgeQueue.delete(requestId);
++      window.clearTimeout(queued.timer);
++      void Bridge.approvalDecline(requestId);
++      officeBackToWork(queued.payload);
++    }
++  }
++  if (name === "QuestionResolved") {
++    const pending = State.pendingApproval;
++    if (pending && payload.coucou_question_id && pending.sessionId === sessionId && pending.pillId === agentId && pending.bridgeQuestionId === payload.coucou_question_id) {
++      if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
++      pendingTimeout = null;
++      if (pending.requestId) void Bridge.approvalDecline(pending.requestId);
++      dropPendingCard(island);
++    }
++    State.notify();
++    return;
++  }
++
+   /** Alerts force the island open; work events only reveal the compact island. */
+   const surface = (view: Parameters<Island["alert"]>[0], isAlert: boolean) => {
+     if (State.mode === "expanded") {
+@@ -408,6 +501,9 @@ function handleHook(island: Island, payload: HookPayload) {
+         agentId,
+         window.setTimeout(() => {
+           stopTimers.delete(agentId);
++          // A different session may have finished on the shared catalogue pill.
++          // Its timer must never remove a live permission/question card's owner.
++          if (State.pendingApproval?.bridgeQuestionId && State.pendingApproval.pillId === agentId) return;
+           if (isExternalAgent) {
+             State.removeTask(agentId);
+           } else {
+@@ -461,6 +557,7 @@ function handleHook(island: Island, payload: HookPayload) {
+       // declined at once, so the agent asks in its own terminal.
+       if (isExternalAgent && !APPROVAL_AGENTS.has(validAgent!)) {
+         if (payload.request_id) void Bridge.approvalDecline(payload.request_id);
++        officeBackToWork(payload);
+         break;
+       }
+ 
+@@ -469,7 +566,27 @@ function handleHook(island: Island, payload: HookPayload) {
+       // — that would leave a human staring at request B while request A waits for
+       // a decision nobody can give. Hand it straight back to the terminal.
+       if (State.pendingApproval && State.pendingApproval.requestId !== requestId) {
++        if (validAgent === "codex" && payload.coucou_question_bridge && requestId && bridgeQueue.size < 20) {
++          if (!bridgeQueue.has(requestId)) {
++            const deadline = bridgeDeadline ?? Date.now() + 105_000;
++            const timer = window.setTimeout(() => {
++              bridgeQueue.delete(requestId);
++              void Bridge.approvalDecline(requestId);
++              officeBackToWork(payload);
++              State.notify();
++            }, Math.max(0, deadline - Date.now()));
++            bridgeQueue.set(requestId, { island, payload, deadline, timer });
++          }
++          void Bridge.approvalAck(requestId);
++          break;
++        }
++        if (requestId) void Bridge.approvalDecline(requestId);
++        officeBackToWork(payload);
++        break;
++      }
++      if (bridgeDeadline != null && bridgeDeadline <= Date.now()) {
+         if (requestId) void Bridge.approvalDecline(requestId);
++        officeBackToWork(payload);
+         break;
+       }
+       ensurePill();
+@@ -480,7 +597,7 @@ function handleHook(island: Island, payload: HookPayload) {
+       // Claude Code asking a question is not a permission to grant: the island
+       // shows the options and sends back the one that was picked. Only Claude
+       // Code asks questions this way.
+-      const questions = isExternalAgent ? null : askedQuestions(tool, input);
++      const questions = !isExternalAgent || (validAgent === "codex" && payload.coucou_question_bridge === true) ? askedQuestions(tool, input) : null;
+       const view = questions ? "question" : "approval";
+       // The card always comes up, even over another pill or an island that is
+       // already open: its pill comes to the front, and the one you were on
+@@ -491,11 +608,14 @@ function handleHook(island: Island, payload: HookPayload) {
+         pillId: agentId,
+         tool,
+         command: approvalTarget(tool, input),
++        ...(payload.coucou_question_id ? { bridgeQuestionId: payload.coucou_question_id } : {}),
+         ...(questions ? { questions } : {}),
+       });
+       // The relay's short ack window closes in 800 ms; everything below this
+       // line is synchronous, so the card really is up by the time it lands.
+-      if (requestId) void Bridge.approvalAck(requestId);
++      // A queued bridge was acknowledged on arrival. A second ack would be
++      // consumed as its decision by pipe.rs and close the waiting relay.
++      if (requestId && bridgeDeadline == null) void Bridge.approvalAck(requestId);
+       State.updateTask(agentId, view);
+       Sound.play(view);
+       // Any agent's card (Claude Code, Codex, Copilot CLI, Muse Code) comes up
+@@ -506,7 +626,7 @@ function handleHook(island: Island, payload: HookPayload) {
+       pendingTimeout = window.setTimeout(() => {
+         pendingTimeout = null;
+         dropPendingCard(island);
+-      }, 110_000);
++      }, bridgeDeadline == null ? 110_000 : Math.max(0, bridgeDeadline - Date.now()));
+       break;
+     }
+ 
+diff --git a/windows/src/main.ts b/windows/src/main.ts
+index a2db5b2..bfa059b 100644
+--- a/windows/src/main.ts
++++ b/windows/src/main.ts
+@@ -5,6 +5,7 @@ import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
+ import { Sound } from "./core/sound";
+ import { State, type Settings } from "./core/state";
+ import { Island } from "./island/island";
++import { registerOfficeRelay } from "./office/relay";
+ import { registerHookHandlers } from "./island/hooks";
+ import { registerPhoneLink } from "./island/phone-link";
+ import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
+@@ -136,6 +137,7 @@ async function main() {
+   });
+ 
+   registerHookHandlers(island);
++  await registerOfficeRelay(island);
+   registerPhoneLink(island);
+   registerIntegrationHandlers(island);
+   registerShortcutHandlers(island, () => setPaused(false));
+diff --git a/windows/src/office/model.ts b/windows/src/office/model.ts
+new file mode 100644
+index 0000000..b359ea2
+--- /dev/null
++++ b/windows/src/office/model.ts
+@@ -0,0 +1,31 @@
++import type { ApprovalInfo, OfficeAgent } from "../core/state";
++import { t } from "../i18n/i18n";
++
++/** The Hub receives display data only; answers still use the island's real cards. */
++export interface OfficeSnapshot {
++  agents: OfficeAgent[];
++  pending: Pick<ApprovalInfo, "requestId" | "sessionId" | "pillId" | "command" | "questions"> | null;
++}
++
++export interface OfficeOpen {
++  agentId: string;
++  requestId?: string;
++}
++
++export function requestForAgent(scene: OfficeSnapshot, agent: OfficeAgent) {
++  const req = scene.pending;
++  return req && !agent.subagentId && req.pillId === agent.pillId && req.sessionId === agent.sessionId ? req : null;
++}
++
++export function officeStatus(agent: OfficeAgent, pending: boolean): string {
++  if (pending || agent.state === "question") return t("Needs an answer");
++  switch (agent.state) {
++    case "working": return /write|edit|patch|writing|escrib/i.test(agent.step ?? "") ? t("Writing") : t("Running");
++    case "thinking": case "searching": return t("Thinking");
++    case "approval": return t("Needs approval");
++    case "finished": return t("Finished");
++    case "error": return t("Error");
++    case "ratelimit": return t("Rate limited");
++    default: return t("Idle");
++  }
++}
+diff --git a/windows/src/office/office.css b/windows/src/office/office.css
+new file mode 100644
+index 0000000..52f683d
+--- /dev/null
++++ b/windows/src/office/office.css
+@@ -0,0 +1,37 @@
++.office { margin: 22px 28px 40px; color: #eee9da; }
++.office-summary { font-size: 12px; color: #adaeaa; margin: 0 0 14px; }
++.office-details { margin-top: 20px; padding: 22px; background: #202a25; border: 1px solid #727f6d; border-radius: 8px; line-height: 1.7; overflow-wrap: anywhere; }
++.office-details h2 { font-size: 18px; margin: 0 0 12px; }
++.office-details h3 { font-size: 13px; }
++.office-details p { white-space: pre-wrap; }
++.office-details code, .office-detail-id { font-size: 11px; color: #c6cbbd; }
++.office-room { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 22px; padding: 28px; min-height: 320px; border: 1px solid #424b47; border-radius: 12px; background-color: #26312f; background-image: linear-gradient(90deg, #ffffff04 1px, transparent 1px), linear-gradient(#ffffff04 1px, transparent 1px); background-size: 28px 28px; box-shadow: inset 0 8px 0 #34423e; }
++.office-seat { min-width: 0; }
++.office-desk { width: 100%; height: 100%; border: 1px solid #6f766b; border-radius: 7px; padding: 16px; color: inherit; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px; background: #35423c; text-align: center; }
++.office-desk:hover { background: #3c4d44; border-color: #b4c4ab; }
++.office-desk:focus-visible { outline: 3px solid #f4d187; outline-offset: 5px; }
++.office-desk.needs-answer { border-color: #e6b978; background: #474436; }
++.office-bubble { align-self: stretch; display: block; font-size: 12px; line-height: 1.6; color: #312b22; background: #f2dfae; padding: 10px 12px; border-radius: 7px 7px 7px 0; overflow-wrap: anywhere; }
++.office-workspace { position: relative; display: block; width: 156px; height: 116px; flex-shrink: 0; image-rendering: pixelated; }
++.office-monitor { position: absolute; left: 48px; top: 15px; width: 55px; height: 37px; background: #222c29; border: 5px solid #aaa997; box-shadow: 0 5px 0 #1d2724; }
++.office-monitor::after { content: ''; position: absolute; width: 8px; height: 11px; top: 32px; left: 19px; background: #aaa997; }
++.office-monitor span { display: block; font: bold 15px monospace; color: #b7d5ac; margin-top: 4px; }
++.office-person { position: absolute; z-index: 2; left: 56px; top: 64px; width: 42px; height: 33px; background: var(--office-agent); border: 4px solid #24312e; border-radius: 8px 8px 3px 3px; box-shadow: 0 5px 0 #1e2926; }
++.office-eyes { display: block; position: absolute; left: 8px; top: 10px; width: 4px; height: 5px; background: #26312f; box-shadow: 15px 0 #26312f; }
++.office-table { position: absolute; top: 58px; left: 13px; width: 130px; height: 12px; background: #b79870; border-bottom: 5px solid #816c51; box-shadow: -1px 20px 0 -4px #907451, 1px 20px 0 -4px #907451; }
++.office-plant { position: absolute; color: #92ae75; top: 12px; right: 3px; font: 29px monospace; text-shadow: 0 6px #496342; }
++.office-name { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
++.office-project { font-size: 11px; color: #c6cbbd; overflow-wrap: anywhere; }
++.office-state { border: 1px solid #727f6d; border-radius: 4px; padding: 4px 8px; font: 11px monospace; }
++.office-step { font-size: 11px; line-height: 1.5; color: #c6cbbd; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
++.office-action { margin-top: auto; padding-top: 8px; font-size: 11px; color: #f2dfae; }
++.office-empty { grid-column: 1 / -1; align-self: center; justify-self: center; max-width: 340px; text-align: center; padding: 24px 0; }
++.office-empty-icon { font: 42px monospace; color: #b7d5ac; }
++.office-empty h2 { font-size: 18px; margin: 16px 0 8px; }
++.office-empty p { color: #bdc6bb; font-size: 13px; line-height: 1.7; }
++.office-desk[data-state="working"] .office-person { animation: office-type .5s steps(2) infinite; }
++.office-desk[data-state="thinking"] .office-monitor span, .office-desk[data-state="searching"] .office-monitor span { animation: office-think 1.6s steps(2) infinite; }
++@keyframes office-type { 50% { transform: translateY(-2px); } }
++@keyframes office-think { 50% { opacity: .4; } }
++@media (prefers-reduced-motion: reduce) { .office * { animation: none !important; } }
++@media (max-width: 700px) { .office { margin: 16px; } .office-room { padding: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 16px; } }
+diff --git a/windows/src/office/page.ts b/windows/src/office/page.ts
+new file mode 100644
+index 0000000..fc26649
+--- /dev/null
++++ b/windows/src/office/page.ts
+@@ -0,0 +1,23 @@
++import { emitToWindow, onEvent } from "../core/bridge";
++import { t } from "../i18n/i18n";
++import type { FlowPageRenderer } from "../hub/shell";
++import type { OfficeSnapshot } from "./model";
++import { officeView } from "./view";
++
++export const officePage: FlowPageRenderer = async (container, ctx) => {
++  const view = officeView((request) => void emitToWindow("island", "office-open", request));
++  container.append(ctx.hero("office", t("Agent office"), t("A live workspace for your agents. Select a desk for details or to answer a question.")), view.root);
++  view.update({ agents: [], pending: null });
++  let left = false;
++  let unlisten: (() => void) | undefined;
++  ctx.onLeave = () => {
++    left = true;
++    unlisten?.();
++    void emitToWindow("island", "office-watch", false);
++  };
++  unlisten = await onEvent<OfficeSnapshot>("office-snapshot", (scene) => {
++    if (!left && scene && Array.isArray(scene.agents)) view.update(scene);
++  });
++  if (left) { unlisten(); return; }
++  await emitToWindow("island", "office-watch", true);
++};
+diff --git a/windows/src/office/relay.ts b/windows/src/office/relay.ts
+new file mode 100644
+index 0000000..945a8f6
+--- /dev/null
++++ b/windows/src/office/relay.ts
+@@ -0,0 +1,39 @@
++import { State } from "../core/state";
++import { emitToWindow, onEvent } from "../core/bridge";
++import type { Island } from "../island/island";
++import { requestForAgent, type OfficeOpen, type OfficeSnapshot } from "./model";
++
++export function officeSnapshot(): OfficeSnapshot {
++  const req = State.pendingApproval;
++  return {
++    agents: State.officeAgents.map((a) => ({ ...a })),
++    pending: req ? { requestId: req.requestId, sessionId: req.sessionId, pillId: req.pillId, command: req.command, questions: req.questions } : null,
++  };
++}
++
++/** The two webviews have different JS globals: the island owns live state. */
++export async function registerOfficeRelay(island: Island) {
++  let watching = false;
++  let last = "";
++  const publish = () => {
++    if (!watching) return;
++    const scene = officeSnapshot();
++    const next = JSON.stringify(scene);
++    if (next === last) return;
++    last = next;
++    void emitToWindow("settings", "office-snapshot", scene);
++  };
++  State.subscribe(publish);
++  await onEvent<boolean>("office-watch", (on) => { watching = on === true; last = ""; publish(); });
++  await onEvent<OfficeOpen>("office-open", (input) => {
++    if (!input || typeof input.agentId !== "string") return;
++    const scene = officeSnapshot();
++    const agent = scene.agents.find((a) => a.id === input.agentId);
++    if (!agent) return;
++    const req = requestForAgent(scene, agent);
++    // A stale bubble can never open/answer a different session's request.
++    if (!input.requestId || req?.requestId !== input.requestId) return;
++    State.setFocus(agent.pillId);
++    island.alert(req.questions ? "question" : "approval");
++  });
++}
+diff --git a/windows/src/office/view.ts b/windows/src/office/view.ts
+new file mode 100644
+index 0000000..8b61064
+--- /dev/null
++++ b/windows/src/office/view.ts
+@@ -0,0 +1,92 @@
++import { h, clear } from "../views/dom";
++import { t } from "../i18n/i18n";
++import { officeStatus, requestForAgent, type OfficeOpen, type OfficeSnapshot } from "./model";
++
++/** Original CSS pixel characters. No images, canvas loop or synthetic sessions. */
++export function officeView(onOpen: (request: OfficeOpen) => void) {
++  const root = h("section", { class: "office", "aria-label": t("Agent office") });
++  const summary = h("p", { class: "office-summary", role: "status", "aria-live": "polite" });
++  const room = h("div", { class: "office-room", role: "list", "aria-label": t("Live sessions") });
++  const details = h("section", { class: "office-details", "aria-label": t("Details"), hidden: true });
++  root.append(summary, room, details);
++  let fingerprint = "";
++  let current: OfficeSnapshot = { agents: [], pending: null };
++  let selected: string | null = null;
++  let buttons = new Map<string, HTMLButtonElement>();
++
++  function drawDetails(focus = false) {
++    const agent = current.agents.find((a) => a.id === selected);
++    clear(details);
++    if (!agent) { details.setAttribute("hidden", ""); selected = null; return; }
++    details.removeAttribute("hidden");
++    const heading = h("h2", { text: agent.name, tabindex: -1 });
++    details.append(heading,
++      h("p", { text: officeStatus(agent, !!requestForAgent(current, agent)) }),
++      h("p", { class: "office-detail-project", text: agent.project }),
++      h("code", { text: agent.cwd }),
++      h("p", { class: "office-detail-id", text: `${t("Session")}: ${agent.sessionId}${agent.subagentId ? ` · ${t("Subagent")}: ${agent.subagentId}` : ""}` }),
++      h("p", { text: agent.step || t("Waiting for activity") }));
++    if (agent.finalLine) details.append(h("h3", { text: t("Result") }), h("p", { text: agent.finalLine }));
++    details.append(h("button", { type: "button", class: "hub-btn small", text: t("Close"), onclick: () => {
++      const previous = selected;
++      selected = null;
++      drawDetails();
++      if (previous) buttons.get(previous)?.focus();
++    } }));
++    if (focus) heading.focus();
++  }
++
++  function update(scene: OfficeSnapshot) {
++    // Unrelated island animation/state updates must not replace focused buttons.
++    const next = JSON.stringify(scene);
++    if (next === fingerprint) return;
++    fingerprint = next;
++    current = scene;
++    const active = document.activeElement as HTMLElement | null;
++    const focused = active && room.contains?.(active) ? active.dataset.officeAgent : undefined;
++    buttons = new Map<string, HTMLButtonElement>();
++    clear(room);
++    const waiting = scene.agents.filter((a) => requestForAgent(scene, a)).length;
++    summary.textContent = `${scene.agents.length} ${t("live sessions")} · ${waiting} ${t("waiting for you")}`;
++    if (!scene.agents.length) {
++      room.append(h("div", { class: "office-empty" },
++        h("span", { class: "office-empty-icon", "aria-hidden": "true", text: "▤" }),
++        h("h2", { text: t("Your office is ready") }),
++        h("p", { text: t("Start an agent with Coucou hooks enabled. Real sessions and subagents will appear here.") })));
++      drawDetails();
++      return;
++    }
++    for (const agent of scene.agents) {
++      const pending = requestForAgent(scene, agent);
++      const status = officeStatus(agent, !!pending);
++      const action = pending ? t("Open answer card") : t("Details");
++      const button = h("button", {
++        type: "button", class: `office-desk ${pending ? "needs-answer" : ""}`,
++        "aria-label": `${agent.name} · ${status} · ${action}`,
++        onclick: () => {
++          if (pending) onOpen({ agentId: agent.id, requestId: pending.requestId });
++          else { selected = agent.id; drawDetails(true); }
++        },
++      });
++      button.dataset.officeAgent = agent.id;
++      button.dataset.state = agent.state;
++      // The palette is fixed, not injected hook data.
++      button.style.setProperty("--office-agent", agent.subagentId ? "#e6b978" : "#9cbbad");
++      if (pending) button.append(h("span", { class: "office-bubble", text: pending.questions?.[0]?.question || pending.command || t("Needs approval") }));
++      const art = h("span", { class: "office-workspace", "aria-hidden": "true" },
++        h("span", { class: "office-monitor" }, h("span", { text: agent.state === "finished" ? "✓" : ">_" })),
++        h("span", { class: "office-person" }, h("i", { class: "office-eyes" })),
++        h("span", { class: "office-table" }), h("span", { class: "office-plant", text: "✚" }));
++      button.append(art, h("span", { class: "office-name", text: agent.name }),
++        h("span", { class: "office-project", text: agent.project || (agent.subagentId ? t("Subagent") : t("Session")) }),
++        h("span", { class: "office-state", text: status }),
++        h("span", { class: "office-step", text: agent.finalLine || agent.step || t("Waiting for activity") }),
++        h("span", { class: "office-action", text: action }));
++      room.append(h("div", { class: "office-seat", role: "listitem" }, button));
++      buttons.set(agent.id, button);
++    }
++    drawDetails(!!active && !!details.contains?.(active));
++    if (focused) buttons.get(focused)?.focus();
++  }
++  return { root, update };
++}
+diff --git a/windows/tests/codex-bridge.test.mjs b/windows/tests/codex-bridge.test.mjs
+new file mode 100644
+index 0000000..3b5d66a
+--- /dev/null
++++ b/windows/tests/codex-bridge.test.mjs
+@@ -0,0 +1,149 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++const bridge = await import('../scripts/codex-bridge.mjs').catch(() => ({}));
++const request = (id = 7) => ({ id, method: 'item/tool/requestUserInput', params: { threadId: 'thread-a', turnId: 'turn-a', itemId: 'item-a', questions: [{ id: 'db', header: 'Database', question: 'Database?', isOther: false, isSecret: false, options: [{ label: 'SQLite', description: 'Local' }, { label: 'PostgreSQL', description: 'Server' }] }] } });
++const setup = (ask = async () => ({ answers: { 'Database?': 'SQLite' } })) => {
++  assert.equal(typeof bridge.createQuestionRouter, 'function');
++  const replies = [], events = [];
++  const router = bridge.createQuestionRouter({ ask, send: value => replies.push(value), event: value => events.push(value), timeoutMs: 20 });
++  return { router, replies, events };
++};
++
++test('Codex question round trip maps displayed choices back to original ids', async () => {
++  const { router, replies } = setup();
++  await router.handle(request());
++  assert.deepEqual(replies, [{ id: 7, result: { answers: { db: { answers: ['SQLite'] } } } }]);
++});
++
++test('two same-looking questions remain correlated and are queued', async () => {
++  let release;
++  const asked = [];
++  const { router, replies } = setup(async payload => { asked.push(payload); if (asked.length === 1) await new Promise(resolve => { release = resolve; }); return { answers: { 'Database?': 'SQLite' } }; });
++  const first = router.handle(request(1));
++  const second = router.handle(request(2));
++  await new Promise(resolve => setImmediate(resolve));
++  assert.equal(asked.length, 1);
++  release();
++  await Promise.all([first, second]);
++  assert.deepEqual(replies.map(x => x.id), [1, 2]);
++});
++
++test('invalid answer, unavailable island and timeouts never invent an answer', async () => {
++  for (const ask of [async () => ({ answers: { 'Database?': 'injected' } }), async () => null, () => new Promise(() => {})]) {
++    const { router, replies } = setup(ask);
++    await router.handle(request());
++    assert.ok(replies[0].error);
++    assert.equal(replies[0].result, undefined);
++  }
++});
++
++test('server resolution cancels an active question and discards late answers', async () => {
++  let release;
++  const { router, replies, events } = setup(async () => { await new Promise(resolve => { release = resolve; }); return { answers: { 'Database?': 'SQLite' } }; });
++  const pending = router.handle(request());
++  await new Promise(resolve => setImmediate(resolve));
++  router.resolve({ threadId: 'thread-a', requestId: 7 });
++  release();
++  await pending;
++  assert.deepEqual(replies, []);
++  assert.equal(events.at(-1).hook_event_name, 'QuestionResolved');
++});
++
++test('secret, duplicate text, malformed, and unsupported questions are rejected', async () => {
++  for (const transform of [r => {r.params.questions[0].isSecret = true;}, r => {r.params.questions.push({...r.params.questions[0], id: 'other'});}, r => {r.params.questions[0].options = null;}, r => {r.params.questions[0].question = 'cut…';}]) {
++    const { router, replies } = setup(async () => { throw Error('must not ask'); });
++    const r = request(); transform(r);
++    await router.handle(r);
++    assert.ok(replies[0].error);
++  }
++});
++
++test('JSON-lines App Server client completes a real duplex question handshake', async () => {
++  const { PassThrough } = await import('node:stream');
++  const { EventEmitter } = await import('node:events');
++  const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough();
++  const wire = [], events = [], output = [];
++  child.stdin.on('data', data => {
++    for (const line of data.toString().trim().split('\n')) {
++      const value = JSON.parse(line); wire.push(value);
++      if (value.method === 'initialize') child.stdout.write(JSON.stringify({id: value.id, result: {}}) + '\n');
++    }
++  });
++  const client = bridge.createClient(child, { relay: async payload => { events.push(payload); return { answers: { 'Database?': 'PostgreSQL' } }; }, output: text => output.push(text) });
++  try {
++    await client.rpc('initialize', { clientInfo: { name: 'test', version: '1' } });
++    child.stdout.write(JSON.stringify(request('request-original')) + '\n');
++    await new Promise(resolve => setImmediate(resolve));
++    assert.deepEqual(wire.at(-1), {id: 'request-original', result: {answers: {db: {answers: ['PostgreSQL']}}}});
++    child.stdout.write(JSON.stringify({method:'item/agentMessage/delta',params:{threadId:'thread-a',delta:'Continuing'}}) + '\n');
++    assert.deepEqual(output, ['Continuing']);
++    assert.equal(events[0].tool_name, 'AskUserQuestion');
++    assert.equal(events[0].coucou_agent, 'codex');
++  } finally { client.close(); }
++});
++
++test('command and file approvals require an explicit human allow and keep request identity', async () => {
++  for (const kind of ['commandExecution', 'fileChange']) {
++    for (const decision of ['allow', 'deny', undefined]) {
++      const { router, replies, events } = setup(async payload => { assert.equal(payload.tool_name, kind === 'commandExecution' ? 'Bash' : 'Codex file change'); assert.match(JSON.stringify(payload.tool_input), /original/); return decision ? {decision} : null; });
++      await router.handle({id:'approval-original', method:`item/${kind}/requestApproval`, params:{threadId:'thread-a',turnId:'turn-a',itemId:'original',command:'echo hello',grantRoot:'/project'}});
++      assert.equal(replies[0].id, 'approval-original');
++      if (decision) assert.equal(replies[0].result.decision, decision === 'allow' ? 'accept' : 'decline');
++      else assert.ok(replies[0].error);
++      assert.equal(events.at(-1).hook_event_name, 'QuestionResolved');
++    }
++  }
++});
++
++test('CLI spawns App Server and relay and resumes after a selected question', async () => {
++  const { mkdtemp, writeFile, rm, readFile } = await import('node:fs/promises');
++  const { tmpdir } = await import('node:os');
++  const { join, resolve } = await import('node:path');
++  const { execFile } = await import('node:child_process');
++  const { promisify } = await import('node:util');
++  const dir = await mkdtemp(join(tmpdir(), 'coucou-bridge-'));
++  try {
++    const server = join(dir, 'server.mjs'), hook = join(dir, 'hook.mjs'), record = join(dir, 'wire.json'), hooksRecord = join(dir, 'hooks.jsonl');
++    await writeFile(server, `import {createInterface} from 'node:readline'; import {writeFileSync} from 'node:fs'; const send=x=>console.log(JSON.stringify(x)); createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line); if(m.method==='initialize') send({id:m.id,result:{}}); if(m.method==='thread/start'){if(m.params.sandbox!=='workspace-write'||m.params.approvalPolicy!=='on-request'){send({id:m.id,error:{code:-32602,message:'Invalid sandbox or approvalPolicy for rust-v0.159.2'}});return;} send({id:m.id,result:{thread:{id:'spawned-thread'},model:'test-model'}});} if(m.method==='turn/start'){if(m.params.collaborationMode?.mode!=='plan'||m.params.collaborationMode?.settings.model!=='test-model'||m.params.collaborationMode.settings.reasoning_effort!=='medium'||m.params.collaborationMode.settings.developer_instructions!==null){send({id:m.id,error:{code:-32602,message:'Invalid plan contract'}});return;}send({method:'turn/started',params:{threadId:'spawned-thread',turn:{id:'spawned-turn'}}});send({method:'item/started',params:{threadId:'spawned-thread',item:{id:'read',type:'commandExecution',command:'echo test'}}});send({id:m.id,result:{turn:{id:'spawned-turn'}}});send({id:91,method:'item/tool/requestUserInput',params:{threadId:'spawned-thread',turnId:'spawned-turn',itemId:'q',isBlocking:true,autoResolutionMs:null,questions:[{id:'db',header:'Database',question:'Database?',isOther:false,isSecret:false,options:[{label:'SQLite',description:'Local'},{label:'PostgreSQL',description:'Server'}]}]}});} if(m.id===91 && m.result){writeFileSync(${JSON.stringify(record)},JSON.stringify(m));send({method:'item/agentMessage/delta',params:{threadId:'spawned-thread',delta:'Resumed with '+m.result.answers.db.answers[0]}});send({method:'turn/completed',params:{threadId:'spawned-thread',turn:{id:'spawned-turn',status:'completed'}}});}});`);
++    await writeFile(hook, `import {appendFileSync} from 'node:fs'; let raw=''; for await (const chunk of process.stdin) raw+=chunk; const p=JSON.parse(raw); appendFileSync(${JSON.stringify(hooksRecord)},JSON.stringify(p)+'\\n'); if(p.hook_event_name==='PermissionRequest'&&p.cwd!==${JSON.stringify(dir)}) throw Error('Wrong project cwd'); if(p.hook_event_name==='PermissionRequest') console.log(JSON.stringify({answers:{'Database?':'PostgreSQL'}}));`);
++    const result = await promisify(execFile)(process.execPath, [resolve('scripts/codex-bridge.mjs'), '--codex', server, '--hook', hook, '--cwd', dir, '--plan', 'Ask which database'], {timeout:10000});
++    assert.match(result.stdout, /Resumed with PostgreSQL/);
++    assert.equal(JSON.parse(await readFile(record,'utf8')).id, 91);
++    const emitted = (await readFile(hooksRecord,'utf8')).trim().split('\n').map(line => JSON.parse(line));
++    for (const name of ['UserPromptSubmit', 'PreToolUse', 'PermissionRequest']) assert.equal(emitted.find(event => event.hook_event_name === name)?.cwd, dir);
++  } finally { await rm(dir, {recursive:true,force:true}); }
++});
++
++test('approval preview includes command and additional permissions together', async () => {
++  const { router, replies } = setup(async payload => {
++    assert.match(payload.tool_input.command, /outside/);
++    assert.match(payload.tool_input.command, /echo hello/);
++    return {decision:'allow'};
++  });
++  await router.handle({id:8,method:'item/commandExecution/requestApproval',params:{threadId:'thread-a',turnId:'turn-a',itemId:'original',command:'echo hello',additionalPermissions:{fileSystem:{write:['/outside']}}}});
++  assert.equal(replies[0].result?.decision,'accept');
++});
++
++test('server timeout includes time in the queue and never displays expired requests', async () => {
++  let release; let asked = 0;
++  const { router, replies } = setup(async () => { asked++; await new Promise(resolve => {release=resolve;}); return {answers:{'Database?':'SQLite'}}; });
++  const first = router.handle(request(1));
++  const expired = request(2); expired.params.autoResolutionMs = 1;
++  const second = router.handle(expired);
++  await new Promise(resolve => setTimeout(resolve, 5)); release();
++  await Promise.all([first, second]);
++  assert.equal(asked,1);
++  assert.match(replies.at(-1).error.message,/expired/);
++});
++
++test('completed assistant message becomes the office final line', async () => {
++  const { PassThrough } = await import('node:stream');
++  const { EventEmitter } = await import('node:events');
++  const child=new EventEmitter(); child.stdin=new PassThrough(); child.stdout=new PassThrough();
++  const events=[];
++  const client=bridge.createClient(child,{relay:async payload=>{events.push(payload);return null;},output:()=>{}});
++  child.stdout.write(JSON.stringify({method:'item/completed',params:{threadId:'t',item:{type:'agentMessage',id:'a',text:'Database selected.'}}})+'\n');
++  child.stdout.write(JSON.stringify({method:'turn/completed',params:{threadId:'t',turn:{id:'turn',status:'completed'}}})+'\n');
++  assert.equal(events.find(x=>x.hook_event_name==='Stop')?.last_assistant_message,'Database selected.');
++  client.close();
++});
+diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
+index 89bd089..a7a4932 100644
+--- a/windows/tests/hooks.test.mjs
++++ b/windows/tests/hooks.test.mjs
+@@ -703,3 +703,85 @@ test("a declined permission request leaves the stop timer running", () => {
+   assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }, { requestId: "r2" }]);
+   assert.equal(task().state, "idle");
+ });
++
++test("office keeps two Codex sessions independent and removes only the ended session", () => {
++  State.officeAgents = [];
++  hook({ hook_event_name: "UserPromptSubmit", coucou_agent: "codex", session_id: "a", cwd: "/a", prompt: "first" });
++  hook({ hook_event_name: "PreToolUse", coucou_agent: "codex", session_id: "b", cwd: "/b", tool_name: "Read", tool_input: { path: "b.txt" } });
++  assert.equal(State.officeAgents.length, 2);
++  assert.equal(State.officeAgents.find(x => x.sessionId === "a").state, "thinking");
++  assert.equal(State.officeAgents.find(x => x.sessionId === "b").state, "working");
++  hook({ hook_event_name: "SessionEnd", coucou_agent: "codex", session_id: "a" });
++  assert.deepEqual(State.officeAgents.map(x => x.sessionId), ["b"]);
++});
++
++test("office identifies subagents only when an explicit id is present", () => {
++  State.officeAgents = [];
++  hook({ hook_event_name: "SessionStart", session_id: "parent", cwd: "/p" });
++  hook({ hook_event_name: "SubagentStart", session_id: "parent", agent_id: "child", agent_type: "Explore" });
++  hook({ hook_event_name: "SubagentStart", session_id: "parent" });
++  assert.equal(State.officeAgents.length, 2);
++  assert.equal(State.officeAgents.find(x => x.subagentId === "child").state, "working");
++  hook({ hook_event_name: "SubagentStop", session_id: "parent", agent_id: "child" });
++  assert.equal(State.officeAgents.find(x => x.subagentId === "child").state, "finished");
++  assert.equal(State.officeAgents.find(x => !x.subagentId).state, "idle");
++});
++
++test("the explicit Codex bridge can ask options while ordinary Codex hooks cannot", () => {
++  hook({ hook_event_name: "PermissionRequest", coucou_agent: "codex", coucou_question_bridge: true, request_id: "bridge-1", session_id: "a", tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Database?", options: [{ label: "SQLite" }, { label: "PostgreSQL" }] }] } });
++  assert.equal(State.pendingApproval.questions[0].question, "Database?");
++  assert.ok(asked.includes("alert:question"));
++});
++
++test("bridge requests from separate processes queue globally and keep their deadlines", async () => {
++  const make = (session, requestId) => ({ hook_event_name: "PermissionRequest", coucou_agent: "codex", coucou_question_bridge: true, coucou_question_id: requestId, request_id: requestId, session_id: session, tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Database?", options: [{label:"SQLite"},{label:"PostgreSQL"}] }] } });
++  hook(make("a", "queue-a"));
++  hook(make("b", "queue-b"));
++  assert.equal(State.pendingApproval.requestId,"queue-a");
++  assert.deepEqual(sent("approval_decline"),[]);
++  assert.equal(sent("approval_ack").length,2);
++  State.endApproval();
++  await new Promise(resolve => queueMicrotask(resolve));
++  assert.equal(State.pendingApproval.requestId,"queue-b");
++  assert.equal(State.pendingApproval.sessionId,"b");
++  assert.equal(sent("approval_ack").filter(x => x.requestId === "queue-b").length, 1);
++  const { Bridge } = await import("../src/core/bridge.ts");
++  await Bridge.approvalAnswer(State.pendingApproval.requestId, { "Database?": "PostgreSQL" });
++  assert.deepEqual(sent("approval_answer"), [{ requestId: "queue-b", answers: { "Database?": "PostgreSQL" } }]);
++  State.endApproval();
++  await new Promise(resolve => queueMicrotask(resolve));
++});
++
++test("a rejected unsupported permission is not left needing an answer in office", () => {
++  State.officeAgents=[];
++  hook({hook_event_name:"PermissionRequest",coucou_agent:"gemini",session_id:"no-card",request_id:"unsupported",tool_name:"Bash"});
++  assert.notEqual(State.officeAgents[0]?.state,"approval");
++});
++
++test("queued bridge cancellation cannot withdraw the card of another session", async () => {
++  const make = (session, requestId) => ({ hook_event_name: "PermissionRequest", coucou_agent: "codex", coucou_question_bridge: true, coucou_question_id: requestId, request_id: requestId, session_id: session, tool_name: "Bash", tool_input: {command:"echo ok"} });
++  hook(make("a","live-a")); hook(make("b","cancel-b"));
++  hook({hook_event_name:"QuestionResolved",coucou_agent:"codex",session_id:"b",coucou_question_id:"cancel-b"});
++  assert.equal(State.pendingApproval.requestId,"live-a");
++  State.endApproval(); await new Promise(resolve=>queueMicrotask(resolve));
++  assert.equal(State.pendingApproval,null);
++  assert.ok(sent("approval_decline").some(x=>x.requestId==="cancel-b"));
++});
++
++test("queued bridge requests expire instead of reappearing after their relay deadline", async () => {
++  const make = (session, requestId) => ({hook_event_name:"PermissionRequest",coucou_agent:"codex",coucou_question_bridge:true,coucou_question_id:requestId,request_id:requestId,session_id:session,tool_name:"Bash"});
++  hook(make("a","expire-a")); hook(make("b","expire-b"));
++  seconds(106);
++  assert.equal(State.pendingApproval.requestId,"expire-a");
++  assert.ok(sent("approval_decline").some(x=>x.requestId==="expire-b"));
++  State.endApproval(); await new Promise(resolve=>queueMicrotask(resolve));
++  assert.equal(State.pendingApproval,null);
++});
++
++test("another session finishing cannot remove the pill of an active bridge question", () => {
++  hook({hook_event_name:"PermissionRequest",coucou_agent:"codex",coucou_question_bridge:true,coucou_question_id:"question-a",request_id:"question-a",session_id:"a",tool_name:"AskUserQuestion",tool_input:{questions:[{question:"Pick?",options:[{label:"A"},{label:"B"}]}]}});
++  hook({hook_event_name:"Stop",coucou_agent:"codex",session_id:"b"});
++  seconds(6);
++  assert.equal(State.pendingApproval.requestId,"question-a");
++  assert.ok(task("agent_codex"));
++});
+diff --git a/windows/tests/office-review.test.mjs b/windows/tests/office-review.test.mjs
+new file mode 100644
+index 0000000..e480da5
+--- /dev/null
++++ b/windows/tests/office-review.test.mjs
+@@ -0,0 +1,59 @@
++import { afterEach, beforeEach, mock, test } from 'node:test';
++import assert from 'node:assert/strict';
++import { State, DEFAULT_SETTINGS } from '../src/core/state.ts';
++import { registerHookHandlers } from '../src/island/hooks.ts';
++import { registerOfficeRelay, officeSnapshot } from '../src/office/relay.ts';
++import { officeView } from '../src/office/view.ts';
++import { installFakeDom } from './fakedom.mjs';
++import { emit } from './tauri.mjs';
++
++const island = { alert() {}, setView() {}, reveal() {}, dropPin() {} };
++registerHookHandlers(island);
++await registerOfficeRelay(island);
++const hook = (session_id, hook_event_name, extra = {}) => emit('hook', { coucou_agent: 'codex', session_id, hook_event_name, cwd: `/projects/${session_id}`, ...extra });
++beforeEach(() => {
++  installFakeDom();
++  mock.timers.enable({apis:['setTimeout']});
++  State.tasks = []; State.officeAgents = []; State.focusId = null;
++  State.settings = {...DEFAULT_SETTINGS}; State.pendingApproval = null;
++  State.paused = false; State.mode = 'hidden'; State.view = 'overview';
++  State.loadIntegrationTasks();
++});
++afterEach(() => { mock.timers.runAll(); mock.timers.reset(); });
++
++test('session A details stay exact after session B activity on the same catalog pill', () => {
++  hook('A', 'PreToolUse', {tool_name:'Read', tool_input:{path:'one'}});
++  hook('B', 'PreToolUse', {tool_name:'Write', tool_input:{path:'two'}});
++  const deskA = State.officeAgents.find(agent => agent.sessionId === 'A');
++  const opened = [];
++  const view = officeView(request => opened.push(request));
++  view.update(officeSnapshot());
++  view.root.find('button').find(button => button.dataset.officeAgent === deskA.id).fire('click');
++  const details = view.root.find('.office-details')[0];
++  assert.ok(details.textContent.includes('/projects/A'));
++  assert.ok(details.textContent.includes('Session: A'));
++  assert.ok(details.textContent.includes('one'));
++  assert.ok(!details.textContent.includes('/projects/B'));
++  assert.deepEqual(opened, []);
++});
++
++test('working session details survive sibling stop timer without recreating catalog pills or replacing another answer card', () => {
++  hook('A', 'SessionStart');
++  hook('B', 'PreToolUse', {tool_name:'Bash', tool_input:{command:'long-running-job'}});
++  hook('A', 'Stop');
++  mock.timers.tick(5201);
++  const deskB = State.officeAgents.find(agent => agent.sessionId === 'B');
++  assert.equal(deskB.state, 'working');
++  const pending = {requestId:'waiting-A',sessionId:'A',pillId:'agent_codex',command:'confirm'};
++  State.pendingApproval = pending;
++  const tasksBefore = [...State.tasks];
++  const opened = [];
++  const view = officeView(request => { opened.push(request); emit('office-open', request); });
++  view.update(officeSnapshot());
++  view.root.find('button').find(button => button.dataset.officeAgent === deskB.id).fire('click');
++  assert.ok(view.root.find('.office-details')[0].textContent.includes('/projects/B'));
++  assert.ok(view.root.find('.office-details')[0].textContent.includes('long-running-job'));
++  assert.deepEqual(State.tasks, tasksBefore);
++  assert.equal(State.pendingApproval, pending);
++  assert.deepEqual(opened, []);
++});
+diff --git a/windows/tests/office.test.mjs b/windows/tests/office.test.mjs
+new file mode 100644
+index 0000000..def8c94
+--- /dev/null
++++ b/windows/tests/office.test.mjs
+@@ -0,0 +1,90 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { officeStatus, requestForAgent } from '../src/office/model.ts';
++import { State } from '../src/core/state.ts';
++import { calls, emit, sent } from './tauri.mjs';
++import { installFakeDom } from './fakedom.mjs';
++
++const agent = (sessionId = 'one', subagentId) => ({
++  id: JSON.stringify(['agent_codex', sessionId, subagentId ?? '']), pillId: 'agent_codex',
++  sessionId, subagentId, name: 'Codex <script>', state: 'working', step: 'Edit src/app.ts', updatedAt: 1,
++});
++const pending = { requestId: 'request-one', sessionId: 'one', pillId: 'agent_codex', command: '',
++  questions: [{ question: 'SQLite <script> or PostgreSQL?', options: [], multiSelect: false }] };
++
++test('office ties answer bubbles to the exact session, never sibling sessions or subagents', () => {
++  const scene = { agents: [], pending };
++  assert.equal(requestForAgent(scene, agent()), pending);
++  assert.equal(requestForAgent(scene, agent('two')), null);
++  assert.equal(requestForAgent(scene, agent('one', 'worker')), null);
++  assert.equal(officeStatus(agent(), false), 'Writing');
++  assert.equal(officeStatus({ ...agent(), step: 'Bash npm test' }, false), 'Running');
++  assert.equal(officeStatus(agent(), true), 'Needs an answer');
++});
++
++test('empty office creates no synthetic agents; live desks safely render text and dispatch exact request IDs', async () => {
++  installFakeDom();
++  const { officeView } = await import('../src/office/view.ts');
++  const opened = [];
++  const view = officeView((request) => opened.push(request));
++  view.update({ agents: [], pending: null });
++  assert.equal(view.root.find('button').length, 0);
++  assert.ok(view.root.textContent.includes('Your office is ready'));
++  const scene = { agents: [agent(), agent('two')], pending };
++  view.update(scene);
++  const buttons = view.root.find('button');
++  assert.equal(buttons.length, 2);
++  assert.ok(buttons[0].textContent.includes('SQLite <script>'));
++  assert.equal(view.root.find('.office-bubble').length, 1);
++  buttons[0].fire('click');
++  buttons[1].fire('click');
++  assert.deepEqual(opened, [{ agentId: agent().id, requestId: pending.requestId }]);
++  assert.ok(view.root.find('.office-details')[0].textContent.includes('Session: two'));
++  view.update(scene);
++  assert.equal(view.root.find('button')[0], buttons[0], 'unchanged snapshots preserve DOM and keyboard focus');
++  const room = view.root.find('.office-room')[0];
++  room.contains = (node) => [...room.walk()].includes(node);
++  document.activeElement = buttons[1];
++  const originalCreateElement = document.createElement;
++  document.createElement = (tag) => {
++    const element = originalCreateElement(tag);
++    element.focus = () => { document.activeElement = element; };
++    return element;
++  };
++  view.update({ ...scene, agents: [agent(), { ...agent('two'), state: 'thinking' }] });
++  assert.equal(document.activeElement, view.root.find('button')[1], 'updated snapshots restore the same session keyboard focus');
++});
++
++test('island relay sends current state on subscribe and ignores stale answer requests', async () => {
++  const { registerOfficeRelay } = await import('../src/office/relay.ts');
++  const alerts = [];
++  State.officeAgents = [agent(), agent('two')];
++  State.pendingApproval = pending;
++  State.tasks = [{ id: 'agent_codex', name: 'Codex', state: 'working', steps: [] }];
++  await registerOfficeRelay({ alert: (view) => alerts.push(view) });
++  calls.length = 0;
++  emit('office-watch', true);
++  assert.ok(sent('plugin:event|emit_to').some((event) => event.event === 'office-snapshot' && event.payload.agents.length === 2));
++  emit('office-open', { agentId: agent('two').id, requestId: pending.requestId });
++  emit('office-open', { agentId: agent().id, requestId: 'expired' });
++  assert.deepEqual(alerts, []);
++  emit('office-open', { agentId: agent().id, requestId: pending.requestId });
++  assert.deepEqual(alerts, ['question']);
++  emit('office-watch', false);
++  calls.length = 0;
++  State.notify();
++  assert.equal(sent('plugin:event|emit_to').length, 0);
++});
++
++test('office page subscribes after listening and stops watching on navigation', async () => {
++  const dom = installFakeDom();
++  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
++  const { officePage } = await import('../src/office/page.ts');
++  const ctx = { hero: () => dom.root() };
++  calls.length = 0;
++  await officePage(dom.root(), ctx);
++  assert.ok(sent('plugin:event|emit_to').some((event) => event.event === 'office-watch' && event.payload === true));
++  ctx.onLeave();
++  assert.ok(sent('plugin:event|emit_to').some((event) => event.event === 'office-watch' && event.payload === false));
++  assert.ok(sent('plugin:event|unlisten').length > 0);
++});

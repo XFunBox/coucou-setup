@@ -19,6 +19,7 @@ import hashlib, json, sys
 from pathlib import Path
 root = Path(sys.argv[1]); lock = json.loads((root/'source-lock.json').read_text())
 assert hashlib.sha256((root/'patches/sendoa.patch').read_bytes()).hexdigest() == lock['patchSha256'], 'El parche no coincide con source-lock.json'
+assert hashlib.sha256((root/'patches/desktop.patch').read_bytes()).hexdigest() == lock['desktopPatchSha256'], 'El parche de escritorio no coincide con source-lock.json'
 PY
 SOURCE_URL=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourceUrl"])' "$ROOT/source-lock.json")
 SOURCE_SHA=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourceSha256"])' "$ROOT/source-lock.json")
@@ -42,8 +43,11 @@ tar -xzf "$TASK_TMP/source.tar.gz" --strip-components=1 -C "$TASK_TMP/context"
 # Aislar el árbol: sin esto Git podría encontrar el .git del setup padre e
 # ignorar rutas del parche por ejecutarse en un subdirectorio del repositorio.
 git -C "$TASK_TMP/context" init --quiet
+git -C "$TASK_TMP/context" config core.autocrlf false
 git -C "$TASK_TMP/context" apply --check "$ROOT/patches/sendoa.patch"
 git -C "$TASK_TMP/context" apply "$ROOT/patches/sendoa.patch"
+git -C "$TASK_TMP/context" apply --check "$ROOT/patches/desktop.patch"
+git -C "$TASK_TMP/context" apply "$ROOT/patches/desktop.patch"
 cp "$ROOT/Dockerfile" "$TASK_TMP/context/Dockerfile"
 printf '.git\n**/node_modules\n**/target\n**/dist\n' > "$TASK_TMP/context/.dockerignore"
 if [[ "$MODE" == prepare ]]; then
@@ -64,7 +68,7 @@ IMAGE="coucou-setup-local:$VERSION"
   -t "$IMAGE" "$TASK_TMP/context"
 EXPORT_TMP=$(mktemp -d "$ROOT/.build/export.XXXXXXXX")
 TASK_CONTAINER=$("${DOCKER[@]}" create "$IMAGE" /coucou)
-for file in coucou coucou-hook LICENSE LICENSE-ASSETS.md LICENSE-ANDROID SHA256SUMS; do
+for file in coucou coucou-hook codex-bridge.mjs LICENSE LICENSE-ASSETS.md LICENSE-ANDROID SHA256SUMS; do
   "${DOCKER[@]}" cp "$TASK_CONTAINER:/$file" "$EXPORT_TMP/$file"
 done
 "${DOCKER[@]}" rm "$TASK_CONTAINER" >/dev/null
