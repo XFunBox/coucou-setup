@@ -1,6 +1,22 @@
 # Coucou con Codex, GitHub y Spotify
 
-Setup de **Coucou 0.5.0-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.0-sendoa.3** para Ubuntu/Debian amd64 y Windows x64. Descarga la fuente oficial 0.5.0, verifica su SHA-256 y aplica dos parches verificados: las personalizaciones Sendoa y la oficina de agentes. Linux compila en Docker; Windows utiliza su backend nativo y MSVC. No necesita las imágenes ni los binarios de otro equipo.
+
+## Windows y oficina de agentes
+
+Para Windows, consulta [WINDOWS.md](WINDOWS.md): `install.ps1 -DryRun` muestra el plan, `build.ps1 -PrepareOnly` prepara la fuente y `install.ps1` compila e instala para tu usuario. Requiere las herramientas de compilación indicadas; no las instala globalmente.
+
+En ambos sistemas, abre **Coucou → Notch → Oficina de agentes**. La oficina representa las sesiones reales recibidas por los hooks, con escritorios, estados y subagentes cuando el agente proporciona su identificador. Seleccionar un escritorio abre sus detalles; una burbuja de pregunta abre su tarjeta real en la isla. La oficina vacía no inventa actividad. Respeta el teclado y la preferencia de movimiento reducido.
+
+Las preguntas de Claude Code existentes se conservan. Para responder preguntas de opciones de **Codex**, inicia una sesión nueva con el puente incluido. En Linux:
+
+```bash
+~/.local/share/coucou-local/bin/coucou-codex --cwd "$PWD" --plan 'Revisa el proyecto y pregunta qué enfoque prefiero'
+```
+
+Requiere Coucou abierto, Node 22+ en PATH y Codex CLI autenticado. El puente usa `codex app-server`; no se conecta a chats ya abiertos de Codex Desktop. Permite preguntas de opciones y aprobaciones de comandos/archivos, con respuestas humanas correlacionadas y una cola compartida entre sesiones. También admite `--model`, `--codex` y `--hook` (ejecutable nativo o archivo JavaScript). No admite respuestas libres, preguntas secretas ni solicitudes de permisos adicionales `item/permissions/requestApproval`; una solicitud no compatible se devuelve con un error explícito, sin conceder permisos. No sustituye al CLI interactivo completo: cada invocación ejecuta un turno y conserva la conversación de Codex en su almacenamiento normal.
+
+Los hooks de Codex ya instalados siguen funcionando con su mecanismo anterior de aprobaciones. El puente es la vía específica para las preguntas con opciones. Las comprobaciones ejecutadas y los límites están en [VERIFICATION.md](VERIFICATION.md).
 
 Incluye:
 
