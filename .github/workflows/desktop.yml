@@ -3,7 +3,7 @@ name: Desktop checks
 on:
   pull_request:
   push:
-    branches: [main, 'feature/windows-agent-office']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
