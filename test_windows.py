@@ -65,7 +65,7 @@ class WindowsInstallerTests(unittest.TestCase):
             backup = apply(home, source, profile, source, platform='windows')
             real_copy = configure.atomic_copy
             def fail_relay(source_path, target, mode=0o755):
-                if target == relay:
+                if Path(target).resolve() == relay.resolve():
                     raise PermissionError('relay is running')
                 return real_copy(source_path, target, mode)
             with patch('configure.atomic_copy', side_effect=fail_relay):
