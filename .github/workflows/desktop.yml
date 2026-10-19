@@ -76,3 +76,10 @@ jobs:
         run: python windows_build.py
       - name: Verify build provenance
         run: python windows_build.py --verify-release
+      - name: Upload portable Windows build for smoke testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: coucou-windows-${{ github.sha }}
+          path: .build/release-windows/
+          if-no-files-found: error
+          retention-days: 7
