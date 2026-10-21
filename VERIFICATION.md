@@ -1,3 +1,15 @@
+# Verificación — 2026-10-21 · monitor de subagentes
+
+Versión **0.5.0-sendoa.4**, sobre la misma base oficial Linux 0.5.0.
+
+- **415 pruebas Node**, **10 pruebas Rust del monitor** y **10 Python del instalador** correctas; una prueba Rust de lectura de sesiones reales permanece ignorada en la suite aislada. TypeScript, Vite, Tauri release, sintaxis Bash y revisión de espacios correctos. La compilación local reutiliza dependencias y cachés de .3; se conserva la receta Docker completa del setup.
+- Parche aplicado a fuente limpia, **40 archivos** comparados byte a byte y SHA-256 fijado. SHA-256 de binarios y `ldd` comprobados antes de instalar, hashes comprobados después del arranque.
+- Parser incremental acotado, aislamiento de chats, jerarquía, guardianes excluidos, líneas parciales, truncación, privacidad y cadenas de padres incompletas/cíclicas cubiertos. Consulta JSON del binario final contra registros reales: árbol de este chat con **3 agentes**; comprobados principal y dos subagentes conocidos. No se devuelve contenido de mensajes ni argumentos/resultados de herramientas.
+- Revisión independiente: prioridad visual de preguntas/permisos y clics tras cambiar entre hooks y monitor corregidos, con regresiones verificadas. Los metadatos se mantienen separados del chat/enlace al móvil.
+- QA con componentes reales en Chrome y datos simulados: sala **880 × 480**, ficha de subagente, plegado a **288 × 32** al sacar el cursor, cero puestos ocultos y cero errores JavaScript. Pin explícito y retardo de 0,6 s cubiertos por pruebas. No se ha inspeccionado visualmente la ventana nativa.
+- Instalación real: servicio `active/running`, versión .4 y overlay layer-shell confirmados en log. Valores de ajustes existentes conservados; hooks y menú idénticos. Copia previa y reversión preparadas. No se modifican paneles ni pantallas.
+- Los estados proceden de registros locales de Codex, cuyo formato puede cambiar. Una lectura incompleta se indica como desconocida y se señala la actividad antigua; no se afirma un heartbeat de procesos ni un nuevo canal de respuestas a preguntas Codex. El árbol usa el ID del hook (resolviendo hijos validados hacia la raíz) o la raíz modificada más recientemente.
+
 # Verificación — 2026-10-21
 
 Versión **0.5.0-sendoa.3**, sobre la misma base oficial Linux 0.5.0. El cambio de esta versión está en la interfaz; no modifica la lógica Rust de servicios o hooks.

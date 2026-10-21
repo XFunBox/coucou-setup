@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.0-sendoa.4 — 2026-10-21
+
+- Monitor del flujo real de Codex: principal y subagentes explícitos, jerarquía, rol, modelo, esfuerzo, estado registrado y última herramienta. Lectura local incremental con límites; excluye guardianes y otros chats del árbol.
+- Sala ampliada a 880 × 480, ajustable al espacio disponible, con ficha del puesto seleccionado. Se recoge al notch al salir el cursor en 0,6 s, conservando la prioridad de solicitudes pendientes.
+- Recuento de subagentes en compacto y consulta JSON desde consola para facilitar seguimiento por herramientas. Lecturas incompletas se muestran como estado desconocido; no se exportan mensajes, prompts, argumentos ni resultados de herramientas.
+
 ## 0.5.0-sendoa.3 — 2026-10-21
 
 - Sala de agentes EVA-01 integrada en el notch: puestos, personajes animados y estados reales de hooks; selección para abrir detalle o solicitud pendiente.

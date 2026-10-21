@@ -1,5 +1,5 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index b161fd0..e6917af 100644
+index b161fd0..8f28fb1 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index b161fd0..e6917af 100644
  [[package]]
  name = "coucou"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.3"
++version = "0.5.0-sendoa.4"
  dependencies = [
   "arboard",
   "cpal",
@@ -16,12 +16,12 @@ index b161fd0..e6917af 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.3"
++version = "0.5.0-sendoa.4"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index aa82ca8..17f12db 100644
+index aa82ca8..4b2f0cb 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -29,31 +29,31 @@ index aa82ca8..17f12db 100644
  
  [workspace.package]
 -version = "0.5.0"
-+version = "0.5.0-sendoa.3"
++version = "0.5.0-sendoa.4"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1b260d3..d504a6a 100644
+index 1b260d3..f921031 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.3",
++  "version": "0.5.0-sendoa.4",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.0",
-+      "version": "0.5.0-sendoa.3",
++      "version": "0.5.0-sendoa.4",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 4f905eb..1f0ea88 100644
+index 4f905eb..3edf90b 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,7 +1,7 @@
@@ -61,10 +61,579 @@ index 4f905eb..1f0ea88 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.3",
++  "version": "0.5.0-sendoa.4",
    "type": "module",
    "scripts": {
      "dev": "vite",
+diff --git a/windows/src-tauri/src/codex_agents.rs b/windows/src-tauri/src/codex_agents.rs
+new file mode 100644
+index 0000000..532d44d
+--- /dev/null
++++ b/windows/src-tauri/src/codex_agents.rs
+@@ -0,0 +1,563 @@
++//! Read-only, bounded view of Codex rollout metadata. Never return conversation
++//! text, tool arguments/results, prompts, reasoning, or raw parser errors.
++
++use serde::Serialize;
++use serde_json::Value;
++use std::collections::{HashMap, HashSet};
++use std::fs::{self, File, Metadata, OpenOptions};
++use std::io::{Read, Seek, SeekFrom};
++use std::path::{Path, PathBuf};
++use std::sync::{Mutex, OnceLock};
++
++const MAX_FILES: usize = 256;
++const MAX_ENTRIES: usize = 20_000;
++const MAX_LINE: usize = 1024 * 1024;
++const MAX_FILE_READ: usize = 2 * 1024 * 1024;
++const MAX_POLL_READ: usize = 16 * 1024 * 1024;
++
++#[derive(Clone, Debug, Serialize)]
++#[serde(rename_all = "camelCase")]
++pub struct Agent {
++    id: String,
++    parent_id: Option<String>,
++    name: String,
++    role: Option<String>,
++    model: Option<String>,
++    effort: Option<String>,
++    status: &'static str,
++    tool: Option<String>,
++    last_seen: Option<String>,
++}
++
++#[derive(Debug, Serialize)]
++#[serde(rename_all = "camelCase")]
++pub struct Snapshot {
++    root_id: Option<String>,
++    agents: Vec<Agent>,
++    pub(crate) truncated: bool,
++    warnings: Vec<&'static str>,
++}
++
++#[derive(Default)]
++struct Rollout {
++    offset: u64,
++    pending: Vec<u8>,
++    skipping_line: bool,
++    first_line: bool,
++    identity: Option<(u64, u64)>,
++    modified: Option<std::time::SystemTime>,
++    agent: Option<Agent>,
++    root: bool,
++    limited: bool,
++    incomplete: bool,
++}
++
++impl Rollout {
++    fn fresh(metadata: &Metadata) -> Self {
++        Self { first_line: true, identity: file_identity(metadata), modified: metadata.modified().ok(), incomplete: true, ..Self::default() }
++    }
++
++    fn line(&mut self, line: &[u8]) {
++        let first = self.first_line;
++        self.first_line = false;
++        let Ok(record) = serde_json::from_slice::<Value>(line) else { return };
++        let payload = &record["payload"];
++        if first {
++            if record["type"] != "session_meta" { return; }
++            let Some(id) = payload["id"].as_str().filter(|id| valid_id(id)) else { return };
++            let source = &payload["source"];
++            if source.pointer("/subagent/other").and_then(Value::as_str) == Some("guardian") { return; }
++            let spawn = source.pointer("/subagent/thread_spawn");
++            // Guardians and other internal subagent sources are deliberately
++            // excluded, even if they happen to declare a parent_thread_id.
++            self.root = source.is_string() && source.as_str() != Some("subagent")
++                && payload["parent_thread_id"].is_null();
++            let parent = if let Some(spawn) = spawn {
++                spawn["parent_thread_id"].as_str()
++                    .or_else(|| payload["parent_thread_id"].as_str())
++                    .filter(|id| valid_id(id)).map(str::to_owned)
++            } else { None };
++            if !self.root && parent.is_none() { return; }
++            let role = spawn.and_then(|s| label(&s["agent_role"]));
++            let name = spawn.and_then(|s| label(&s["agent_path"]))
++                .and_then(|path| path.rsplit('/').find(|part| !part.is_empty()).map(str::to_owned))
++                .or_else(|| spawn.and_then(|s| label(&s["agent_nickname"])))
++                .unwrap_or_else(|| if self.root { "Codex".into() } else { "Subagente".into() });
++            self.agent = Some(Agent {
++                id: id.into(), parent_id: parent, name, role,
++                model: label(&payload["model"]), effort: None,
++                status: "unknown", tool: None, last_seen: timestamp(&record["timestamp"]),
++            });
++            return;
++        }
++        let Some(agent) = self.agent.as_mut() else { return };
++        // An old event in an out-of-order append cannot reverse current state.
++        let time = timestamp(&record["timestamp"]);
++        if let (Some(new), Some(old)) = (&time, &agent.last_seen) {
++            if new < old { return; }
++        }
++        match record["type"].as_str() {
++            Some("event_msg") => match payload["type"].as_str() {
++                Some("task_started") => { agent.status = "working"; agent.tool = None; }
++                Some("task_complete") => { agent.status = "completed"; agent.tool = None; }
++                Some("turn_aborted") => { agent.status = "interrupted"; agent.tool = None; }
++                _ => {}
++            },
++            Some("turn_context") => {
++                agent.model = label(&payload["model"]);
++                agent.effort = label(&payload["effort"]);
++            }
++            Some("response_item") if matches!(payload["type"].as_str(), Some("function_call" | "custom_tool_call")) => {
++                if agent.status == "working" {
++                    agent.tool = label(&payload["name"]).map(|name| {
++                        label(&payload["namespace"]).map(|ns| format!("{ns}.{name}")).unwrap_or(name)
++                    });
++                }
++            }
++            _ => {}
++        }
++        if time.is_some() { agent.last_seen = time; }
++    }
++
++    fn consume(&mut self, bytes: &[u8]) {
++        for &byte in bytes {
++            if byte == b'\n' {
++                if !self.skipping_line {
++                    let line = std::mem::take(&mut self.pending);
++                    self.line(&line);
++                } else { self.first_line = false; }
++                self.pending.clear();
++                self.skipping_line = false;
++            } else if !self.skipping_line {
++                if self.pending.len() < MAX_LINE { self.pending.push(byte); }
++                else {
++                    self.pending.clear();
++                    self.skipping_line = true;
++                    self.limited = true;
++                    if let Some(agent) = self.agent.as_mut() {
++                        agent.status = "unknown";
++                        agent.tool = None;
++                    }
++                }
++            }
++        }
++    }
++
++    fn update(&mut self, mut file: File, metadata: &Metadata, budget: usize) -> std::io::Result<usize> {
++        if metadata.len() < self.offset || self.identity != file_identity(metadata)
++            || (metadata.len() == self.offset && self.modified != metadata.modified().ok()) {
++            *self = Self::fresh(metadata);
++        }
++        file.seek(SeekFrom::Start(self.offset))?;
++        let mut remaining = budget.min(MAX_FILE_READ);
++        let mut read = 0;
++        let mut bytes = [0u8; 64 * 1024];
++        while remaining > 0 {
++            let len = bytes.len().min(remaining);
++            let n = file.read(&mut bytes[..len])?;
++            if n == 0 { break; }
++            self.consume(&bytes[..n]);
++            self.offset += n as u64;
++            remaining -= n;
++            read += n;
++        }
++        self.modified = metadata.modified().ok();
++        self.incomplete = self.offset < file.metadata()?.len() || !self.pending.is_empty() || self.skipping_line;
++        Ok(read)
++    }
++}
++
++fn valid_id(id: &str) -> bool {
++    id.len() == 36 && id.bytes().enumerate().all(|(i, c)| {
++        if matches!(i, 8 | 13 | 18 | 23) { c == b'-' } else { c.is_ascii_hexdigit() }
++    })
++}
++
++fn label(value: &Value) -> Option<String> {
++    value.as_str().filter(|s| !s.is_empty() && s.len() <= 160 && !s.chars().any(char::is_control)).map(str::to_owned)
++}
++
++// Rollouts use UTC ISO timestamps; accept that exact sortable shape only.
++fn timestamp(value: &Value) -> Option<String> {
++    let s = value.as_str()?;
++    let b = s.as_bytes();
++    if !(20..=30).contains(&b.len()) || b.last() != Some(&b'Z') { return None; }
++    for (i, &c) in b[..19].iter().enumerate() {
++        let expected = match i { 4 | 7 => Some(b'-'), 10 => Some(b'T'), 13 | 16 => Some(b':'), _ => None };
++        if expected.map(|e| c != e).unwrap_or(!c.is_ascii_digit()) { return None; }
++    }
++    if b.len() > 20 && (b[19] != b'.' || !b[20..b.len()-1].iter().all(u8::is_ascii_digit)) { return None; }
++    // Normalize fractional precision so comparisons remain chronological when
++    // one record uses whole seconds and another milliseconds or microseconds.
++    let fraction = if b.len() > 20 { &s[20..s.len()-1] } else { "" };
++    Some(format!("{}.{:0<9}Z", &s[..19], fraction))
++}
++
++#[cfg(unix)]
++fn file_identity(metadata: &Metadata) -> Option<(u64, u64)> {
++    use std::os::unix::fs::MetadataExt;
++    Some((metadata.dev(), metadata.ino()))
++}
++#[cfg(not(unix))]
++fn file_identity(_: &Metadata) -> Option<(u64, u64)> { None }
++
++/// Reject symlinks in the path as well as the final file. Linux also opens the
++/// final component with O_NOFOLLOW, closing the usual check/open race there.
++fn no_symlinks(path: &Path) -> bool {
++    let mut checked = PathBuf::new();
++    path.components().all(|part| {
++        checked.push(part);
++        fs::symlink_metadata(&checked).map(|m| !m.file_type().is_symlink()).unwrap_or(false)
++    })
++}
++
++fn open_rollout(path: &Path) -> std::io::Result<File> {
++    if !no_symlinks(path) { return Err(std::io::ErrorKind::PermissionDenied.into()); }
++    let mut options = OpenOptions::new();
++    options.read(true);
++    #[cfg(target_os = "linux")]
++    {
++        use std::os::unix::fs::OpenOptionsExt;
++        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
++    }
++    #[cfg(windows)]
++    {
++        use std::os::windows::fs::OpenOptionsExt;
++        options.custom_flags(0x00200000); // FILE_FLAG_OPEN_REPARSE_POINT
++    }
++    let file = options.open(path)?;
++    let metadata = file.metadata()?;
++    if !metadata.is_file() || metadata.file_type().is_symlink() { return Err(std::io::ErrorKind::InvalidData.into()); }
++    Ok(file)
++}
++
++#[derive(Default)]
++struct Cache { files: HashMap<PathBuf, Rollout> }
++
++impl Cache {
++    fn snapshot(&mut self, directory: &Path, requested: Option<&str>) -> Snapshot {
++        let mut warnings = Vec::new();
++        let mut limited = false;
++        let mut paths = Vec::new();
++        let mut entries = 0;
++        if no_symlinks(directory) {
++            discover(directory, 0, &mut entries, &mut paths, &mut limited);
++        } else { warnings.push("sessions_unavailable"); }
++        // Recent files first; unchanged files need no content I/O next poll.
++        paths.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| b.0.cmp(&a.0)));
++        if paths.len() > MAX_FILES { paths.truncate(MAX_FILES); limited = true; }
++        let present: HashSet<_> = paths.iter().map(|(p, _)| p.clone()).collect();
++        self.files.retain(|path, _| present.contains(path));
++        let mut budget = MAX_POLL_READ;
++        let mut latest_root: Option<(std::time::SystemTime, String)> = None;
++        for (path, _) in paths {
++            if let Some(rollout) = self.files.get_mut(&path) { rollout.incomplete = true; }
++            let Ok(file) = open_rollout(&path) else { warnings.push("session_unreadable"); limited = true; continue };
++            let Ok(meta) = file.metadata() else { warnings.push("session_unreadable"); limited = true; continue };
++            let rollout = self.files.entry(path).or_insert_with(|| Rollout::fresh(&meta));
++            match rollout.update(file, &meta, budget) {
++                Ok(read) => budget -= read,
++                Err(_) => { warnings.push("session_unreadable"); limited = true; },
++            }
++            if rollout.root {
++                if let Some(agent) = &rollout.agent {
++                    let candidate = (meta.modified().unwrap_or(std::time::UNIX_EPOCH), agent.id.clone());
++                    if latest_root.as_ref().map(|old| &candidate > old).unwrap_or(true) { latest_root = Some(candidate); }
++                }
++            }
++            limited |= rollout.incomplete || rollout.limited;
++        }
++        let all: HashMap<_, _> = self.files.values().filter_map(|r| r.agent.as_ref().map(|a| (a.id.clone(), (a, r.root)))).collect();
++        // Hooks may identify a spawned session. Follow only validated metadata
++        // parents; an incomplete or cyclic chain never falls back to another chat.
++        let root_id = requested.map(|id| {
++            let mut current = id;
++            let mut seen = HashSet::new();
++            while seen.insert(current) {
++                match all.get(current) {
++                    Some((agent, false)) => match agent.parent_id.as_deref() {
++                        Some(parent) => current = parent,
++                        None => break,
++                    },
++                    _ => break,
++                }
++            }
++            current.to_owned()
++        }).or_else(|| latest_root.map(|(_, id)| id));
++        let mut agents = Vec::new();
++        if let Some(root) = root_id.as_deref() {
++            // The resolved ID must be a genuine root. Missing parents, cycles
++            // and guardians produce an empty exact tree.
++            if let Some((agent, true)) = all.get(root) {
++                agents.push((*agent).clone());
++                let mut seen = HashSet::from([root.to_owned()]);
++                loop {
++                    let mut next: Vec<_> = all.values().filter(|(a, _)| !seen.contains(&a.id)
++                        && a.parent_id.as_ref().map(|p| seen.contains(p)).unwrap_or(false))
++                        .map(|(a, _)| (*a).clone()).collect();
++                    if next.is_empty() { break; }
++                    next.sort_by(|a, b| a.id.cmp(&b.id));
++                    for a in next { seen.insert(a.id.clone()); agents.push(a); }
++                }
++            } else { warnings.push("root_not_found"); }
++        }
++        if limited { warnings.push("bounded_history"); }
++        // A bounded read may stop in the middle of a live turn or before a
++        // terminal event. Never present that historical state as current.
++        let incomplete: HashSet<_> = self.files.values().filter(|r| r.incomplete)
++            .filter_map(|r| r.agent.as_ref().map(|a| a.id.as_str())).collect();
++        for agent in &mut agents {
++            if incomplete.contains(agent.id.as_str()) {
++                agent.status = "unknown";
++                agent.tool = None;
++            }
++        }
++        warnings.sort_unstable(); warnings.dedup();
++        Snapshot { root_id, agents, truncated: limited, warnings }
++    }
++}
++
++/// Only YYYY/MM/DD/rollout*.jsonl, bounded directory work and no symlink descent.
++fn discover(dir: &Path, depth: usize, entries: &mut usize, paths: &mut Vec<(PathBuf, std::time::SystemTime)>, limited: &mut bool) {
++    let Ok(read) = fs::read_dir(dir) else { *limited = true; return };
++    let mut children = Vec::new();
++    for entry in read {
++        if *entries >= MAX_ENTRIES { *limited = true; break; }
++        *entries += 1;
++        let Ok(entry) = entry else { *limited = true; continue };
++        let Ok(kind) = entry.file_type() else { continue };
++        if kind.is_symlink() { continue; }
++        let name = entry.file_name().to_string_lossy().into_owned();
++        if depth < 3 {
++            let width = if depth == 0 { 4 } else { 2 };
++            if kind.is_dir() && name.len() == width && name.bytes().all(|c| c.is_ascii_digit()) {
++                children.push(entry.path());
++            }
++        } else if kind.is_file() && name.starts_with("rollout") && name.ends_with(".jsonl") {
++            if let Ok(meta) = entry.metadata() {
++                paths.push((entry.path(), meta.modified().unwrap_or(std::time::UNIX_EPOCH)));
++            }
++        }
++    }
++    children.sort_by(|a, b| b.cmp(a));
++    for child in children {
++        if *entries >= MAX_ENTRIES { *limited = true; break; }
++        discover(&child, depth + 1, entries, paths, limited);
++    }
++}
++
++static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();
++
++pub fn read(root_thread_id: Option<String>) -> Result<Snapshot, String> {
++    if root_thread_id.as_deref().map(|id| !valid_id(id)).unwrap_or(false) {
++        return Err("Invalid Codex root thread ID".into());
++    }
++    let codex_home = std::env::var_os("CODEX_HOME").filter(|value| !value.is_empty())
++        .map(PathBuf::from).unwrap_or_else(|| crate::platform::home_dir().join(".codex"));
++    let directory = codex_home.join("sessions");
++    // ponytail: one global lock serializes bounded polls; split only if measured
++    // contention warrants it. No watcher, daemon, or extra dependency.
++    let mut cache = CACHE.get_or_init(|| Mutex::new(Cache::default())).lock()
++        .map_err(|_| "Codex session monitor unavailable".to_owned())?;
++    Ok(cache.snapshot(&directory, root_thread_id.as_deref()))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use serde_json::json;
++    const ROOT: &str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
++    const CHILD: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
++    const OTHER: &str = "cccccccc-cccc-cccc-cccc-cccccccccccc";
++
++    fn record(kind: &str, payload: Value) -> Vec<u8> {
++        let mut out = serde_json::to_vec(&json!({"timestamp":"2026-10-21T10:00:00.000Z", "type":kind,"payload":payload})).unwrap();
++        out.push(b'\n'); out
++    }
++    fn rollout(id: &str, source: Value, parent: Option<&str>) -> Rollout {
++        let mut r = Rollout { first_line: true, ..Rollout::default() };
++        r.consume(&record("session_meta", json!({"id":id,"source":source,"parent_thread_id":parent})));
++        r
++    }
++    fn state(r: &mut Rollout, state: &str) { r.consume(&record("event_msg", json!({"type":state}))); }
++
++    #[test]
++    fn metadata_accepts_only_roots_and_spawned_agents() {
++        let root = rollout(ROOT, json!("vscode"), None);
++        assert!(root.root);
++        let child = rollout(CHILD, json!({"subagent":{"thread_spawn":{"parent_thread_id":ROOT,"agent_role":"explorer","agent_nickname":"Luna","agent_path":"/root/explore"}}}), Some(ROOT));
++        let agent = child.agent.unwrap();
++        assert_eq!(agent.parent_id.as_deref(), Some(ROOT));
++        assert_eq!(agent.name, "explore"); assert_eq!(agent.role.as_deref(), Some("explorer"));
++        assert!(rollout(CHILD, json!({"subagent":{"other":"guardian"}}), Some(ROOT)).agent.is_none());
++        assert!(rollout(CHILD, json!({"subagent":{"other":"unknown"}}), Some(ROOT)).agent.is_none());
++        assert!(rollout("invalid", json!("vscode"), None).agent.is_none());
++    }
++
++    #[test]
++    fn turn_states_and_new_turn_clear_stale_tools() {
++        let mut r = rollout(ROOT, json!("vscode"), None);
++        assert_eq!(r.agent.as_ref().unwrap().status, "unknown");
++        state(&mut r, "task_started");
++        r.consume(&record("turn_context", json!({"model":"gpt-6.1-sol","effort":"high"})));
++        r.consume(&record("response_item", json!({"type":"function_call","name":"exec_command","namespace":"functions","arguments":"SECRET"})));
++        assert_eq!(r.agent.as_ref().unwrap().tool.as_deref(), Some("functions.exec_command"));
++        state(&mut r, "task_complete");
++        assert_eq!(r.agent.as_ref().unwrap().status, "completed");
++        assert!(r.agent.as_ref().unwrap().tool.is_none());
++        state(&mut r, "task_started");
++        assert_eq!(r.agent.as_ref().unwrap().status, "working");
++        assert!(r.agent.as_ref().unwrap().tool.is_none());
++        state(&mut r, "turn_aborted");
++        assert_eq!(r.agent.as_ref().unwrap().status, "interrupted");
++        assert_eq!(r.agent.as_ref().unwrap().effort.as_deref(), Some("high"));
++    }
++
++    #[test]
++    fn privacy_allowlist_ignores_content_and_outputs() {
++        let mut r = rollout(ROOT, json!("vscode"), None);
++        state(&mut r, "task_started");
++        r.consume(&record("response_item", json!({"type":"custom_tool_call","name":"apply_patch","input":"SECRET_INPUT","output":"SECRET_OUTPUT","arguments":"SECRET_ARGS"})));
++        r.consume(&record("response_item", json!({"type":"reasoning","text":"SECRET_REASONING"})));
++        r.consume(&record("event_msg", json!({"type":"user_message","message":"SECRET_PROMPT"})));
++        let encoded = serde_json::to_string(&r.agent).unwrap();
++        assert!(!encoded.contains("SECRET"));
++        assert!(encoded.contains("apply_patch"));
++    }
++
++    #[test]
++    fn partial_lines_are_processed_once_only_after_newline() {
++        let mut r = rollout(ROOT, json!("vscode"), None);
++        let started = record("event_msg", json!({"type":"task_started"}));
++        r.consume(&started[..started.len()-1]);
++        assert_eq!(r.agent.as_ref().unwrap().status, "unknown");
++        r.consume(b"\n");
++        assert_eq!(r.agent.as_ref().unwrap().status, "working");
++        r.consume(&vec![b'x'; MAX_LINE+1]);
++        r.consume(b"\n");
++        state(&mut r, "task_complete");
++        assert_eq!(r.agent.as_ref().unwrap().status, "completed");
++        assert!(r.limited);
++    }
++
++    #[test]
++    fn bounded_reads_do_not_report_historical_work_as_current() {
++        let temp = Temp::new();
++        let mut content = bytes(json!({"id":ROOT,"source":"vscode"}));
++        content.extend(record("event_msg", json!({"type":"task_started"})));
++        content.extend(vec![b'x'; MAX_FILE_READ]);
++        content.push(b'\n');
++        content.extend(record("event_msg", json!({"type":"task_complete"})));
++        temp.write("root", &content);
++        let mut cache = Cache::default();
++        let partial = cache.snapshot(&temp.0, Some(ROOT));
++        assert!(partial.truncated);
++        assert_eq!(partial.agents[0].status, "unknown");
++        assert!(partial.agents[0].tool.is_none());
++        let caught_up = cache.snapshot(&temp.0, Some(ROOT));
++        assert_eq!(caught_up.agents[0].status, "completed");
++    }
++
++    struct Temp(PathBuf);
++    impl Temp {
++        fn new() -> Self {
++            static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
++            let dir = std::env::temp_dir().join(format!("coucou-codex-test-{}-{}", std::process::id(), COUNT.fetch_add(1,std::sync::atomic::Ordering::Relaxed)));
++            fs::create_dir_all(dir.join("2026/10/21")).unwrap(); Self(dir)
++        }
++        fn write(&self, name: &str, bytes: &[u8]) -> PathBuf {
++            let path = self.0.join("2026/10/21").join(format!("rollout-{name}.jsonl"));
++            fs::write(&path, bytes).unwrap(); path
++        }
++    }
++    impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
++    fn bytes(r: Value) -> Vec<u8> { record("session_meta", r) }
++
++    #[test]
++    fn exact_tree_isolation_includes_nested_agents_and_excludes_guardians() {
++        let temp = Temp::new();
++        temp.write("root", &bytes(json!({"id":ROOT,"source":"vscode"})));
++        temp.write("child", &bytes(json!({"id":CHILD,"source":{"subagent":{"thread_spawn":{"parent_thread_id":ROOT}}}})));
++        temp.write("other", &bytes(json!({"id":OTHER,"source":"cli"})));
++        let nested = "dddddddd-dddd-dddd-dddd-dddddddddddd";
++        temp.write("nested", &bytes(json!({"id":nested,"source":{"subagent":{"thread_spawn":{"parent_thread_id":CHILD}}}})));
++        temp.write("guardian", &bytes(json!({"id":"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee","parent_thread_id":ROOT,"source":{"subagent":{"other":"guardian"}}})));
++        let mut cache = Cache::default();
++        let result = cache.snapshot(&temp.0, Some(ROOT));
++        let ids: Vec<_> = result.agents.iter().map(|a| a.id.as_str()).collect();
++        assert_eq!(ids, [ROOT, CHILD, nested]);
++        let from_child = cache.snapshot(&temp.0, Some(nested));
++        assert_eq!(from_child.root_id.as_deref(), Some(ROOT));
++        assert_eq!(from_child.agents.len(), 3);
++        assert!(cache.snapshot(&temp.0, Some("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")).agents.is_empty());
++        assert_eq!(cache.snapshot(&temp.0, Some(OTHER)).agents.len(), 1);
++    }
++
++    #[test]
++    fn missing_or_cyclic_parent_never_uses_unrelated_root() {
++        let temp = Temp::new();
++        temp.write("root", &bytes(json!({"id":ROOT,"source":"vscode"})));
++        temp.write("child", &bytes(json!({"id":CHILD,"source":{"subagent":{"thread_spawn":{"parent_thread_id":OTHER}}}})));
++        let mut cache = Cache::default();
++        let missing = cache.snapshot(&temp.0, Some(CHILD));
++        assert!(missing.agents.is_empty());
++        assert!(missing.warnings.contains(&"root_not_found"));
++        temp.write("other", &bytes(json!({"id":OTHER,"source":{"subagent":{"thread_spawn":{"parent_thread_id":CHILD}}}})));
++        assert!(cache.snapshot(&temp.0, Some(CHILD)).agents.is_empty());
++    }
++
++    #[test]
++    fn incremental_append_and_truncation_and_newest_root() {
++        use std::io::Write;
++        let temp = Temp::new();
++        let path = temp.write("root", &bytes(json!({"id":ROOT,"source":"vscode"})));
++        let mut cache = Cache::default();
++        assert_eq!(cache.snapshot(&temp.0, None).root_id.as_deref(), Some(ROOT));
++        let event = record("event_msg", json!({"type":"task_started"}));
++        let mut file = OpenOptions::new().append(true).open(&path).unwrap();
++        file.write_all(&event[..event.len()-1]).unwrap();
++        assert_eq!(cache.snapshot(&temp.0, None).agents[0].status, "unknown");
++        file.write_all(b"\n").unwrap();
++        assert_eq!(cache.snapshot(&temp.0, None).agents[0].status, "working");
++        temp.write("root", &bytes(json!({"id":OTHER,"source":"cli"})));
++        assert_eq!(cache.snapshot(&temp.0, None).root_id.as_deref(), Some(OTHER));
++        assert!(cache.snapshot(&temp.0, Some(ROOT)).agents.is_empty());
++    }
++
++    #[test]
++    fn timestamps_normalize_precision_and_latest_root_ignores_child_activity() {
++        assert_eq!(timestamp(&json!("2026-10-21T10:00:00Z")), timestamp(&json!("2026-10-21T10:00:00.000Z")));
++        assert!(timestamp(&json!("2026-10-21T10:00:00.001Z")) > timestamp(&json!("2026-10-21T10:00:00Z")));
++        assert!(timestamp(&json!("secret")).is_none());
++        let temp = Temp::new();
++        temp.write("root", &bytes(json!({"id":ROOT,"source":"vscode"})));
++        let mut newer = bytes(json!({"id":OTHER,"source":"cli"}));
++        newer.extend_from_slice(b"{\"timestamp\":\"2026-10-21T11:00:00Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}\n");
++        temp.write("other", &newer);
++        let mut child = bytes(json!({"id":CHILD,"source":{"subagent":{"thread_spawn":{"parent_thread_id":ROOT}}}}));
++        child.extend_from_slice(b"{\"timestamp\":\"2026-10-21T12:00:00Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}\n");
++        temp.write("child", &child);
++        assert_eq!(Cache::default().snapshot(&temp.0, None).root_id.as_deref(), Some(OTHER));
++    }
++
++    #[test]
++    #[ignore = "reads real local rollout metadata; opt in with CODEX_HOME mounted"]
++    fn live_snapshot_print() {
++        let root = std::env::var("CODEX_MONITOR_ROOT").ok();
++        let snapshot = read(root).unwrap();
++        println!("{}", serde_json::to_string(&snapshot).unwrap());
++    }
++
++    #[cfg(unix)]
++    #[test]
++    fn symlinked_rollouts_and_session_directories_are_ignored() {
++        use std::os::unix::fs::symlink;
++        let temp = Temp::new();
++        let outside = temp.0.join("outside.jsonl");
++        fs::write(&outside, bytes(json!({"id":ROOT,"source":"vscode"}))).unwrap();
++        symlink(&outside, temp.0.join("2026/10/21/rollout-link.jsonl")).unwrap();
++        assert!(Cache::default().snapshot(&temp.0, None).agents.is_empty());
++        let linked = temp.0.join("linked"); symlink(&temp.0, &linked).unwrap();
++        assert!(Cache::default().snapshot(&linked, None).agents.is_empty());
++    }
++}
 diff --git a/windows/src-tauri/src/github.rs b/windows/src-tauri/src/github.rs
 index f1b2907..a59485e 100644
 --- a/windows/src-tauri/src/github.rs
@@ -447,6 +1016,96 @@ index 14969e4..ec537c0 100644
          had
      };
      if had_data {
+diff --git a/windows/src-tauri/src/island.rs b/windows/src-tauri/src/island.rs
+index b7cf921..d200ffb 100644
+--- a/windows/src-tauri/src/island.rs
++++ b/windows/src-tauri/src/island.rs
+@@ -15,8 +15,8 @@ use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize
+ use crate::platform::{self, cursor_physical, left_button_down};
+ 
+ /// Logical size of the full window — the largest island view, like the macOS panel.
+-pub const PANEL_W: f64 = 720.0;
+-pub const PANEL_H: f64 = 320.0;
++pub const PANEL_W: f64 = 960.0;
++pub const PANEL_H: f64 = 540.0;
+ /// Logical size of the invisible strip that wakes the island when it is hidden.
+ pub const STRIP_W: f64 = 240.0;
+ pub const STRIP_H: f64 = 6.0;
+@@ -360,8 +360,8 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+     let ms = *m.size();
+ 
+     let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
+-    let pw = (lw * scale).round().max(1.0) as u32;
+-    let ph = (lh * scale).round().max(1.0) as u32;
++    let pw = ((lw * scale).round().max(1.0) as u32).min(ms.width);
++    let ph = ((lh * scale).round().max(1.0) as u32).min(ms.height);
+     let x = mp.x + (ms.width as i32 - pw as i32) / 2;
+     let y = mp.y;
+ 
+diff --git a/windows/src-tauri/src/lib.rs b/windows/src-tauri/src/lib.rs
+index b4ea3cb..c001f9c 100644
+--- a/windows/src-tauri/src/lib.rs
++++ b/windows/src-tauri/src/lib.rs
+@@ -4,6 +4,7 @@ mod agent_hooks;
+ mod agents;
+ mod chat;
+ mod claude;
++mod codex_agents;
+ mod codex_plan;
+ mod config_file;
+ mod desktop;
+@@ -444,6 +445,25 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
+     tauri::async_runtime::spawn_blocking(codex_plan::read).await.ok().flatten()
+ }
+ 
++#[tauri::command]
++async fn codex_agent_snapshot(root_thread_id: Option<String>) -> Result<codex_agents::Snapshot, String> {
++    tauri::async_runtime::spawn_blocking(move || codex_agents::read(root_thread_id))
++        .await.map_err(|_| "Codex session monitor unavailable".to_owned())?
++}
++
++/// The CLI monitor shares the same bounded metadata reader as the webview.
++pub fn agent_monitor_json(root_thread_id: Option<String>) -> Result<String, String> {
++    let mut snapshot = codex_agents::read(root_thread_id.clone())?;
++    // A fresh CLI process can catch up with a long rollout without waiting for
++    // the webview's next poll. Still bounded; partial data stays explicitly unknown.
++    for _ in 0..7 {
++        if !snapshot.truncated { break; }
++        snapshot = codex_agents::read(root_thread_id.clone())?;
++    }
++    serde_json::to_string(&snapshot)
++        .map_err(|_| "Codex session monitor unavailable".to_owned())
++}
++
+ #[tauri::command]
+ fn approval_decision(app: AppHandle, request_id: String, decision: String) {
+     recap::record_decision(&app, &request_id, &decision);
+@@ -755,6 +775,7 @@ pub fn run() {
+             status_line_preview,
+             status_line_apply,
+             codex_plan_usage,
++            codex_agent_snapshot,
+             approval_decision,
+             approval_answer,
+             approval_ack,
+diff --git a/windows/src-tauri/src/main.rs b/windows/src-tauri/src/main.rs
+index 1893b83..b038dfb 100644
+--- a/windows/src-tauri/src/main.rs
++++ b/windows/src-tauri/src/main.rs
+@@ -2,5 +2,13 @@
+ #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+ 
+ fn main() {
++    let mut args = std::env::args().skip(1);
++    if args.next().as_deref() == Some("--agent-monitor-json") {
++        match coucou_lib::agent_monitor_json(args.next()) {
++            Ok(snapshot) => println!("{snapshot}"),
++            Err(error) => { eprintln!("{error}"); std::process::exit(1); }
++        }
++        return;
++    }
+     coucou_lib::run()
+ }
 diff --git a/windows/src-tauri/src/spotify.rs b/windows/src-tauri/src/spotify.rs
 index cb008bf..0744673 100644
 --- a/windows/src-tauri/src/spotify.rs
@@ -1167,7 +1826,7 @@ index cb008bf..0744673 100644
              v.box_clone()
          }
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index b9d01d4..e43475d 100644
+index b9d01d4..1978627 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -1175,16 +1834,17 @@ index b9d01d4..e43475d 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.3",
++  "version": "0.5.0-sendoa.4",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
 diff --git a/windows/src/core/agent-room.ts b/windows/src/core/agent-room.ts
 new file mode 100644
-index 0000000..7f976b7
+index 0000000..bcc44bc
 --- /dev/null
 +++ b/windows/src/core/agent-room.ts
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,29 @@
++import { CodexFlow } from "./codex-flow";
 +import type { AgentTask } from "./state";
 +import type { BotStateName } from "./layout";
 +import { pillDefinition } from "./pills";
@@ -1192,6 +1852,10 @@ index 0000000..7f976b7
 +
 +/** Only agents/workspaces that actually exist in Coucou; services aren't workers. */
 +export function roomAgents(tasks: AgentTask[]): AgentTask[] {
++  const hook = tasks.find(task => task.id === "agent_codex");
++  if (CodexFlow.tasks.length && hook) return CodexFlow.tasks.map(task =>
++    task.id === hook.id && ["question", "approval", "ratelimit", "error"].includes(hook.state)
++      ? { ...task, state: hook.state } : task);
 +  return tasks.filter(task => {
 +    const category = pillDefinition(task.id)?.category;
 +    return category === "workspace" || category === "agent" ||
@@ -1208,6 +1872,50 @@ index 0000000..7f976b7
 +export function agentStatus(state: BotStateName): string {
 +  const [symbol, label] = STATUS[state];
 +  return `${symbol} ${t(label)}`;
++}
+diff --git a/windows/src/core/bridge.ts b/windows/src/core/bridge.ts
+index 2c56b8d..a4d265c 100644
+--- a/windows/src/core/bridge.ts
++++ b/windows/src/core/bridge.ts
+@@ -180,6 +180,7 @@ export interface PhoneAnswersStatus {
+ 
+ export const Bridge = {
+   boot: () => call<BootInfo>("boot"),
++  codexAgentSnapshot: (rootThreadId: string | null) => call<import("./codex-flow").FlowSnapshot>("codex_agent_snapshot", { rootThreadId }),
+   /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
+   setSystemLanguages: (languages: string[]) => call<void>("set_system_languages", { languages }),
+ 
+diff --git a/windows/src/core/codex-flow.ts b/windows/src/core/codex-flow.ts
+new file mode 100644
+index 0000000..0423783
+--- /dev/null
++++ b/windows/src/core/codex-flow.ts
+@@ -0,0 +1,26 @@
++import type { AgentTask } from './state';
++
++export interface FlowAgent {
++  id: string; parentId: string | null; name: string; role: string | null;
++  model: string | null; effort: string | null;
++  status: 'working' | 'completed' | 'interrupted' | 'unknown';
++  tool: string | null; lastSeen: string | null;
++}
++export interface FlowSnapshot {
++  rootId: string | null; agents: FlowAgent[]; truncated: boolean; warnings: string[];
++}
++/** Local session metadata only. Never enters the phone/chat integration. */
++export const CodexFlow = { snapshot: null as FlowSnapshot | null, tasks: [] as AgentTask[], error: false };
++
++export function applyFlow(snapshot: FlowSnapshot | null) {
++  CodexFlow.snapshot = snapshot;
++  CodexFlow.error = snapshot === null;
++  CodexFlow.tasks = (snapshot?.agents ?? []).map(agent => ({
++    id: agent.id === snapshot?.rootId ? 'agent_codex' : `codex_child_${agent.id}`,
++    name: agent.id === snapshot?.rootId ? 'Codex · principal' : agent.name.split('/').filter(Boolean).at(-1) || agent.name,
++    color: agent.id === snapshot?.rootId ? '#b4ff39' : '#b18aff',
++    state: agent.status === 'completed' ? 'finished' : agent.status === 'working' ? 'working' : agent.status === 'interrupted' ? 'error' : 'idle',
++    source: 'agent', isIntegration: false, steps: [agent.tool || ''], stepIndex: 0,
++    flow: agent,
++  }));
 +}
 diff --git a/windows/src/core/github.ts b/windows/src/core/github.ts
 index 866f8f1..e70a2a8 100644
@@ -1261,7 +1969,7 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/core/layout.ts b/windows/src/core/layout.ts
-index 9853591..d8b9fbe 100644
+index 9853591..1b7745a 100644
 --- a/windows/src/core/layout.ts
 +++ b/windows/src/core/layout.ts
 @@ -5,6 +5,7 @@
@@ -1272,14 +1980,34 @@ index 9853591..d8b9fbe 100644
    | "overview"
    | "empty"
    | "approval"
+@@ -52,8 +53,8 @@ export interface ViewLayout {
+ 
+ // The window is a fixed 720×320 (largest view) like the macOS panel; the island is
+ // drawn inside it, glued to the top edge and horizontally centred.
+-export const PANEL_W = 720;
+-export const PANEL_H = 320;
++export const PANEL_W = 960;
++export const PANEL_H = 540;
+ 
+ // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
+ export const NOTCH_W = 184;
 @@ -69,6 +70,7 @@ export const WAKE_STRIP_W = 240;
  export const WAKE_STRIP_H = 6;
  
  export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
-+  agents: { height: 268, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
++  agents: { height: 480, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
    overview: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "pills" },
    empty: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
    approval: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "column" },
+@@ -121,7 +123,7 @@ export function islandSize(
+       return { w: COMPACT_W, h: NOTCH_H };
+     case "expanded": {
+       const h = view === "prompt" ? chatPromptHeight(chatCount) : VIEW_LAYOUTS[view].height;
+-      return { w: EXPANDED_W, h };
++      return { w: view === "agents" ? 880 : EXPANDED_W, h };
+     }
+   }
+ }
 diff --git a/windows/src/core/spotify.ts b/windows/src/core/spotify.ts
 index 47d7c20..95b8331 100644
 --- a/windows/src/core/spotify.ts
@@ -1294,7 +2022,7 @@ index 47d7c20..95b8331 100644
    running: boolean;
    /** There is a Spotify to launch. */
 diff --git a/windows/src/core/state.ts b/windows/src/core/state.ts
-index 3c9c8aa..7335e14 100644
+index 3c9c8aa..14ad42b 100644
 --- a/windows/src/core/state.ts
 +++ b/windows/src/core/state.ts
 @@ -1,6 +1,7 @@
@@ -1305,7 +2033,24 @@ index 3c9c8aa..7335e14 100644
  import type { EyeShape } from "../mochi/engine";
  import {
    DEFAULT_MAIN_PILL, HOST_OS, availablePills, orderPills, pillDefinition, sanitizeDeclared,
-@@ -507,7 +508,8 @@ class AppState {
+@@ -18,6 +19,7 @@ export type AgentSource = "claudeCode" | "n8n" | "agent";
+ export type PillBadge = "approval" | "finished" | "error";
+ 
+ export interface AgentTask {
++  flow?: import("./codex-flow").FlowAgent;
+   id: string;
+   name: string;
+   color: string;
+@@ -281,7 +283,7 @@ class AppState {
+   }
+ 
+   get effectiveState(): BotStateName {
+-    return this.stateOverride ?? this.focusTask?.state ?? "idle";
++    return this.stateOverride ?? roomAgents(this.tasks).find(task => task.id === this.focusId && task.flow)?.state ?? this.focusTask?.state ?? "idle";
+   }
+ 
+   /** Spotify plays on a declared pill: Mochi dances (Linux; never on Windows yet). */
+@@ -507,7 +509,8 @@ class AppState {
     */
    defaultView(): IslandViewName {
      if (this.pendingApproval) return this.pendingApproval.questions ? "question" : "approval";
@@ -1610,6 +2355,59 @@ index 2035662..6d6a2a1 100644
    }
   }
  }
+diff --git a/windows/src/island/codex-flow.ts b/windows/src/island/codex-flow.ts
+new file mode 100644
+index 0000000..8232d13
+--- /dev/null
++++ b/windows/src/island/codex-flow.ts
+@@ -0,0 +1,25 @@
++import { Bridge, IS_TAURI } from '../core/bridge';
++import { State } from '../core/state';
++import { applyFlow } from '../core/codex-flow';
++
++/** One read at a time. Recheck session identity after awaiting the backend. */
++export function registerCodexFlow() {
++  if (!IS_TAURI) return;
++  let busy = false;
++  const session = () => {
++    const task = State.tasks.find(task => task.id === 'agent_codex');
++    const id = task?.sessionId;
++    return id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) && task?.state !== 'idle' ? id : null;
++  };
++  async function poll() {
++    if (busy || State.paused) return;
++    busy = true;
++    const root = session();
++    try {
++      const snapshot = await Bridge.codexAgentSnapshot(root);
++      if (session() === root) { applyFlow(snapshot); State.notify(); }
++    } finally { busy = false; }
++  }
++  void poll();
++  window.setInterval(() => void poll(), 2500);
++}
+diff --git a/windows/src/island/fsm.ts b/windows/src/island/fsm.ts
+index 23b65ee..29f5ed1 100644
+--- a/windows/src/island/fsm.ts
++++ b/windows/src/island/fsm.ts
+@@ -29,6 +29,8 @@ export class IslandStateMachine {
+   greetHoverCollapseDelay = 10;
+   /** An alert waiting for an answer stays open, even when the mouse leaves. */
+   pinned = false;
++  /** The large flow room folds promptly even after a click. */
++  roomOpen = false;
+   /**
+    * Hovering opens the island all the way instead of peeking (Settings →
+    * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
+@@ -170,7 +172,7 @@ export class IslandStateMachine {
+   private scheduleHomeCollapse() {
+     this.clear("homeCollapse");
+     if (this.pinned) return;
+-    const ms = (this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
++    const ms = (this.roomOpen || this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
+     this.homeCollapseDueAt = performance.now() + ms;
+     this.homeCollapse = window.setTimeout(() => {
+       this.homeCollapse = null;
 diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
 index ad01493..9f69cca 100644
 --- a/windows/src/island/hooks.ts
@@ -1626,7 +2424,7 @@ index ad01493..9f69cca 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index bca15aa..3273984 100644
+index bca15aa..b6a4bf8 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -20,6 +20,7 @@ import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
@@ -1661,7 +2459,15 @@ index bca15aa..3273984 100644
        this.countdown,
      );
  
-@@ -427,6 +431,9 @@ export class Island {
+@@ -392,6 +396,7 @@ export class Island {
+   }
+ 
+   setView(view: IslandViewName) {
++    this.fsm.roomOpen = view === "agents";
+     this.stopSequenceIfLeaving(view);
+     if (view !== "overview") closePlanCard();
+     if (State.mode !== "expanded") {
+@@ -427,6 +432,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -1671,7 +2477,26 @@ index bca15aa..3273984 100644
    }
  
    reveal() {
-@@ -1024,7 +1031,7 @@ export class Island {
+@@ -645,6 +653,10 @@ export class Island {
+ 
+   private targetSize(): { w: number; h: number; r: number } {
+     let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
++    if (State.mode === "expanded" && State.view === "agents") {
++      w = Math.min(w, Math.max(288, window.innerWidth - 32));
++      h = Math.min(h, Math.max(240, window.innerHeight - 24));
++    }
+     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
+       h = QUESTION_PICKER_H;
+     }
+@@ -857,6 +869,7 @@ export class Island {
+       this.fsm.mouseEntered();
+     }
+     if (!inIsland && wasIn) {
++      this.fsm.roomOpen = State.view === "agents";
+       this.fsm.mouseLeft();
+     }
+ 
+@@ -1024,7 +1037,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -1680,13 +2505,15 @@ index bca15aa..3273984 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1177,19 +1184,28 @@ export class Island {
+@@ -1177,20 +1190,31 @@ export class Island {
      // Compact mini grid
      const showGrid = State.mode === "compact";
      this.miniGrid.style.opacity = showGrid ? "1" : "0";
 +    const focusAgent = roomAgents(State.tasks).find(task => task.id === State.focusId);
 +    this.compactStatus.style.display = showGrid && focusAgent ? "block" : "none";
-+    this.compactStatus.textContent = focusAgent ? `${focusAgent.name} · ${agentStatus(focusAgent.state)}` : "";
++    const flowTasks = roomAgents(State.tasks);
++    const children = flowTasks.filter(task => task.flow?.parentId);
++    this.compactStatus.textContent = children.length ? `Codex · ${children.filter(task => task.state === "working").length}/${children.length} subagentes activos` : focusAgent ? `${focusAgent.name} · ${agentStatus(focusAgent.state)}` : "";
      if (showGrid) {
 -      const others = State.otherTasks.slice(0, 4);
 +      const others = roomAgents(State.tasks).filter(task => task.id !== State.focusId).slice(0, 4);
@@ -1704,18 +2531,40 @@ index bca15aa..3273984 100644
        }
      }
  
+-    syncMiniBotStates(State.tasks);
 +    for (const worker of Array.from(this.miniGrid.children) as HTMLElement[]) {
-+      const task = State.tasks.find(t => t.id === worker.dataset.agentId);
++      const task = roomAgents(State.tasks).find(t => t.id === worker.dataset.agentId);
 +      if (task) worker.title = `${task.name}: ${agentStatus(task.state)}`;
 +    }
-     syncMiniBotStates(State.tasks);
++    syncMiniBotStates([...roomAgents(State.tasks), ...State.tasks]);
      this.engine.setState(State.effectiveState);
    }
+ 
+diff --git a/windows/src/main.ts b/windows/src/main.ts
+index a2db5b2..979d072 100644
+--- a/windows/src/main.ts
++++ b/windows/src/main.ts
+@@ -5,6 +5,7 @@ import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
+ import { Sound } from "./core/sound";
+ import { State, type Settings } from "./core/state";
+ import { Island } from "./island/island";
++import { registerCodexFlow } from "./island/codex-flow";
+ import { registerHookHandlers } from "./island/hooks";
+ import { registerPhoneLink } from "./island/phone-link";
+ import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
+@@ -136,6 +137,7 @@ async function main() {
+   });
+ 
+   registerHookHandlers(island);
++  registerCodexFlow();
+   registerPhoneLink(island);
+   registerIntegrationHandlers(island);
+   registerShortcutHandlers(island, () => setPaused(false));
 diff --git a/windows/src/style.css b/windows/src/style.css
-index 1a56c61..7cf5f4e 100644
+index 1a56c61..93eae7e 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
-@@ -2628,3 +2628,31 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -2628,3 +2628,35 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    unicode-bidi: plaintext;
    text-align: start;
  }
@@ -1724,15 +2573,15 @@ index 1a56c61..7cf5f4e 100644
 +.agent-room { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 8px; }
 +.room-heading { display: flex; align-items: center; justify-content: space-between; color: #b4ff39; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
 +.room-count { color: #ba91ff; font-family: monospace; }
-+.agent-room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; overflow-y: auto; min-height: 0; flex: 1; align-content: start; padding: 2px; }
++.agent-room-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; overflow-y: auto; min-height: 0; flex: 1; align-content: start; padding: 2px; }
 +.agent-desk { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px; border: 1px solid #573b79; border-radius: 10px; background: linear-gradient(160deg, #21162e, #100e18); color: #f0eafa; cursor: pointer; text-align: center; font: inherit; }
 +.agent-desk:hover, .agent-desk:focus-visible { border-color: #b4ff39; outline: 2px solid #b4ff39; outline-offset: -2px; background: #2a1b3b; }
 +.agent-desk.selected { border-color: #b4ff39; }
-+.desk-scene { display: block; position: relative; width: 100%; height: 64px; flex-shrink: 0; background: repeating-linear-gradient(0deg, transparent, transparent 15px, #b18bd608 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, #b18bd608 16px); }
-+.desk-monitor { position: absolute; width: 30px; height: 22px; left: calc(50% + 7px); top: 5px; border: 3px solid #735193; border-radius: 3px; background: #141b17; box-shadow: 0 0 12px #b4ff3918; }
++.desk-scene { display: block; position: relative; width: 100%; height: 106px; flex-shrink: 0; background: repeating-linear-gradient(0deg, transparent, transparent 15px, #b18bd608 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, #b18bd608 16px); }
++.desk-monitor { position: absolute; width: 30px; height: 22px; left: calc(50% + 7px); top: 22px; border: 3px solid #735193; border-radius: 3px; background: #141b17; box-shadow: 0 0 12px #b4ff3918; }
 +.desk-monitor::after { content: ''; display: block; margin: 4px; width: 12px; height: 2px; background: #b4ff39; box-shadow: 0 4px #b4ff3960; }
-+.desk-surface { position: absolute; top: 32px; left: 16%; width: 68%; height: 7px; background: #6f508a; border-bottom: 3px solid #30243f; box-shadow: 0 13px 0 -2px #30243f; }
-+.desk-worker { position: absolute; top: 31px; left: calc(50% - 22px); }
++.desk-surface { position: absolute; top: 56px; left: 16%; width: 68%; height: 7px; background: #6f508a; border-bottom: 3px solid #30243f; box-shadow: 0 13px 0 -2px #30243f; }
++.desk-worker { position: absolute; top: 57px; left: calc(50% - 32px); }
 +.desk-name, .desk-status, .desk-step { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 17px; }
 +.desk-name { font-size: 11px; font-weight: 650; }
 +.desk-status { font-size: 10px; color: #c7b7db; }
@@ -1747,13 +2596,18 @@ index 1a56c61..7cf5f4e 100644
 +@media (prefers-reduced-motion: reduce) { .agent-room * { animation: none !important; } }
 +
 +#compact-agent-status { position: absolute; top: 0; left: 64px; width: 164px; line-height: 32px; font-size: 10px; color: #d8efbc; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
++
++.room-detail { white-space: pre-line; font-size: 11px; line-height: 18px; padding: 8px 12px; border-left: 2px solid #b4ff39; background: #22172e; color: #ded1ed; flex-shrink: 0; overflow-wrap: anywhere; }
++.agent-room-grid { background: repeating-linear-gradient(0deg, transparent, transparent 31px, #b18bd60b 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, #b18bd60b 32px); border: 1px solid #402c57; border-radius: 12px; padding: 14px; }
++@media (max-width: 650px) { .agent-room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 6px; } }
 diff --git a/windows/src/views/agent-room.ts b/windows/src/views/agent-room.ts
 new file mode 100644
-index 0000000..af6ae92
+index 0000000..fef268a
 --- /dev/null
 +++ b/windows/src/views/agent-room.ts
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,84 @@
 +import { h } from "./dom";
++import { CodexFlow } from "../core/codex-flow";
 +import { State } from "../core/state";
 +import { roomAgents, agentStatus } from "../core/agent-room";
 +import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
@@ -1765,9 +2619,11 @@ index 0000000..af6ae92
 +  const count = h("span", { class: "room-count" });
 +  const grid = h("div", { class: "agent-room-grid" });
 +  const empty = h("div", { class: "room-empty", text: tl("Connect an agent in Settings to see its activity here.") });
++  const detail = h("div", { class: "room-detail" });
++  const caption = h("div", { class: "room-caption" });
++  let selected: string | null = null;
 +  const el = h("div", { class: "view agent-room" },
-+    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty,
-+    h("div", { class: "room-caption", text: tl("Live hook activity · Select a desk to see details") }));
++    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty, detail, caption);
 +  let key = "";
 +  let desks: { id: string; button: HTMLElement; name: HTMLElement; status: HTMLElement; step: HTMLElement }[] = [];
 +  function clear() {
@@ -1786,25 +2642,48 @@ index 0000000..af6ae92
 +        const status = h("span", { class: "desk-status" });
 +        const step = h("span", { class: "desk-step" });
 +        const button = h("button", { class: "agent-desk", onclick: () => {
-+          actions.blip(); actions.setFocus(task.id);
++          actions.blip();
++          const current = roomAgents(State.tasks).find(item => item.id === task.id);
++          if (!current) return;
 +          const request = State.pendingApproval;
-+          actions.setView(request?.pillId === task.id ? (request.questions ? "question" : "approval") : "overview");
++          if (request?.pillId === task.id) {
++            actions.setFocus(task.id);
++            actions.setView(request.questions ? "question" : "approval");
++            return;
++          }
++          if (current.flow) { selected = task.id; State.notify(); return; }
++          actions.setFocus(task.id);
++          actions.setView("overview");
 +        } }, h("span", { class: "desk-scene", "aria-hidden": "true" },
 +          h("span", { class: "desk-monitor" }), h("span", { class: "desk-surface" }),
-+          h("span", { class: "desk-worker" }, createMiniBot(task, 26))), name, status, step);
++          h("span", { class: "desk-worker" }, createMiniBot(task, 38))), name, status, step);
 +        grid.append(button); desks.push({ id: task.id, button, name, status, step });
 +      }
 +      pruneMiniBots();
 +    }
-+    count.textContent = String(tasks.length).padStart(2, "0");
++    const flow = tasks.some(task => task.flow);
++    const active = tasks.filter(task => task.state === "working").length;
++    count.textContent = flow ? `${active} activos · ${Math.max(0, tasks.length - 1)} subagentes` : String(tasks.length).padStart(2, "0");
++    caption.textContent = flow ? `Registros locales de Codex · chat ${CodexFlow.snapshot?.rootId?.slice(0, 8) ?? ""} · actualización cada 2,5 s${CodexFlow.snapshot?.truncated ? " · lectura parcial" : ""}` : CodexFlow.error ? "Monitor de Codex no disponible · actividad de hooks" : t("Live hook activity · Select a desk to see details");
++    const chosen = tasks.find(task => task.id === selected) ?? tasks[0];
++    detail.style.display = flow ? "" : "none";
++    if (chosen?.flow) {
++      const meta = chosen.flow;
++      const parent = tasks.find(task => task.flow?.id === meta.parentId);
++      const seen = meta.lastSeen ? new Date(meta.lastSeen) : null;
++      const stamp = seen && Number.isFinite(seen.getTime()) ? seen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "sin fecha";
++      detail.textContent = `${chosen.name} · ${meta.role || "agente principal"} · ${meta.model || "modelo no registrado"}${meta.effort ? ` / ${meta.effort}` : ""}\n${parent ? `Depende de ${parent.name} · ` : "Coordina el flujo · "}${meta.tool ? `Última herramienta: ${meta.tool} · ` : ""}Último registro: ${stamp}`;
++    }
 +    empty.style.display = tasks.length ? "none" : "";
 +    for (let i = 0; i < tasks.length; i++) {
 +      const task = tasks[i], desk = desks[i];
-+      const status = agentStatus(task.state);
-+      const activity = task.finalLine || task.steps.at(-1) || t("Waiting for activity");
++      const stale = task.flow?.status === "working" && (!task.flow.lastSeen || Date.now() - Date.parse(task.flow.lastSeen) > 90_000);
++      const alert = ["question", "approval", "ratelimit", "error"].includes(task.state) && task.state !== (task.flow?.status === "interrupted" ? "error" : "");
++      const status = alert ? agentStatus(task.state) : stale ? "◌ Sin actividad reciente" : task.flow?.status === "unknown" ? "○ Estado no registrado" : task.flow?.status === "interrupted" ? "Ⅱ Interrumpido" : agentStatus(task.state);
++      const activity = task.flow ? [task.flow.role || (task.flow.parentId ? "subagente" : "coordinador"), task.flow.tool].filter(Boolean).join(" · ") : task.finalLine || task.steps.at(-1) || t("Waiting for activity");
 +      desk.name.textContent = task.name; desk.status.textContent = status; desk.step.textContent = activity;
 +      desk.button.dataset.state = task.state;
-+      desk.button.classList.toggle("selected", task.id === State.focusId);
++      desk.button.classList.toggle("selected", task.id === (flow ? chosen?.id : State.focusId));
 +      desk.button.setAttribute("aria-label", `${task.name}: ${status}. ${activity}`);
 +      desk.button.title = `${task.name} — ${status}\n${activity}`;
 +      desk.button.style.setProperty("--agent-color", task.color);
@@ -2135,6 +3014,71 @@ index 0000000..7c5280a
 + State.mode='compact';room.sync();assert.equal(room.el.find('.agent-desk').length,0);
 + State.mode='expanded';room.sync();assert.equal(room.el.find('.agent-desk').length,1);
 + State.tasks=[];room.sync();assert.equal(room.el.find('.agent-desk').length,0);assert.ok(room.el.textContent.includes('Conecta'));
++});
+diff --git a/windows/tests/codex-flow.test.mjs b/windows/tests/codex-flow.test.mjs
+new file mode 100644
+index 0000000..51f0631
+--- /dev/null
++++ b/windows/tests/codex-flow.test.mjs
+@@ -0,0 +1,43 @@
++import { test, afterEach } from 'node:test';
++import assert from 'node:assert/strict';
++import { applyFlow, CodexFlow } from '../src/core/codex-flow.ts';
++import { State } from '../src/core/state.ts';
++import { roomAgents } from '../src/core/agent-room.ts';
++const agent=(id,parentId=null,status='working')=>({id,parentId,name:`/root/${id}`,role:parentId?'sendoa-tecnico':null,model:'gpt-6.1-sol',effort:'high',status,tool:'exec',lastSeen:'2026-10-21T06:00:00Z'});
++afterEach(()=>applyFlow(null));
++test('monitor shows actual tree instead of configured product pills',()=>{
++ applyFlow({rootId:'root',agents:[agent('root'),agent('child','root','completed')],truncated:false,warnings:[]});
++ const tasks=roomAgents([{id:'agent_codex'},{id:'agent_copilot'}]);
++ assert.deepEqual(tasks.map(t=>t.id),['agent_codex','codex_child_child']);
++ assert.equal(tasks[1].state,'finished');assert.equal(tasks[1].flow.parentId,'root');
++ applyFlow(null);assert.equal(CodexFlow.tasks.length,0);
++});
++test('new snapshot removes vanished children and preserves unknown status',()=>{
++ applyFlow({rootId:'new',agents:[agent('new',null,'unknown')],truncated:true,warnings:[]});
++ assert.equal(CodexFlow.tasks.length,1);assert.equal(CodexFlow.tasks[0].state,'idle');
++ assert.equal(CodexFlow.snapshot.truncated,true);
++});
++
++test('hook attention state stays visible over working flow metadata',()=>{
++ applyFlow({rootId:'root',agents:[agent('root')],truncated:false,warnings:[]});
++ for (const state of ['question','approval','ratelimit','error']) {
++  State.tasks=[{id:'agent_codex',state}]; State.focusId='agent_codex';
++  assert.equal(roomAgents(State.tasks)[0].state,state);
++  assert.equal(State.effectiveState,state);
++ }
++ State.tasks=[];
++});
++test('room clicks use current source and preserve pending questions',async()=>{
++ const {installFakeDom}=await import('./fakedom.mjs');installFakeDom();
++ const {buildAgentRoom}=await import('../src/views/agent-room.ts');
++ const views=[];const room=buildAgentRoom({setFocus(){},setView:v=>views.push(v),blip(){}});
++ State.mode='expanded';State.view='agents';State.pendingApproval=null;
++ State.tasks=[{id:'agent_codex',name:'Codex',color:'#b4ff39',state:'working',source:'agent',steps:[],stepIndex:0}];State.focusId='agent_codex';
++ applyFlow(null);room.sync();const desk=room.el.find('.agent-desk')[0];
++ applyFlow({rootId:'root',agents:[agent('root')],truncated:false,warnings:[]});room.sync();desk.fire('click');
++ assert.deepEqual(views,[]);
++ State.tasks[0].state='question';State.pendingApproval={pillId:'agent_codex',questions:[{}]};room.sync();desk.fire('click');
++ assert.equal(views.at(-1),'question');
++ applyFlow(null);State.pendingApproval=null;room.sync();desk.fire('click');assert.equal(views.at(-1),'overview');
++ State.tasks=[];State.pendingApproval=null;
++});
+diff --git a/windows/tests/fsm.test.mjs b/windows/tests/fsm.test.mjs
+index f1685dd..210c7c5 100644
+--- a/windows/tests/fsm.test.mjs
++++ b/windows/tests/fsm.test.mjs
+@@ -377,3 +377,11 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
+   seconds(2);
+   assert.equal(fsm.state, "petit");
+ });
++
++test("the large flow room folds promptly after leaving, even after clicks", () => {
++  fsm.forceHome();fsm.roomOpen=true;fsm.userInteracted();fsm.mouseLeft();
++  seconds(0.59);assert.equal(fsm.state,"home");seconds(0.01);assert.equal(fsm.state,"petit");
++});
++test("the flow room still respects pending-answer pinning", () => {
++  fsm.forceHome();fsm.roomOpen=true;fsm.pinned=true;fsm.mouseLeft();seconds(2);assert.equal(fsm.state,"home");
 +});
 diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs
 new file mode 100644
