@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.5.0-sendoa.3 — 2026-10-21
+
+- Sala de agentes EVA-01 integrada en el notch: puestos, personajes animados y estados reales de hooks; selección para abrir detalle o solicitud pendiente.
+- Estado del agente enfocado y hasta cuatro compañeros en compacto; prioridad conservada para preguntas y aprobaciones.
+- Traducciones, navegación por teclado y nombres accesibles; movimiento decorativo reducido según la preferencia del sistema.
+- Se liberan los personajes de la sala al plegar u ocultar la isla. Regresiones de filtrado, estados, navegación y ciclo de vida.
+
 ## 0.5.0-sendoa.2 — 2026-10-16
 
 - Integración Spotifast/EVA-01 separada de la actualización principal: detección y preferencia MPRIS, reconexión y filtrado de señales por propietario, controles y lanzadores compatibles con Spotify.

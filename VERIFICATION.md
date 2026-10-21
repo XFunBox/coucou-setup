@@ -1,3 +1,15 @@
+# Verificación — 2026-10-21
+
+Versión **0.5.0-sendoa.3**, sobre la misma base oficial Linux 0.5.0. El cambio de esta versión está en la interfaz; no modifica la lógica Rust de servicios o hooks.
+
+- **409 pruebas Node** correctas en la fuente final, incluidas las regresiones de filtrado, traducciones, navegación y liberación de personajes al plegar. **10 pruebas Python** del instalador, sintaxis Bash y revisión de espacios correctas.
+- El parche se aplica a la fuente original limpia; sus 29 archivos resultantes coinciden byte a byte con la fuente de trabajo. SHA-256 fijado en `source-lock.json`.
+- Vista previa con los componentes reales de la isla en Chrome: cuatro puestos, uno, sala vacía, navegación a detalle y vuelta a sala; sin errores JavaScript. Los datos de esa vista son simulados. Revisión independiente y corrección del ciclo de vida de los personajes ocultos.
+- Compilación Tauri release, TypeScript y Vite correctos. SHA-256 de aplicación y relés verificados antes y después del arranque; `ldd` sin bibliotecas ausentes. Servicio real `active/running`, versión .3 y overlay layer-shell confirmados en el registro. Ajustes existentes conservados y hooks/acceso del menú idénticos. Copia previa y reversión preparadas. No se ha comprobado visualmente la ventana nativa: la QA visual corresponde a Chrome.
+- Compacto verificado con estado visible y cero puestos ocultos; sin errores JavaScript.
+- La sala representa agentes registrados; no inventa subagentes internos de Codex. Las preguntas y aprobaciones conservan sus canales previos. No se afirma un nuevo canal bidireccional de preguntas de esta app Codex.
+- Se conserva la receta Docker completa del setup; la compilación local reutiliza dependencias de la imagen .2. Las suites Rust/MPRIS de .2 que se describen abajo no se repiten para este cambio de interfaz.
+
 # Verificación — 2026-10-16
 
 Versión final **0.5.0-sendoa.2**, base oficial Linux 0.5.0 `841a81ce1d75b65882b30139e6b716d0837dce30`. Dos cambios separados: primero la actualización principal a 0.5.0-sendoa.1, después Spotifast/EVA-01.

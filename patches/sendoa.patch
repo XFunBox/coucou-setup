@@ -1,5 +1,5 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index b161fd0..55637c5 100644
+index b161fd0..e6917af 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index b161fd0..55637c5 100644
  [[package]]
  name = "coucou"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.2"
++version = "0.5.0-sendoa.3"
  dependencies = [
   "arboard",
   "cpal",
@@ -16,12 +16,12 @@ index b161fd0..55637c5 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.2"
++version = "0.5.0-sendoa.3"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index aa82ca8..3a39a99 100644
+index aa82ca8..17f12db 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -29,31 +29,31 @@ index aa82ca8..3a39a99 100644
  
  [workspace.package]
 -version = "0.5.0"
-+version = "0.5.0-sendoa.2"
++version = "0.5.0-sendoa.3"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1b260d3..267e919 100644
+index 1b260d3..d504a6a 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.2",
++  "version": "0.5.0-sendoa.3",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.0",
-+      "version": "0.5.0-sendoa.2",
++      "version": "0.5.0-sendoa.3",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 4f905eb..19ac4de 100644
+index 4f905eb..1f0ea88 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,7 +1,7 @@
@@ -61,7 +61,7 @@ index 4f905eb..19ac4de 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.2",
++  "version": "0.5.0-sendoa.3",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1167,7 +1167,7 @@ index cb008bf..0744673 100644
              v.box_clone()
          }
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index b9d01d4..51a489d 100644
+index b9d01d4..e43475d 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -1175,10 +1175,40 @@ index b9d01d4..51a489d 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.2",
++  "version": "0.5.0-sendoa.3",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
+diff --git a/windows/src/core/agent-room.ts b/windows/src/core/agent-room.ts
+new file mode 100644
+index 0000000..7f976b7
+--- /dev/null
++++ b/windows/src/core/agent-room.ts
+@@ -0,0 +1,24 @@
++import type { AgentTask } from "./state";
++import type { BotStateName } from "./layout";
++import { pillDefinition } from "./pills";
++import { t, N_ } from "../i18n/i18n";
++
++/** Only agents/workspaces that actually exist in Coucou; services aren't workers. */
++export function roomAgents(tasks: AgentTask[]): AgentTask[] {
++  return tasks.filter(task => {
++    const category = pillDefinition(task.id)?.category;
++    return category === "workspace" || category === "agent" ||
++      (!task.isIntegration && (task.source === "agent" || task.source === "claudeCode"));
++  });
++}
++const STATUS: Record<BotStateName, [string, string]> = {
++  idle: ["○", N_("Ready")], working: ["▶", N_("Working")], thinking: ["◌", N_("Thinking")],
++  searching: ["⌕", N_("Searching")], approval: ["!", N_("Needs permission")],
++  question: ["?", N_("Needs an answer")], error: ["!", N_("Error")],
++  finished: ["✓", N_("Finished")], ratelimit: ["Ⅱ", N_("Rate limited")],
++  sleeping: ["z", N_("Sleeping")], dizzy: ["~", N_("Recovering")],
++};
++export function agentStatus(state: BotStateName): string {
++  const [symbol, label] = STATUS[state];
++  return `${symbol} ${t(label)}`;
++}
 diff --git a/windows/src/core/github.ts b/windows/src/core/github.ts
 index 866f8f1..e70a2a8 100644
 --- a/windows/src/core/github.ts
@@ -1230,6 +1260,26 @@ index 866f8f1..e70a2a8 100644
  export function readActivity(data: Record<string, unknown>): GitHubActivity | null {
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
+diff --git a/windows/src/core/layout.ts b/windows/src/core/layout.ts
+index 9853591..d8b9fbe 100644
+--- a/windows/src/core/layout.ts
++++ b/windows/src/core/layout.ts
+@@ -5,6 +5,7 @@
+ export type IslandMode = "hidden" | "compact" | "expanded";
+ 
+ export type IslandViewName =
++  | "agents"
+   | "overview"
+   | "empty"
+   | "approval"
+@@ -69,6 +70,7 @@ export const WAKE_STRIP_W = 240;
+ export const WAKE_STRIP_H = 6;
+ 
+ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
++  agents: { height: 268, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
+   overview: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "pills" },
+   empty: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
+   approval: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "column" },
 diff --git a/windows/src/core/spotify.ts b/windows/src/core/spotify.ts
 index 47d7c20..95b8331 100644
 --- a/windows/src/core/spotify.ts
@@ -1243,11 +1293,42 @@ index 47d7c20..95b8331 100644
    /** Spotify is running. */
    running: boolean;
    /** There is a Spotify to launch. */
+diff --git a/windows/src/core/state.ts b/windows/src/core/state.ts
+index 3c9c8aa..7335e14 100644
+--- a/windows/src/core/state.ts
++++ b/windows/src/core/state.ts
+@@ -1,6 +1,7 @@
+ // App state — mirror of AppState.swift (the parts the island needs).
+ 
+ import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
++import { roomAgents } from "./agent-room";
+ import type { EyeShape } from "../mochi/engine";
+ import {
+   DEFAULT_MAIN_PILL, HOST_OS, availablePills, orderPills, pillDefinition, sanitizeDeclared,
+@@ -507,7 +508,8 @@ class AppState {
+    */
+   defaultView(): IslandViewName {
+     if (this.pendingApproval) return this.pendingApproval.questions ? "question" : "approval";
+-    return this.tasks.length === 0 ? "empty" : "overview";
++    if (this.tasks.length === 0) return "empty";
++    return roomAgents(this.tasks).some(task => task.id === this.focusId) ? "agents" : "overview";
+   }
+ }
+ 
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 2035662..a6d8482 100644
+index 2035662..6d6a2a1 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
-@@ -4394,6 +4394,138 @@
+@@ -1687,7 +1687,7 @@
+   "Ready": {
+    "zh-Hans": "就绪",
+    "hi": "तैयार",
+-   "es": "Listo",
++   "es": "Disponible",
+    "ar": "جاهز",
+    "fr": "Prêt",
+    "bn": "প্রস্তুত",
+@@ -4394,6 +4394,281 @@
     "pt-BR": "O Coucou não conseguiu responder: verifique sua chave do Claude em Notch → Chat.",
     "ru": "Coucou не смог ответить: проверьте ключ Claude в Notch → Чат.",
     "id": "Coucou tidak bisa menjawab: periksa kunci Claude-mu di Notch → Obrolan."
@@ -1383,6 +1464,149 @@ index 2035662..a6d8482 100644
 +   "pt-BR": "{0} — abrir o {player}",
 +   "ru": "{0} — открыть {player}",
 +   "id": "{0} — buka {player}"
++  },
++  "Agent room": {
++   "es": "Sala de agentes",
++   "zh-Hans": "智能体工作室",
++   "hi": "एजेंट कक्ष",
++   "ar": "غرفة الوكلاء",
++   "fr": "Salle des agents",
++   "bn": "এজেন্ট কক্ষ",
++   "pt-BR": "Sala de agentes",
++   "ru": "Комната агентов",
++   "id": "Ruang agen"
++  },
++  "Connect an agent in Settings to see its activity here.": {
++   "es": "Conecta un agente en Ajustes para ver su actividad aquí.",
++   "zh-Hans": "在设置中连接智能体，即可在此查看其活动。",
++   "hi": "यहाँ गतिविधि देखने के लिए सेटिंग में एजेंट जोड़ें।",
++   "ar": "اربط وكيلاً في الإعدادات لعرض نشاطه هنا.",
++   "fr": "Connectez un agent dans les réglages pour voir son activité ici.",
++   "bn": "এখানে কাজ দেখতে সেটিংসে একটি এজেন্ট সংযুক্ত করুন।",
++   "pt-BR": "Conecte um agente nos Ajustes para ver sua atividade aqui.",
++   "ru": "Подключите агента в настройках, чтобы видеть его действия здесь.",
++   "id": "Hubungkan agen di Pengaturan untuk melihat aktivitasnya di sini."
++  },
++  "Live hook activity · Select a desk to see details": {
++   "es": "Actividad recibida en directo · Pulsa un puesto para ver el detalle",
++   "zh-Hans": "实时钩子活动 · 选择工位查看详情",
++   "hi": "लाइव हुक गतिविधि · विवरण के लिए डेस्क चुनें",
++   "ar": "نشاط مباشر عبر الخطافات · اختر مكتباً لعرض التفاصيل",
++   "fr": "Activité des hooks en direct · Sélectionnez un bureau pour les détails",
++   "bn": "সরাসরি হুক কার্যকলাপ · বিস্তারিত দেখতে ডেস্ক বাছুন",
++   "pt-BR": "Atividade dos hooks ao vivo · Selecione uma mesa para ver detalhes",
++   "ru": "События хуков в реальном времени · Выберите стол для подробностей",
++   "id": "Aktivitas hook langsung · Pilih meja untuk melihat detail"
++  },
++  "Waiting for activity": {
++   "es": "Esperando actividad",
++   "zh-Hans": "等待活动",
++   "hi": "गतिविधि की प्रतीक्षा",
++   "ar": "بانتظار النشاط",
++   "fr": "En attente d’activité",
++   "bn": "কাজের অপেক্ষায়",
++   "pt-BR": "Aguardando atividade",
++   "ru": "Ожидание активности",
++   "id": "Menunggu aktivitas"
++  },
++  "Working": {
++   "es": "Trabajando",
++   "zh-Hans": "工作中",
++   "hi": "काम जारी",
++   "ar": "يعمل",
++   "fr": "Au travail",
++   "bn": "কাজ করছে",
++   "pt-BR": "Trabalhando",
++   "ru": "Работает",
++   "id": "Bekerja"
++  },
++  "Thinking": {
++   "es": "Pensando",
++   "zh-Hans": "思考中",
++   "hi": "सोच रहा है",
++   "ar": "يفكر",
++   "fr": "Réfléchit",
++   "bn": "ভাবছে",
++   "pt-BR": "Pensando",
++   "ru": "Думает",
++   "id": "Berpikir"
++  },
++  "Searching": {
++   "es": "Buscando",
++   "zh-Hans": "搜索中",
++   "hi": "खोज जारी",
++   "ar": "يبحث",
++   "fr": "Recherche",
++   "bn": "খুঁজছে",
++   "pt-BR": "Buscando",
++   "ru": "Ищет",
++   "id": "Mencari"
++  },
++  "Needs permission": {
++   "es": "Necesita permiso",
++   "zh-Hans": "需要许可",
++   "hi": "अनुमति चाहिए",
++   "ar": "يحتاج إلى إذن",
++   "fr": "Autorisation requise",
++   "bn": "অনুমতি প্রয়োজন",
++   "pt-BR": "Precisa de permissão",
++   "ru": "Нужно разрешение",
++   "id": "Perlu izin"
++  },
++  "Needs an answer": {
++   "es": "Espera una respuesta",
++   "zh-Hans": "等待回答",
++   "hi": "जवाब चाहिए",
++   "ar": "ينتظر إجابة",
++   "fr": "Attend une réponse",
++   "bn": "উত্তর প্রয়োজন",
++   "pt-BR": "Aguardando resposta",
++   "ru": "Ждёт ответа",
++   "id": "Menunggu jawaban"
++  },
++  "Finished": {
++   "es": "Terminado",
++   "zh-Hans": "已完成",
++   "hi": "पूरा हुआ",
++   "ar": "مكتمل",
++   "fr": "Terminé",
++   "bn": "সম্পন্ন",
++   "pt-BR": "Concluído",
++   "ru": "Завершено",
++   "id": "Selesai"
++  },
++  "Rate limited": {
++   "es": "Límite alcanzado",
++   "zh-Hans": "达到速率限制",
++   "hi": "दर सीमा पहुँची",
++   "ar": "تم بلوغ حد المعدل",
++   "fr": "Limite atteinte",
++   "bn": "সীমায় পৌঁছেছে",
++   "pt-BR": "Limite atingido",
++   "ru": "Достигнут лимит",
++   "id": "Batas tercapai"
++  },
++  "Sleeping": {
++   "es": "Descansando",
++   "zh-Hans": "休息中",
++   "hi": "विश्राम",
++   "ar": "يستريح",
++   "fr": "Au repos",
++   "bn": "বিশ্রাম নিচ্ছে",
++   "pt-BR": "Descansando",
++   "ru": "Отдыхает",
++   "id": "Beristirahat"
++  },
++  "Recovering": {
++   "es": "Recuperándose",
++   "zh-Hans": "恢复中",
++   "hi": "पुनर्प्राप्ति जारी",
++   "ar": "جارٍ التعافي",
++   "fr": "Récupération",
++   "bn": "পুনরুদ্ধার চলছে",
++   "pt-BR": "Recuperando",
++   "ru": "Восстанавливается",
++   "id": "Memulihkan"
    }
   }
  }
@@ -1402,10 +1626,42 @@ index ad01493..9f69cca 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index bca15aa..65ebd85 100644
+index bca15aa..3273984 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
-@@ -427,6 +427,9 @@ export class Island {
+@@ -20,6 +20,7 @@ import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
+ import { UploadCanvas } from "../upload/canvas";
+ import { USC, UploadSeq } from "../upload/sequence";
+ import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
++import { roomAgents, agentStatus } from "../core/agent-room";
+ import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
+ import { h } from "../views/dom";
+ import { IslandStateMachine } from "./fsm";
+@@ -57,6 +58,7 @@ export class Island {
+   private botGlow!: HTMLElement;
+   private greetingCanvas!: HTMLCanvasElement;
+   private miniGrid!: HTMLElement;
++  private compactStatus!: HTMLElement;
+   private countdown!: HTMLElement;
+   private wakeStrip!: HTMLElement;
+ 
+@@ -258,6 +260,7 @@ export class Island {
+     this.botCanvas = h("canvas", { id: "bot-canvas" });
+     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
+     this.miniGrid = h("div", { id: "mini-grid" });
++    this.compactStatus = h("div", { id: "compact-agent-status" });
+     this.countdown = h("div", { id: "countdown" });
+ 
+     this.header = buildHeader(actions);
+@@ -292,6 +295,7 @@ export class Island {
+       this.botGlow,
+       this.botCanvas,
+       this.miniGrid,
++      this.compactStatus,
+       this.countdown,
+     );
+ 
+@@ -427,6 +431,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -1415,6 +1671,146 @@ index bca15aa..65ebd85 100644
    }
  
    reveal() {
+@@ -1024,7 +1031,7 @@ export class Island {
+     // The drop canvas draws its own Mochi; two of them would overlap. Out on the
+     // desktop, he isn't here at all.
+     const away = State.mochiOnDesktop;
+-    const visible = p.opacity > 0 && !greetingActive && !this.uploadActive && !away;
++    const visible = p.opacity > 0 && p.diameter > 0 && !greetingActive && !this.uploadActive && !away;
+     this.botCanvas.style.opacity = visible ? "1" : "0";
+ 
+     if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
+@@ -1177,19 +1184,28 @@ export class Island {
+     // Compact mini grid
+     const showGrid = State.mode === "compact";
+     this.miniGrid.style.opacity = showGrid ? "1" : "0";
++    const focusAgent = roomAgents(State.tasks).find(task => task.id === State.focusId);
++    this.compactStatus.style.display = showGrid && focusAgent ? "block" : "none";
++    this.compactStatus.textContent = focusAgent ? `${focusAgent.name} · ${agentStatus(focusAgent.state)}` : "";
+     if (showGrid) {
+-      const others = State.otherTasks.slice(0, 4);
++      const others = roomAgents(State.tasks).filter(task => task.id !== State.focusId).slice(0, 4);
+       const key = others.map((t) => t.id).join("|");
+       if (this.miniGrid.dataset.key !== key) {
+         this.miniGrid.dataset.key = key;
+         this.miniGrid.replaceChildren();
+         for (const t of others) {
+-          this.miniGrid.append(createMiniBot(t, 13));
++          const worker = createMiniBot(t, 13);
++          worker.dataset.agentId = t.id;
++          this.miniGrid.append(worker);
+         }
+         pruneMiniBots();
+       }
+     }
+ 
++    for (const worker of Array.from(this.miniGrid.children) as HTMLElement[]) {
++      const task = State.tasks.find(t => t.id === worker.dataset.agentId);
++      if (task) worker.title = `${task.name}: ${agentStatus(task.state)}`;
++    }
+     syncMiniBotStates(State.tasks);
+     this.engine.setState(State.effectiveState);
+   }
+diff --git a/windows/src/style.css b/windows/src/style.css
+index 1a56c61..7cf5f4e 100644
+--- a/windows/src/style.css
++++ b/windows/src/style.css
+@@ -2628,3 +2628,31 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+   unicode-bidi: plaintext;
+   text-align: start;
+ }
++
++/* EVA agent room: hook-driven Mochis at individual desks. */
++.agent-room { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 8px; }
++.room-heading { display: flex; align-items: center; justify-content: space-between; color: #b4ff39; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
++.room-count { color: #ba91ff; font-family: monospace; }
++.agent-room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; overflow-y: auto; min-height: 0; flex: 1; align-content: start; padding: 2px; }
++.agent-desk { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px; border: 1px solid #573b79; border-radius: 10px; background: linear-gradient(160deg, #21162e, #100e18); color: #f0eafa; cursor: pointer; text-align: center; font: inherit; }
++.agent-desk:hover, .agent-desk:focus-visible { border-color: #b4ff39; outline: 2px solid #b4ff39; outline-offset: -2px; background: #2a1b3b; }
++.agent-desk.selected { border-color: #b4ff39; }
++.desk-scene { display: block; position: relative; width: 100%; height: 64px; flex-shrink: 0; background: repeating-linear-gradient(0deg, transparent, transparent 15px, #b18bd608 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, #b18bd608 16px); }
++.desk-monitor { position: absolute; width: 30px; height: 22px; left: calc(50% + 7px); top: 5px; border: 3px solid #735193; border-radius: 3px; background: #141b17; box-shadow: 0 0 12px #b4ff3918; }
++.desk-monitor::after { content: ''; display: block; margin: 4px; width: 12px; height: 2px; background: #b4ff39; box-shadow: 0 4px #b4ff3960; }
++.desk-surface { position: absolute; top: 32px; left: 16%; width: 68%; height: 7px; background: #6f508a; border-bottom: 3px solid #30243f; box-shadow: 0 13px 0 -2px #30243f; }
++.desk-worker { position: absolute; top: 31px; left: calc(50% - 22px); }
++.desk-name, .desk-status, .desk-step { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 17px; }
++.desk-name { font-size: 11px; font-weight: 650; }
++.desk-status { font-size: 10px; color: #c7b7db; }
++.desk-step { font-size: 10px; color: #aea2bc; }
++.agent-desk[data-state='working'] .desk-status, .agent-desk[data-state='finished'] .desk-status { color: #b4ff39; }
++.agent-desk[data-state='approval'] .desk-status, .agent-desk[data-state='question'] .desk-status, .agent-desk[data-state='ratelimit'] .desk-status { color: #ffd078; }
++.agent-desk[data-state='error'] .desk-status { color: #ff8eae; }
++.agent-desk[data-state='working'] .desk-monitor::after, .agent-desk[data-state='thinking'] .desk-monitor::after, .agent-desk[data-state='searching'] .desk-monitor::after { animation: desk-activity 1.4s steps(2, end) infinite; }
++.room-caption { font-size: 10px; color: #b5a6c4; }
++.room-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #c7b7db; font-size: 12px; }
++@keyframes desk-activity { 50% { opacity: .35; } }
++@media (prefers-reduced-motion: reduce) { .agent-room * { animation: none !important; } }
++
++#compact-agent-status { position: absolute; top: 0; left: 64px; width: 164px; line-height: 32px; font-size: 10px; color: #d8efbc; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+diff --git a/windows/src/views/agent-room.ts b/windows/src/views/agent-room.ts
+new file mode 100644
+index 0000000..af6ae92
+--- /dev/null
++++ b/windows/src/views/agent-room.ts
+@@ -0,0 +1,58 @@
++import { h } from "./dom";
++import { State } from "../core/state";
++import { roomAgents, agentStatus } from "../core/agent-room";
++import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
++import { t, tl } from "../i18n/i18n";
++import type { ViewActions, ViewHost } from "./views";
++
++/** A visual home for existing hook-driven agents, without a second state model. */
++export function buildAgentRoom(actions: Pick<ViewActions, "setFocus" | "setView" | "blip">): ViewHost {
++  const count = h("span", { class: "room-count" });
++  const grid = h("div", { class: "agent-room-grid" });
++  const empty = h("div", { class: "room-empty", text: tl("Connect an agent in Settings to see its activity here.") });
++  const el = h("div", { class: "view agent-room" },
++    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty,
++    h("div", { class: "room-caption", text: tl("Live hook activity · Select a desk to see details") }));
++  let key = "";
++  let desks: { id: string; button: HTMLElement; name: HTMLElement; status: HTMLElement; step: HTMLElement }[] = [];
++  function clear() {
++    grid.replaceChildren(); desks = []; key = ""; pruneMiniBots();
++  }
++  // No extra canvases keep running after leaving the room or folding the notch.
++  State.subscribe(() => { if (State.view !== "agents" || State.mode !== "expanded") clear(); });
++  return { el, sync() {
++    if (State.mode !== "expanded" || State.view !== "agents") { clear(); return; }
++    const tasks = roomAgents(State.tasks);
++    const next = JSON.stringify(tasks.map(task => task.id));
++    if (key !== next) {
++      grid.replaceChildren(); desks = []; key = next;
++      for (const task of tasks) {
++        const name = h("span", { class: "desk-name" });
++        const status = h("span", { class: "desk-status" });
++        const step = h("span", { class: "desk-step" });
++        const button = h("button", { class: "agent-desk", onclick: () => {
++          actions.blip(); actions.setFocus(task.id);
++          const request = State.pendingApproval;
++          actions.setView(request?.pillId === task.id ? (request.questions ? "question" : "approval") : "overview");
++        } }, h("span", { class: "desk-scene", "aria-hidden": "true" },
++          h("span", { class: "desk-monitor" }), h("span", { class: "desk-surface" }),
++          h("span", { class: "desk-worker" }, createMiniBot(task, 26))), name, status, step);
++        grid.append(button); desks.push({ id: task.id, button, name, status, step });
++      }
++      pruneMiniBots();
++    }
++    count.textContent = String(tasks.length).padStart(2, "0");
++    empty.style.display = tasks.length ? "none" : "";
++    for (let i = 0; i < tasks.length; i++) {
++      const task = tasks[i], desk = desks[i];
++      const status = agentStatus(task.state);
++      const activity = task.finalLine || task.steps.at(-1) || t("Waiting for activity");
++      desk.name.textContent = task.name; desk.status.textContent = status; desk.step.textContent = activity;
++      desk.button.dataset.state = task.state;
++      desk.button.classList.toggle("selected", task.id === State.focusId);
++      desk.button.setAttribute("aria-label", `${task.name}: ${status}. ${activity}`);
++      desk.button.title = `${task.name} — ${status}\n${activity}`;
++      desk.button.style.setProperty("--agent-color", task.color);
++    }
++  } };
++}
 diff --git a/windows/src/views/github.ts b/windows/src/views/github.ts
 index 86fba2f..f8be7d3 100644
 --- a/windows/src/views/github.ts
@@ -1649,10 +2045,43 @@ index 27fc2e5..9eaa3bf 100644
    }
  
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index 5f866dd..b54edb3 100644
+index 5f866dd..d19bbfb 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
-@@ -532,6 +532,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+@@ -19,6 +19,7 @@ import {
+ import { buildDiffCard } from "./diff";
+ import { lastTextStep } from "../core/diff";
+ import { Bridge } from "../core/bridge";
++import { buildAgentRoom } from "./agent-room";
+ import { buildRecap } from "./recap";
+ import { buildWardrobe } from "./wardrobe";
+ import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
+@@ -108,6 +109,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
+ 
+ export function buildHeader(actions: ViewActions): ViewHost {
+   const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 13));
++  const tabRoom = h("button", { class: "tab", title: tl("Agent room"), "aria-label": tl("Agent room"), onclick: () => go("agents") }, svg("M2 4h8v7H2zM14 4h8v7h-8zM5 11h2v4H5zM17 11h2v4h-2zM1 16h10v2H1zM13 16h10v2H13z", 14));
+   const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
+   const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 13));
+ 
+@@ -127,7 +129,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+   const el = h(
+     "div",
+     { id: "header" },
+-    h("div", { class: "tabs" }, tabHome, tabChat, tabDrop),
++    h("div", { class: "tabs" }, tabHome, tabRoom, tabChat, tabDrop),
+     h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
+   );
+   const headerActions = el.lastElementChild as HTMLElement;
+@@ -137,6 +139,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+     sync() {
+       const v = State.view;
+       tabHome.classList.toggle("on", v === "overview" || v === "empty");
++      tabRoom.classList.toggle("on", v === "agents");
+       tabChat.classList.toggle("on", v === "prompt");
+       tabDrop.classList.toggle("on", v === "upload");
+       gearBtn.classList.toggle("on", v === "settings");
+@@ -532,6 +535,7 @@ function buildApproval(actions: ViewActions): ViewHost {
        // is the command, the file path or the URL being authorised, not just the
        // name of the tool asking.
        code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
@@ -1660,6 +2089,53 @@ index 5f866dd..b54edb3 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
+@@ -807,6 +811,7 @@ export function buildViews(
+ ): Map<IslandViewName, ViewHost> {
+   const map = new Map<IslandViewName, ViewHost>();
+   map.set("overview", buildOverview(actions));
++  map.set("agents", buildAgentRoom(actions));
+   map.set("empty", buildEmpty(actions));
+   map.set("approval", buildApproval(actions));
+   map.set("question", buildQuestion(actions));
+diff --git a/windows/tests/agent-room.test.mjs b/windows/tests/agent-room.test.mjs
+new file mode 100644
+index 0000000..7c5280a
+--- /dev/null
++++ b/windows/tests/agent-room.test.mjs
+@@ -0,0 +1,33 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { roomAgents, agentStatus } from '../src/core/agent-room.ts';
++import { State } from '../src/core/state.ts';
++import { setLanguage } from '../src/i18n/i18n.ts';
++const task=(id,state='idle',extra={})=>({id,name:id,color:'#b4ff39',state,source:'agent',isIntegration:true,steps:[],stepIndex:0,...extra});
++test('room excludes service and chat provider pills',()=>{
++ const tasks=[task('agent_codex','working'),task('integration_spotify'),task('integration_github'),task('custom','thinking',{isIntegration:false}),task('integration_claude')];
++ assert.deepEqual(roomAgents(tasks).map(t=>t.id),['agent_codex','custom','integration_claude']);
++ setLanguage('es');assert.match(agentStatus('working'),/Trabajando/);
++ assert.notEqual(agentStatus('question'),agentStatus('working'));
++});
++test('default room preserves approval and integration priorities',()=>{
++ State.tasks=[task('agent_codex','working')]; State.focusId='agent_codex'; State.pendingApproval=null;
++ assert.equal(State.defaultView(),'agents');
++ State.pendingApproval={pillId:'agent_codex',requestId:'r',questions:[{}]};assert.equal(State.defaultView(),'question');
++ State.pendingApproval=null;State.tasks.push(task('integration_spotify'));State.focusId='integration_spotify';
++ assert.equal(State.defaultView(),'overview');State.tasks=[];assert.equal(State.defaultView(),'empty');
++});
++test('desks update live, use safe text and open details or questions',async()=>{
++ const {installFakeDom}=await import('./fakedom.mjs');installFakeDom();
++ const {buildAgentRoom}=await import('../src/views/agent-room.ts');
++ const selected=[],views=[];const room=buildAgentRoom({setFocus:id=>selected.push(id),setView:v=>views.push(v),blip(){}});
++ State.mode='expanded';State.view='agents';State.pendingApproval=null;
++ State.tasks=[task('agent_codex','working',{name:'Codex <script>',steps:['Editando <b>archivo</b>']})];State.focusId='agent_codex';room.sync();
++ assert.ok(room.el.textContent.includes('Codex <script>'));assert.ok(room.el.textContent.includes('Editando <b>archivo</b>'));
++ const desk=room.el.find('.agent-desk')[0];desk.fire('click');assert.deepEqual(selected,['agent_codex']);assert.deepEqual(views,['overview']);
++ State.tasks[0].state='question';State.pendingApproval={pillId:'agent_codex',requestId:'r',questions:[{}]};room.sync();
++ assert.ok(room.el.textContent.includes(agentStatus('question')));desk.fire('click');assert.equal(views.at(-1),'question');
++ State.mode='compact';room.sync();assert.equal(room.el.find('.agent-desk').length,0);
++ State.mode='expanded';room.sync();assert.equal(room.el.find('.agent-desk').length,1);
++ State.tasks=[];room.sync();assert.equal(room.el.find('.agent-desk').length,0);assert.ok(room.el.textContent.includes('Conecta'));
++});
 diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs
 new file mode 100644
 index 0000000..bd3cc66
@@ -1736,7 +2212,7 @@ index 0000000..b944148
 +serde = { version = "1", features = ["derive"] }
 +serde_json = { version = "1", features = ["preserve_order"] }
 diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
-index 6e965ef..89bd089 100644
+index 6e965ef..c01ef65 100644
 --- a/windows/tests/hooks.test.mjs
 +++ b/windows/tests/hooks.test.mjs
 @@ -251,6 +251,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
@@ -1763,6 +2239,37 @@ index 6e965ef..89bd089 100644
    assert.equal(target(undefined, undefined), "Tool");
  });
  
+@@ -468,7 +476,7 @@ test("the card shows when the island is already open, and is what it reopens on"
+   assert.deepEqual(asked, ["alert:approval"]);
+   assert.equal(State.defaultView(), "approval");
+   State.endApproval();
+-  assert.equal(State.defaultView(), "overview");
++  assert.equal(State.defaultView(), "agents");
+ });
+ 
+ test("a question is what the island reopens on while it waits", () => {
+@@ -528,7 +536,7 @@ test("an unanswered card is withdrawn after 110 s", () => {
+   assert.equal(State.isPinned, false);
+   assert.equal(task().state, "working");
+   assert.equal(task().pillBadge, null);
+-  assert.deepEqual(asked, ["dropPin", "setView:overview"]);
++  assert.deepEqual(asked, ["dropPin", "setView:agents"]);
+ });
+ 
+ test("a card answered in time leaves nothing for the 110 s timer to undo", () => {
+diff --git a/windows/tests/shortcuts.test.mjs b/windows/tests/shortcuts.test.mjs
+index 3b92f7f..a646ce6 100644
+--- a/windows/tests/shortcuts.test.mjs
++++ b/windows/tests/shortcuts.test.mjs
+@@ -353,7 +353,7 @@ test("island keys are read before the chat field sees them, and only while open"
+ 
+ test("the island toggle opens with the keyboard, and closes an open island", () => {
+   runGlobalShortcut(host, "toggleIsland", resume);
+-  assert.deepEqual(did, ["resume", "alert:overview", "keyboard"]);
++  assert.deepEqual(did, ["resume", "alert:agents", "keyboard"]);
+   did = [];
+   State.mode = "expanded";
+   runGlobalShortcut(host, "toggleIsland", resume);
 diff --git a/windows/tests/spotify.test.mjs b/windows/tests/spotify.test.mjs
 index 36cd5d4..5cc17f8 100644
 --- a/windows/tests/spotify.test.mjs

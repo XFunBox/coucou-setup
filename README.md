@@ -1,8 +1,10 @@
 # Coucou con Codex, GitHub y Spotify
 
-Setup de **Coucou 0.5.0-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.0-sendoa.3** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
+
+- Sala de agentes dentro del notch, con puestos EVA-01, personajes animados y estados de los hooks. Al abrir un agente aparece la sala; la pestaña «Sala de agentes» permite volver desde los detalles. Pulsar un puesto abre sus detalles o su solicitud pendiente. En compacto muestra el estado del agente enfocado y hasta cuatro compañeros.
 
 - Autocierre corregido tras avisos consecutivos, manteniendo los avisos al terminar. Panel a 10 segundos, sonido desactivado y pantalla del cursor.
 - GitHub: repositorios propios, últimos commits y pipelines de Actions en ejecución; enlaces a cada elemento y textos en español.
@@ -53,6 +55,8 @@ Las preferencias se preparan automáticamente; las cuentas se autentican en cada
 5. Abre Spotifast/EVA-01 Audio o Spotify para que la tarjeta detecte el reproductor. La tarjeta conserva el título de la canción y la etiqueta de anuncio; en reposo identifica el reproductor.
 
 GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de los diez repositorios con actividad más reciente y Actions `in_progress` de los repositorios listados no archivados. Los errores de acceso se indican como datos parciales. Se renueva cada cinco minutos sin ejecuciones activas y cada minuto con ejecuciones, adaptándose a cuentas grandes; abrir la sección y refrescar también permite actualizar.
+
+La sala representa agentes registrados en Coucou; los subagentes internos de un mismo chat no aparecen por separado si el hook no los identifica. Las preguntas usan el canal existente de cada integración: no se añade un canal nuevo de respuestas para Codex.
 
 El chat propio de Coucou es independiente de los chats de Codex. El perfil base del setup usa OpenAI para ese chat y requiere su propia clave de API; iniciar sesión en Codex no configura esa clave. No se incluyen credenciales, sesiones, historial ni confianza de hooks.
 
