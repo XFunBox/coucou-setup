@@ -17,6 +17,10 @@ RUN npm ci --include=optional
 COPY windows ./
 COPY NotchBuddy/Resources/sounds /app/NotchBuddy/Resources/sounds
 COPY NotchBuddy/Resources/Localizable.xcstrings /app/NotchBuddy/Resources/Localizable.xcstrings
+COPY NotchBuddy/Resources/Info.plist /app/NotchBuddy/Resources/Info.plist
+COPY NotchBuddy/Resources/InfoAppStore.plist /app/NotchBuddy/Resources/InfoAppStore.plist
+COPY NotchBuddy/Sources/App/SettingsView.swift /app/NotchBuddy/Sources/App/SettingsView.swift
+COPY NotchBuddy/project.yml /app/NotchBuddy/project.yml
 COPY LICENSE LICENSE-ASSETS.md /app/
 COPY android/LICENSE /app/LICENSE-ANDROID
 ENV CARGO_BUILD_JOBS=2

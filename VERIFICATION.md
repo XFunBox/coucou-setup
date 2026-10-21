@@ -1,3 +1,26 @@
+# Verificación — 2026-10-21 — Linux 0.5.1
+
+Versión **0.5.1-sendoa.1**, base oficial `9fe1773296cb857f223acedfd41b2842afc7dcac` (linux-v0.5.1). Conserva las personalizaciones de 0.5.0-sendoa.5.
+
+- Fuente oficial y parche fijados por SHA-256. Parche aplicado sobre el archivo canónico limpio: 44 archivos modificados idénticos byte a byte a la fuente compilada. Versiones npm, Cargo y Tauri coordinadas.
+- Se conservan Codex/límites/hooks/aprobaciones/MCP, monitor y sala EVA-01 opcional, plegado de 0,6 s, apertura habitual, GitHub, Spotifast/MPRIS y autocierre. Módulos propios del monitor/sala sin cambios frente a .5.
+- Updater optativo exclusivo del fork `XFunBox/coucou-setup`, tags `vX.Y.Z-sendoa.N`, revisión numérica y URL exacta del fork. Linux abre la release; no instala automáticamente. Dos casos mínimos con funciones extraídas del código real fallan en upstream y pasan con el arreglo; suite unitaria Rust valida también selección de release.
+- Reloj compacto optativo con prioridad para el estado de agentes. Traducciones propias fusionadas con el catálogo nuevo sin pérdida de claves upstream; alemán/turco completados.
+- Dockerfile actualizado con los archivos Apple que requieren las nuevas pruebas de registro de idiomas. La prueba de zona de retorno usa los límites del lienzo nativo personalizado de 960 × 540. `npm test` habilita la transformación TypeScript que necesita la prueba del reloj.
+
+Pruebas: **440 Node, 26 Rust GitHub, 508 unitarias Rust de la aplicación, 34 del hook y 5 MPRIS con bus privado correctas**. Las 11 ignoradas de la ejecución general incluyen esas 5 MPRIS ejecutadas aparte. También pasan 10 Python del instalador, sintaxis Bash y revisión de espacios. TypeScript/Vite y Tauri release compilados correctamente. No se han ejecutado doc-tests Rust. `npm audit` informa un paquete afectado: Vite 6.4.3, dependencia de desarrollo; conserva el lock upstream, sin actualización automática. El servidor de QA se limita a loopback y se elimina tras la comprobación.
+
+QA con componentes reales en Chrome y datos simulados: sala 880 × 480, ficha de subagente, plegado a 288 × 32, cero puestos ocultos y cero errores JavaScript. Reloj opcional oculto cuando hay estado de agentes (opacidad 0). Capturas y métricas guardadas en el scratch del chat.
+
+Instalación real: servicio active/running, versión **0.5.1-sendoa.1** y overlay layer-shell confirmados en el registro. SHA-256 de los dos ejecutables y `ldd` comprobados antes de instalar; hashes comprobados tras el arranque. Valores de ajustes existentes conservados; archivo de ajustes byte idéntico: True. Hooks y menú byte idénticos; inicio automático conserva el ejecutable. Copia previa con reversión preparada: `/home/sendoa/.local/share/coucou-local/backups/upgrade-0.5.1-sendoa.1-20261021-133023`. Sin cambios en paneles ni pantallas.
+
+Lectura real del monitor con el binario instalado: 3 agentes, con aviso `bounded_history` por el límite de historial; no se presenta como árbol completo. Un reproductor MPRIS disponible en el bus de usuario, sin accionar controles.
+
+La compilación local reutiliza la imagen y cachés de dependencias previas; se ejecutan las suites con la fuente nueva. La receta pública Docker conserva su construcción desde imágenes base. No se ha repetido una construcción sin cachés. Las pruebas ignoradas que necesitan modelos/portal no se presentan como verificadas; tampoco se han probado micrófono/dictado, Android, controles sobre un reproductor real ni una nueva aprobación humana. La QA visual descrita corresponde a Chrome, no a una inspección completa de la ventana nativa en KDE.
+
+No se publica esta versión en el remoto como parte de esta actualización local. Los binarios y copias de seguridad quedan fuera de Git.
+
+
 # Verificación — 2026-10-21 · apertura habitual
 
 Versión **0.5.0-sendoa.5**. Cambio acotado: al abrir la isla se muestra la vista habitual, mientras la oficina sigue accesible desde «Sala de agentes».

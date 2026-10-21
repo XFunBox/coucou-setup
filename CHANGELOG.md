@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.1-sendoa.1 — 2026-10-21
+
+- Actualizada la base oficial a Linux 0.5.1, conservando Codex, aprobaciones, GitHub, Spotifast, sala EVA-01 y apertura habitual.
+- Incorporadas la corrección de CPU en KDE, preguntas Antigravity, alemán/turco y reloj compacto opcional; el estado de subagentes tiene prioridad visual sobre el reloj.
+- Avisos optativos dirigidos a las releases de este fork, con comparación de versión y revisión Sendoa.
+
 ## 0.5.0-sendoa.5 — 2026-10-21
 
 - Restaurada la vista habitual al abrir la isla, también desde el teclado y después de un aviso. La oficina sigue disponible en su pestaña; las preguntas y permisos pendientes conservan su prioridad.
