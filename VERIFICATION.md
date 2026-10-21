@@ -1,3 +1,11 @@
+# Verificación — 2026-10-21 · apertura habitual
+
+Versión **0.5.0-sendoa.5**. Cambio acotado: al abrir la isla se muestra la vista habitual, mientras la oficina sigue accesible desde «Sala de agentes».
+
+- Regresiones de apertura, teclado y retirada de avisos adaptadas al comportamiento solicitado. **415 pruebas Node**, TypeScript/Vite y Tauri release correctos. Preguntas y aprobaciones conservan su prioridad.
+- Parche aplicado a fuente limpia y 39 archivos cotejados byte a byte. SHA-256 y ldd comprobados. Servicio real active/running, versión .5 y overlay layer-shell confirmados en log; ajustes byte idénticos, hooks/menú conservados y copia previa preparada.
+- El parser y el diseño de la sala no cambian: se conserva la verificación .4 de abajo, sin repetir sus pruebas Rust o QA visual. No se ha inspeccionado visualmente la ventana nativa.
+
 # Verificación — 2026-10-21 · monitor de subagentes
 
 Versión **0.5.0-sendoa.4**, sobre la misma base oficial Linux 0.5.0.

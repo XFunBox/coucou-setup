@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.5.0-sendoa.5 — 2026-10-21
+
+- Restaurada la vista habitual al abrir la isla, también desde el teclado y después de un aviso. La oficina sigue disponible en su pestaña; las preguntas y permisos pendientes conservan su prioridad.
+
 ## 0.5.0-sendoa.4 — 2026-10-21
 
 - Monitor del flujo real de Codex: principal y subagentes explícitos, jerarquía, rol, modelo, esfuerzo, estado registrado y última herramienta. Lectura local incremental con límites; excluye guardianes y otros chats del árbol.

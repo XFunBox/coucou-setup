@@ -1,10 +1,10 @@
 # Coucou con Codex, GitHub y Spotify
 
-Setup de **Coucou 0.5.0-sendoa.4** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.0-sendoa.5** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.0, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
-- Sala EVA-01 ampliada (880 × 480): el agente principal y sus subagentes reales de Codex, con rol, modelo, esfuerzo, última herramienta y relación padre/hijo. Pulsar un puesto muestra su ficha. Al salir el cursor se recoge al notch en 0,6 s; mantiene las solicitudes pendientes. En compacto muestra cuántos subagentes siguen activos.
+- Sala EVA-01 ampliada (880 × 480): el agente principal y sus subagentes reales de Codex, con rol, modelo, esfuerzo, última herramienta y relación padre/hijo. La isla abre su vista habitual; la oficina se abre desde la pestaña «Sala de agentes». Pulsar un puesto muestra su ficha. Al salir el cursor se recoge al notch en 0,6 s; mantiene las solicitudes pendientes. En compacto muestra cuántos subagentes siguen activos.
 
 - Autocierre corregido tras avisos consecutivos, manteniendo los avisos al terminar. Panel a 10 segundos, sonido desactivado y pantalla del cursor.
 - GitHub: repositorios propios, últimos commits y pipelines de Actions en ejecución; enlaces a cada elemento y textos en español.

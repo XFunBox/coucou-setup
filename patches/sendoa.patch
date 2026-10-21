@@ -1,5 +1,5 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index b161fd0..8f28fb1 100644
+index b161fd0..bd595bf 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index b161fd0..8f28fb1 100644
  [[package]]
  name = "coucou"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.4"
++version = "0.5.0-sendoa.5"
  dependencies = [
   "arboard",
   "cpal",
@@ -16,12 +16,12 @@ index b161fd0..8f28fb1 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.0"
-+version = "0.5.0-sendoa.4"
++version = "0.5.0-sendoa.5"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index aa82ca8..4b2f0cb 100644
+index aa82ca8..a5fea7e 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -29,31 +29,31 @@ index aa82ca8..4b2f0cb 100644
  
  [workspace.package]
 -version = "0.5.0"
-+version = "0.5.0-sendoa.4"
++version = "0.5.0-sendoa.5"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1b260d3..f921031 100644
+index 1b260d3..f0e2b77 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.4",
++  "version": "0.5.0-sendoa.5",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.0",
-+      "version": "0.5.0-sendoa.4",
++      "version": "0.5.0-sendoa.5",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 4f905eb..3edf90b 100644
+index 4f905eb..48ac1c1 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,7 +1,7 @@
@@ -61,7 +61,7 @@ index 4f905eb..3edf90b 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.4",
++  "version": "0.5.0-sendoa.5",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1826,7 +1826,7 @@ index cb008bf..0744673 100644
              v.box_clone()
          }
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index b9d01d4..1978627 100644
+index b9d01d4..73206e5 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -1834,7 +1834,7 @@ index b9d01d4..1978627 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.0",
-+  "version": "0.5.0-sendoa.4",
++  "version": "0.5.0-sendoa.5",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -2022,7 +2022,7 @@ index 47d7c20..95b8331 100644
    running: boolean;
    /** There is a Spotify to launch. */
 diff --git a/windows/src/core/state.ts b/windows/src/core/state.ts
-index 3c9c8aa..14ad42b 100644
+index 3c9c8aa..31f4497 100644
 --- a/windows/src/core/state.ts
 +++ b/windows/src/core/state.ts
 @@ -1,6 +1,7 @@
@@ -2056,7 +2056,7 @@ index 3c9c8aa..14ad42b 100644
      if (this.pendingApproval) return this.pendingApproval.questions ? "question" : "approval";
 -    return this.tasks.length === 0 ? "empty" : "overview";
 +    if (this.tasks.length === 0) return "empty";
-+    return roomAgents(this.tasks).some(task => task.id === this.focusId) ? "agents" : "overview";
++    return "overview";
    }
  }
  
@@ -2978,7 +2978,7 @@ index 5f866dd..d19bbfb 100644
    map.set("question", buildQuestion(actions));
 diff --git a/windows/tests/agent-room.test.mjs b/windows/tests/agent-room.test.mjs
 new file mode 100644
-index 0000000..7c5280a
+index 0000000..0c8e0f5
 --- /dev/null
 +++ b/windows/tests/agent-room.test.mjs
 @@ -0,0 +1,33 @@
@@ -2994,9 +2994,9 @@ index 0000000..7c5280a
 + setLanguage('es');assert.match(agentStatus('working'),/Trabajando/);
 + assert.notEqual(agentStatus('question'),agentStatus('working'));
 +});
-+test('default room preserves approval and integration priorities',()=>{
++test('default opening preserves the usual overview and pending requests',()=>{
 + State.tasks=[task('agent_codex','working')]; State.focusId='agent_codex'; State.pendingApproval=null;
-+ assert.equal(State.defaultView(),'agents');
++ assert.equal(State.defaultView(),'overview');
 + State.pendingApproval={pillId:'agent_codex',requestId:'r',questions:[{}]};assert.equal(State.defaultView(),'question');
 + State.pendingApproval=null;State.tasks.push(task('integration_spotify'));State.focusId='integration_spotify';
 + assert.equal(State.defaultView(),'overview');State.tasks=[];assert.equal(State.defaultView(),'empty');
@@ -3156,7 +3156,7 @@ index 0000000..b944148
 +serde = { version = "1", features = ["derive"] }
 +serde_json = { version = "1", features = ["preserve_order"] }
 diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
-index 6e965ef..c01ef65 100644
+index 6e965ef..89bd089 100644
 --- a/windows/tests/hooks.test.mjs
 +++ b/windows/tests/hooks.test.mjs
 @@ -251,6 +251,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
@@ -3183,37 +3183,6 @@ index 6e965ef..c01ef65 100644
    assert.equal(target(undefined, undefined), "Tool");
  });
  
-@@ -468,7 +476,7 @@ test("the card shows when the island is already open, and is what it reopens on"
-   assert.deepEqual(asked, ["alert:approval"]);
-   assert.equal(State.defaultView(), "approval");
-   State.endApproval();
--  assert.equal(State.defaultView(), "overview");
-+  assert.equal(State.defaultView(), "agents");
- });
- 
- test("a question is what the island reopens on while it waits", () => {
-@@ -528,7 +536,7 @@ test("an unanswered card is withdrawn after 110 s", () => {
-   assert.equal(State.isPinned, false);
-   assert.equal(task().state, "working");
-   assert.equal(task().pillBadge, null);
--  assert.deepEqual(asked, ["dropPin", "setView:overview"]);
-+  assert.deepEqual(asked, ["dropPin", "setView:agents"]);
- });
- 
- test("a card answered in time leaves nothing for the 110 s timer to undo", () => {
-diff --git a/windows/tests/shortcuts.test.mjs b/windows/tests/shortcuts.test.mjs
-index 3b92f7f..a646ce6 100644
---- a/windows/tests/shortcuts.test.mjs
-+++ b/windows/tests/shortcuts.test.mjs
-@@ -353,7 +353,7 @@ test("island keys are read before the chat field sees them, and only while open"
- 
- test("the island toggle opens with the keyboard, and closes an open island", () => {
-   runGlobalShortcut(host, "toggleIsland", resume);
--  assert.deepEqual(did, ["resume", "alert:overview", "keyboard"]);
-+  assert.deepEqual(did, ["resume", "alert:agents", "keyboard"]);
-   did = [];
-   State.mode = "expanded";
-   runGlobalShortcut(host, "toggleIsland", resume);
 diff --git a/windows/tests/spotify.test.mjs b/windows/tests/spotify.test.mjs
 index 36cd5d4..5cc17f8 100644
 --- a/windows/tests/spotify.test.mjs
