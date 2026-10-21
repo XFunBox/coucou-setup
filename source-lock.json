@@ -1,9 +1,9 @@
 {
-  "version": "0.5.1-sendoa.1",
+  "version": "0.5.1-sendoa.2",
   "upstreamCommit": "9fe1773296cb857f223acedfd41b2842afc7dcac",
   "sourceUrl": "https://codeload.github.com/Louis-CFM/coucou/tar.gz/9fe1773296cb857f223acedfd41b2842afc7dcac",
   "sourceSha256": "de6b577607e6407c9ad2c453d5224201f5cd66b3751ae686be37323ca2c71d10",
-  "patchSha256": "03c292622ba13df2cdb3b4e11b2238dc60c43a3ffac11c08e9b4a424d6b68616",
+  "patchSha256": "57ffb43739a708807c0f0d0873386e7683ccafb59b1ae3a555c77c0c88851ae4",
   "nodeImage": "node:22.23.3-bookworm-slim",
   "rustImage": "rust:1.99-bookworm"
 }

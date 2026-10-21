@@ -1,5 +1,5 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 2918633..885433d 100644
+index 2918633..a41c76f 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 2918633..885433d 100644
  [[package]]
  name = "coucou"
 -version = "0.5.1"
-+version = "0.5.1-sendoa.1"
++version = "0.5.1-sendoa.2"
  dependencies = [
   "arboard",
   "cpal",
@@ -16,12 +16,12 @@ index 2918633..885433d 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.1"
-+version = "0.5.1-sendoa.1"
++version = "0.5.1-sendoa.2"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 435cdab..934c10b 100644
+index 435cdab..20d987d 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -29,31 +29,31 @@ index 435cdab..934c10b 100644
  
  [workspace.package]
 -version = "0.5.1"
-+version = "0.5.1-sendoa.1"
++version = "0.5.1-sendoa.2"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1e18d83..652e400 100644
+index 1e18d83..4fc4ca3 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.1",
++  "version": "0.5.1-sendoa.2",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.1",
-+      "version": "0.5.1-sendoa.1",
++      "version": "0.5.1-sendoa.2",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 78f5c72..4d3fd93 100644
+index 78f5c72..96acd6a 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -61,7 +61,7 @@ index 78f5c72..4d3fd93 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.1",
++  "version": "0.5.1-sendoa.2",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -72,6 +72,19 @@ index 78f5c72..4d3fd93 100644
      "icons": "node scripts/gen-icons.mjs",
      "tauri": "tauri",
      "predev": "cargo build --release -p coucou-hook",
+diff --git a/windows/settings.html b/windows/settings.html
+index e2c8a8b..a406038 100644
+--- a/windows/settings.html
++++ b/windows/settings.html
+@@ -5,7 +5,7 @@
+     <meta name="viewport" content="width=device-width, initial-scale=1" />
+     <title>Coucou</title>
+   </head>
+-  <body class="settings-window hub-window" style="background: #000; color: #f5f6f8">
++  <body class="settings-window hub-window">
+     <div id="hub"><p style="padding: 24px">Loading…</p></div>
+     <script type="module" src="/src/settings/main.ts"></script>
+   </body>
 diff --git a/windows/src-tauri/src/codex_agents.rs b/windows/src-tauri/src/codex_agents.rs
 new file mode 100644
 index 0000000..532d44d
@@ -1994,7 +2007,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index f289dc5..6f36c87 100644
+index f289dc5..3f9890f 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -2002,7 +2015,7 @@ index f289dc5..6f36c87 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.1",
++  "version": "0.5.1-sendoa.2",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -2137,7 +2150,7 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/core/layout.ts b/windows/src/core/layout.ts
-index ba07e13..e0f574a 100644
+index ba07e13..9684919 100644
 --- a/windows/src/core/layout.ts
 +++ b/windows/src/core/layout.ts
 @@ -5,6 +5,7 @@
@@ -2176,6 +2189,69 @@ index ba07e13..e0f574a 100644
      }
    }
  }
+@@ -178,16 +180,17 @@ export function botGlowColor(s: BotStateName): string {
+       return "#A78BFA";
+     case "searching":
+       return "#6366F1";
++    case "question":
+     case "approval":
+-      return "#F5A524";
++      return "#FFA34D";
+     case "error":
+-      return "#F4505E";
++      return "#FF647C";
+     case "finished":
+-      return "#34D399";
++      return "#A4FF39";
+     case "ratelimit":
+-      return "#F59E0B";
++      return "#FFA34D";
+     default:
+-      return "#FFFFFF";
++      return "#A4FF39";
+   }
+ }
+ 
+@@ -237,13 +240,13 @@ export type Wash = "red" | "green" | "pink" | "amber" | "cyan" | "indigo" | "sof
+ export function washRGBA(wash: Wash): string {
+   switch (wash) {
+     case "red":
+-      return "rgba(244,80,94,0.55)";
++      return "rgba(255,100,124,0.55)";
+     case "green":
+-      return "rgba(52,211,153,0.5)";
++      return "rgba(164,255,57,0.5)";
+     case "pink":
+       return "rgba(244,114,182,0.55)";
+     case "amber":
+-      return "rgba(245,165,36,0.42)";
++      return "rgba(255,163,77,0.42)";
+     case "cyan":
+       return "rgba(34,211,238,0.38)";
+     case "indigo":
+diff --git a/windows/src/core/pill-colors.ts b/windows/src/core/pill-colors.ts
+index e6b990b..e28da2a 100644
+--- a/windows/src/core/pill-colors.ts
++++ b/windows/src/core/pill-colors.ts
+@@ -4,14 +4,14 @@
+ // by pill ID, so an empty one paints the island exactly as the catalog says.
+ 
+ /**
+- * What the palette offers, in the order it is shown. Every colour is one the
+- * catalog already uses, and all of them stay readable on the island's black
++ * What the palette offers, in the order it is shown. The catalog colours plus EVA-01
++ * stay readable on the island's dark background
+  * with Mochi's dark eyes — which a free colour picker could not promise.
+- * Same list as PillColors.palette on macOS.
++ * Existing catalog choices stay available alongside the EVA-01 accent.
+  */
+ export const PILL_PALETTE: readonly string[] = [
+   "#F5F6F8", "#F4505E", "#F29B38", "#FACC15", "#4ADE80",
+-  "#2DD4BF", "#38BDF8", "#818CF8", "#C084FC", "#E879F9",
++  "#2DD4BF", "#38BDF8", "#818CF8", "#C084FC", "#E879F9", "#A4FF39",
+ ];
+ 
+ /** "#RRGGBB" in upper case, or null for anything that is not six hex digits. */
 diff --git a/windows/src/core/spotify.ts b/windows/src/core/spotify.ts
 index 47d7c20..95b8331 100644
 --- a/windows/src/core/spotify.ts
@@ -2228,6 +2304,426 @@ index a99718d..52c06a8 100644
    }
  }
  
+diff --git a/windows/src/hub/hero.ts b/windows/src/hub/hero.ts
+index b0dce33..8193c8e 100644
+--- a/windows/src/hub/hero.ts
++++ b/windows/src/hub/hero.ts
+@@ -151,7 +151,7 @@ export function backdrop(canvas: HTMLCanvasElement, color: string, pointerFrom:
+       ctx.beginPath();
+       ctx.roundRect(0, 0, w, h, radius);
+       ctx.clip();
+-      ctx.fillStyle = "#020203";
++      ctx.fillStyle = "#151020";
+       ctx.fillRect(0, 0, w, h);
+       const lin = ctx.createLinearGradient(w, 0, w * 0.35, h);
+       lin.addColorStop(0, rgba(color, 0.1));
+@@ -341,7 +341,7 @@ export function troupe(canvas: HTMLCanvasElement, cast: MochiSpec[], width: numb
+ }
+ 
+ /** One Mochi alone (the sidebar's logo, an empty page). */
+-export function liveMochi(canvas: HTMLCanvasElement, color = "#F5F6F8", state: BotStateName = "idle") {
++export function liveMochi(canvas: HTMLCanvasElement, color = "#A4FF39", state: BotStateName = "idle") {
+   const engine = new BotEngine();
+   engine.bodyColor = hexToRGB(color);
+   engine.setState(state, true);
+@@ -450,7 +450,7 @@ export function glowCard(color: string, ...content: (HTMLElement | string)[]): H
+ }
+ 
+ /** An empty page: a Mochi asleep, and a line. */
+-export function emptyState(text: string, state: BotStateName = "sleeping", color = "#F5F6F8"): HTMLElement {
++export function emptyState(text: string, state: BotStateName = "sleeping", color = "#A4FF39"): HTMLElement {
+   const el = document.createElement("div");
+   el.className = "hub-empty";
+   const canvas = document.createElement("canvas");
+diff --git a/windows/src/hub/hub.css b/windows/src/hub/hub.css
+index a4327c0..6c610da 100644
+--- a/windows/src/hub/hub.css
++++ b/windows/src/hub/hub.css
+@@ -1,24 +1,26 @@
++@import "../theme.css";
++
+ /* The Coucou window: an OLED-black sidebar, a dark panel holding the pages,
+    and on top of each page a coloured band where little Mochis walk. Same
+    look as the Mac's Coucou window (FlowHub.swift). */
+ 
+ :root {
+-  --hub-panel: #0e0f11;
+-  --hub-card: #18191c;
+-  --hub-field: #1f2024;
+-  --hub-line: rgba(255, 255, 255, 0.07);
+-  --hub-text: #f5f6f8;
+-  --hub-body: #e1e3e6;
+-  --hub-secondary: #8e939c;
+-  --hub-muted: #6b7079;
+-  --hub-accent: #fb923c;
+-  --hub-on-accent: #170c04;
+-  --hub-green: #34d399;
+-  --hub-red: #ff453a;
++  --hub-panel: var(--eva-panel);
++  --hub-card: var(--eva-card);
++  --hub-field: var(--eva-hover);
++  --hub-line: var(--eva-line);
++  --hub-text: var(--eva-text);
++  --hub-body: var(--eva-text);
++  --hub-secondary: var(--eva-secondary);
++  --hub-muted: var(--eva-secondary);
++  --hub-accent: var(--eva-accent);
++  --hub-on-accent: var(--eva-on-accent);
++  --hub-green: var(--eva-accent);
++  --hub-red: var(--eva-error);
+ }
+ 
+ body.hub-window {
+-  background: #000;
++  background: var(--eva-bg);
+   color: var(--hub-text);
+   font: 400 13px/1.45 var(--font);
+   -webkit-font-smoothing: antialiased;
+@@ -73,7 +75,7 @@ body.hub-window {
+   height: 32px;
+   border-radius: 9px;
+   background: transparent;
+-  color: #c7cad0;
++  color: var(--eva-secondary);
+   font: 500 13.5px var(--font);
+   text-align: start;
+ }
+@@ -91,7 +93,7 @@ body.hub-window {
+ }
+ 
+ .hub-item:hover:not(:disabled) {
+-  background: rgba(255, 255, 255, 0.05);
++  background: var(--eva-hover);
+   transform: none;
+ }
+ 
+@@ -100,8 +102,8 @@ body.hub-window {
+ }
+ 
+ .hub-item.on {
+-  background: rgba(255, 255, 255, 0.09);
+-  color: var(--hub-text);
++  background: var(--eva-hover);
++  color: var(--eva-accent);
+   font-weight: 600;
+ }
+ 
+@@ -116,7 +118,7 @@ body.hub-window {
+   gap: 8px;
+   padding: 10px 12px;
+   border-radius: 11px;
+-  background: rgba(255, 255, 255, 0.05);
++  background: var(--eva-card);
+   color: var(--hub-secondary);
+   font-size: 12px;
+   line-height: 1.3;
+@@ -175,7 +177,7 @@ body.hub-window {
+   border-radius: 18px;
+   overflow: hidden;
+   flex: 0 0 auto;
+-  border: 1px solid var(--hero-line, rgba(255, 255, 255, 0.1));
++  border: 1px solid var(--hero-line, var(--eva-border));
+ }
+ 
+ .hub-hero.compact {
+@@ -221,7 +223,7 @@ body.hub-window {
+ 
+ .hub-hero p {
+   font-size: 14px;
+-  color: #b7bbc2;
++  color: var(--eva-secondary);
+   max-width: 420px;
+ }
+ 
+@@ -290,7 +292,7 @@ body.hub-window {
+   display: inline-flex;
+   align-items: center;
+   border-radius: 7px;
+-  background: rgba(255, 255, 255, 0.08);
++  background: var(--eva-hover);
+   white-space: nowrap;
+ }
+ 
+@@ -298,7 +300,7 @@ button.hub-btn {
+   border-radius: 10px;
+   padding: 8px 14px;
+   font: 600 12.5px var(--font);
+-  background: rgba(255, 255, 255, 0.09);
++  background: var(--eva-panel);
+   color: var(--hub-text);
+ }
+ 
+@@ -308,12 +310,13 @@ button.hub-btn.primary {
+ }
+ 
+ button.hub-btn.primary:hover:not(:disabled) {
+-  background: #fdab63;
++  background: var(--eva-accent);
++  filter: brightness(1.08);
+ }
+ 
+ button.hub-btn.danger {
+-  background: rgba(255, 69, 58, 0.14);
+-  color: #ff8a80;
++  background: rgba(var(--eva-error-rgb), 0.14);
++  color: var(--eva-error);
+ }
+ 
+ button.hub-btn.small {
+@@ -329,8 +332,8 @@ button.hub-icon {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  background: rgba(255, 255, 255, 0.06);
+-  color: #c7cad0;
++  background: var(--eva-panel);
++  color: var(--eva-secondary);
+ }
+ 
+ button.hub-icon svg {
+@@ -349,7 +352,7 @@ button.hub-icon svg {
+   font: 400 13px var(--font);
+   color: var(--hub-text);
+   background: var(--hub-field);
+-  border: 1px solid rgba(255, 255, 255, 0.08);
++  border: 1px solid var(--eva-border);
+   border-radius: 9px;
+   padding: 7px 10px;
+   outline: none;
+@@ -358,7 +361,7 @@ button.hub-icon svg {
+ .hub-input:focus,
+ .hub-textarea:focus,
+ .hub-select:focus {
+-  border-color: rgba(251, 146, 60, 0.6);
++  border-color: var(--eva-accent);
+ }
+ 
+ .hub-textarea {
+@@ -371,7 +374,7 @@ button.hub-icon svg {
+   display: inline-flex;
+   padding: 2px;
+   border-radius: 9px;
+-  background: rgba(255, 255, 255, 0.06);
++  background: var(--eva-panel);
+   gap: 2px;
+ }
+ 
+@@ -379,12 +382,12 @@ button.hub-icon svg {
+   border-radius: 7px;
+   padding: 5px 14px;
+   background: transparent;
+-  color: #c7cad0;
++  color: var(--eva-secondary);
+   font: 500 12.5px var(--font);
+ }
+ 
+ .hub-segmented button.on {
+-  background: rgba(255, 255, 255, 0.14);
++  background: var(--eva-hover);
+   color: var(--hub-text);
+ }
+ 
+@@ -393,7 +396,7 @@ button.hub-icon svg {
+   height: 17px;
+   flex: 0 0 17px;
+   border-radius: 50%;
+-  border: 1.5px solid #5a5f68;
++  border: 1.5px solid var(--eva-secondary);
+ }
+ 
+ .hub-radio.on {
+@@ -404,7 +407,7 @@ button.hub-icon svg {
+   width: 120px;
+   height: 6px;
+   border-radius: 3px;
+-  background: rgba(255, 255, 255, 0.1);
++  background: var(--eva-hover);
+   overflow: hidden;
+ }
+ 
+@@ -426,9 +429,9 @@ button.hub-icon svg {
+ .hub-warn {
+   border-radius: 12px;
+   padding: 12px 14px;
+-  background: rgba(247, 179, 43, 0.1);
+-  border: 1px solid rgba(247, 179, 43, 0.22);
+-  color: #f5d28a;
++  background: rgba(var(--eva-attention-rgb), 0.1);
++  border: 1px solid rgba(var(--eva-attention-rgb), 0.22);
++  color: var(--eva-attention);
+   font-size: 12.5px;
+ }
+ 
+@@ -491,7 +494,7 @@ button.hub-icon svg {
+   font-size: 11px;
+   padding: 1px 7px;
+   border-radius: 5px;
+-  background: rgba(255, 255, 255, 0.07);
++  background: var(--eva-hover);
+   color: var(--hub-secondary);
+   max-width: 100%;
+   overflow: hidden;
+@@ -542,7 +545,7 @@ button.hub-icon svg {
+   position: relative;
+   border-radius: 14px;
+   overflow: hidden;
+-  border: 1px solid var(--glow-line, rgba(255, 255, 255, 0.1));
++  border: 1px solid var(--glow-line, var(--eva-border));
+ }
+ 
+ .hub-glow canvas {
+@@ -634,7 +637,7 @@ button.hub-icon svg {
+   align-items: flex-end;
+   gap: 4px;
+   height: 180px;
+-  border-bottom: 1px dashed rgba(251, 146, 60, 0.35);
++  border-bottom: 1px dashed var(--eva-border);
+ }
+ 
+ .hub-bars i {
+@@ -674,7 +677,7 @@ button.hub-icon svg {
+ .hub-app-bar .track {
+   height: 5px;
+   border-radius: 3px;
+-  background: rgba(255, 255, 255, 0.08);
++  background: var(--eva-hover);
+   overflow: hidden;
+ }
+ 
+@@ -699,7 +702,7 @@ button.hub-icon svg {
+   gap: 6px;
+   padding: 5px 6px 5px 12px;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.07);
++  background: var(--eva-hover);
+   font-size: 13px;
+ }
+ 
+@@ -775,7 +778,7 @@ button.hub-icon svg {
+   border-radius: 14px;
+   overflow: hidden;
+   border: 1px solid var(--hub-line);
+-  background: rgba(0, 0, 0, 0.18);
++  background: var(--eva-panel);
+ }
+ 
+ .hub-notes-list {
+@@ -798,7 +801,7 @@ button.hub-icon svg {
+ }
+ 
+ .hub-note-item.on {
+-  background: rgba(255, 255, 255, 0.08);
++  background: var(--eva-hover);
+ }
+ 
+ .hub-note-item .t {
+@@ -838,7 +841,7 @@ button.hub-icon svg {
+   gap: 7px;
+   padding: 4px 10px 4px 4px;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.06);
++  background: var(--eva-hover);
+   font-size: 13px;
+   color: var(--hub-text);
+ }
+@@ -851,7 +854,7 @@ button.hub-icon svg {
+   align-items: center;
+   justify-content: center;
+   font: 700 11px var(--font);
+-  color: #0b0c0e;
++  color: var(--eva-on-accent);
+ }
+ 
+ .hub-line {
+@@ -900,7 +903,7 @@ button.hub-icon svg {
+   height: 8px;
+   border-radius: 50%;
+   background: var(--hub-red);
+-  box-shadow: 0 0 6px rgba(255, 69, 58, 0.7);
++  box-shadow: 0 0 6px rgba(var(--eva-error-rgb), 0.7);
+ }
+ 
+ @media (max-width: 1000px) {
+diff --git a/windows/src/hub/pages/dictation.ts b/windows/src/hub/pages/dictation.ts
+index 43932d1..8d6393f 100644
+--- a/windows/src/hub/pages/dictation.ts
++++ b/windows/src/hub/pages/dictation.ts
+@@ -36,7 +36,7 @@ export async function dictationPage(page: HTMLElement, ctx: HubContext) {
+   const record = button(t("Record a call"), () => {
+     void FlowBridge.startNote().then(() => ctx.navigate("notes"), (err) => alertLine.replaceChildren(String(err)));
+   }, "primary");
+-  record.prepend(h("span", { class: "hub-rec", style: "background:#170c04;box-shadow:none;margin-inline-end:8px" }));
++  record.prepend(h("span", { class: "hub-rec", style: "background:var(--eva-on-accent);box-shadow:none;margin-inline-end:8px" }));
+   const alertLine = h("div", { class: "hub-note" });
+   const hello = status.userName ? t("Hello {0}", { 0: status.userName }) : t("Hello");
+   page.append(ctx.hero("dictation", hello, t("Hold {0} anywhere, speak, let go: it's pasted.", { 0: key }), [record]));
+@@ -126,7 +126,7 @@ function promo(ctx: HubContext): HTMLElement {
+   return glowCard(
+     "#FB923C",
+     h("div", { style: "font:700 15px var(--font)", text: t("The Notetaker") }),
+-    h("div", { class: "hub-note", style: "color:#b7bbc2", text: t("Your calls transcribed person by person, with a summary and the to-dos. No bot in the meeting.") }),
++    h("div", { class: "hub-note", style: "color:var(--eva-secondary)", text: t("Your calls transcribed person by person, with a summary and the to-dos. No bot in the meeting.") }),
+     h("button", { class: "hub-link", text: t("Open the Notetaker →"), onclick: () => ctx.navigate("notes") }),
+   );
+ }
+@@ -138,7 +138,7 @@ function setup(ctx: HubContext): HTMLElement {
+   const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
+   body.append(
+     h("div", { style: "font:700 17px var(--font)", text: t("Dictate anywhere on your computer") }),
+-    h("div", { class: "hub-note", style: "color:#b7bbc2;font-size:13px", text: t("Hold {0} in any app, speak, let go: your words are pasted where you type.", { 0: key }) }),
++    h("div", { class: "hub-note", style: "color:var(--eva-secondary);font-size:13px", text: t("Hold {0} in any app, speak, let go: your words are pasted where you type.", { 0: key }) }),
+   );
+   body.append(row(t("Turn on dictation"), null, toggle(status.prefs.enabled, (on) => {
+     void ctx.setPrefs((p) => (p.enabled = on)).then(() => ctx.navigate("dictation"));
+diff --git a/windows/src/hub/pages/notes.ts b/windows/src/hub/pages/notes.ts
+index 099556c..f030627 100644
+--- a/windows/src/hub/pages/notes.ts
++++ b/windows/src/hub/pages/notes.ts
+@@ -28,7 +28,7 @@ export async function notesPage(page: HTMLElement, ctx: HubContext) {
+     page.append(glowCard(
+       "#3B9EFF",
+       h("div", { style: "font:700 15px var(--font)", text: t("One download, then offline") }),
+-      h("div", { class: "hub-note", style: "color:#b7bbc2", text: t("Coucou writes your calls on this computer with Parakeet, and tells the voices apart with a second small model. Both are downloaded once (about {0} MB), then everything works offline.", { 0: ctx.status.models.downloadMb }) }),
++      h("div", { class: "hub-note", style: "color:var(--eva-secondary)", text: t("Coucou writes your calls on this computer with Parakeet, and tells the voices apart with a second small model. Both are downloaded once (about {0} MB), then everything works offline.", { 0: ctx.status.models.downloadMb }) }),
+       modelsControl(ctx, () => ctx.navigate("notes")),
+     ));
+   }
+@@ -61,7 +61,7 @@ export async function notesPage(page: HTMLElement, ctx: HubContext) {
+         drawList();
+       });
+     }, "primary");
+-    b.prepend(h("span", { class: "hub-rec", style: "background:#170c04;box-shadow:none;margin-inline-end:8px" }));
++    b.prepend(h("span", { class: "hub-rec", style: "background:var(--eva-on-accent);box-shadow:none;margin-inline-end:8px" }));
+     return b;
+   }
+ 
+diff --git a/windows/src/hub/shell.ts b/windows/src/hub/shell.ts
+index 252a0f1..ff2a971 100644
+--- a/windows/src/hub/shell.ts
++++ b/windows/src/hub/shell.ts
+@@ -119,18 +119,18 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
+   function drawStatus() {
+     clear(statusLine);
+     const models = status.models.parakeet.state;
+-    let color = "#6b7079";
++    let color = "var(--eva-secondary)";
+     let text: string;
+     if (!status.prefs.enabled) {
+       text = t("Dictation is off");
+     } else if (models !== "ready") {
+-      color = "#f7b32b";
++      color = "var(--eva-attention)";
+       text = models === "downloading" ? t("Downloading the voice model…") : t("Download the voice model to dictate");
+     } else if (status.keys !== "ok" && status.keys !== "wayland") {
+-      color = "#f7b32b";
++      color = "var(--eva-attention)";
+       text = t("Use the pill's microphone to dictate");
+     } else {
+-      color = "#34d399";
++      color = "var(--eva-accent)";
+       text = t("Ready · hold {0}", { 0: keyLabel(status.keys === "wayland" ? "wayland" : status.prefs.key, status.platform) });
+     }
+     statusLine.append(h("i", { class: "dot", style: `background:${color}` }), h("span", { text }));
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
 index 4bbfe79..f0e2270 100644
 --- a/windows/src/i18n/extra.json
@@ -2790,6 +3286,483 @@ index b3b4cee..6a4a960 100644
    registerPhoneLink(island);
    registerIntegrationHandlers(island);
    registerShortcutHandlers(island, () => setPaused(false));
+diff --git a/windows/src/mochi/engine.ts b/windows/src/mochi/engine.ts
+index 86d8ce6..35b9494 100644
+--- a/windows/src/mochi/engine.ts
++++ b/windows/src/mochi/engine.ts
+@@ -67,8 +67,8 @@ const EYE_W = 0.25;
+ const EYE_H = 0.27;
+ const EYE_SP = 0.37;
+ const EYE_P = -0.12;
+-const BASE_TOP: RGB = [0.929, 0.929, 0.937]; // #EDEDEF
+-const BASE_BOTTOM: RGB = [0.769, 0.773, 0.792]; // #C4C5CA
++const BASE_TOP: RGB = [164 / 255, 1, 57 / 255]; // EVA-01 #A4FF39
++const BASE_BOTTOM: RGB = [118 / 255, 205 / 255, 37 / 255]; // shaded EVA body
+ const INK = "rgb(26,20,18)"; // #1A1412
+ const MINI_INK = "rgb(16,19,26)"; // #10131A
+ 
+@@ -77,11 +77,11 @@ const C = {
+   working: [0.231, 0.62, 1] as RGB,
+   thinking: [0.545, 0.361, 0.965] as RGB,
+   searching: [0.388, 0.396, 0.949] as RGB,
+-  approval: [0.961, 0.647, 0.141] as RGB,
+-  question: [0.133, 0.827, 0.933] as RGB,
+-  error: [0.957, 0.314, 0.369] as RGB,
+-  finished: [0.204, 0.831, 0.6] as RGB,
+-  ratelimit: [0.984, 0.573, 0.235] as RGB,
++  approval: [1, 163 / 255, 77 / 255] as RGB,
++  question: [1, 163 / 255, 77 / 255] as RGB,
++  error: [1, 100 / 255, 124 / 255] as RGB,
++  finished: [164 / 255, 1, 57 / 255] as RGB,
++  ratelimit: [1, 163 / 255, 77 / 255] as RGB,
+   sleeping: [0.58, 0.635, 0.722] as RGB,
+   dizzy: [0.957, 0.447, 0.714] as RGB,
+ };
+diff --git a/windows/src/pill/main.ts b/windows/src/pill/main.ts
+index 7d81770..653a80c 100644
+--- a/windows/src/pill/main.ts
++++ b/windows/src/pill/main.ts
+@@ -49,7 +49,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""):
+ 
+ const mochi = new BotEngine();
+ mochi.isMini = true;
+-mochi.bodyColor = hexToRGB("#F5F6F8");
++mochi.bodyColor = hexToRGB("#A4FF39");
+ mochi.setState("idle", true);
+ const mochiCanvas = el("canvas");
+ 
+@@ -177,7 +177,7 @@ function content(l: Look): HTMLElement {
+       if (vertical()) {
+         const icon = el("span");
+         icon.append(svgIcon(state.phase === "failed" ? "mic" : "copy"));
+-        icon.querySelector("svg")!.setAttribute("style", "width:13px;height:13px;fill:none;stroke:#e8e9ec;stroke-width:2");
++        icon.querySelector("svg")!.setAttribute("style", "width:13px;height:13px;fill:none;stroke:var(--eva-text);stroke-width:2");
+         c.append(mochiSlot(), icon);
+       } else {
+         c.append(mochiSlot(), el("span", "message", messageText() ?? ""));
+diff --git a/windows/src/pill/pill.css b/windows/src/pill/pill.css
+index 9602991..7f0a48c 100644
+--- a/windows/src/pill/pill.css
++++ b/windows/src/pill/pill.css
+@@ -1,3 +1,5 @@
++@import "../theme.css";
++
+ /* Flow dictation's pill (FlowPill.swift): a see-through capsule resting on an
+    edge of the screen, black once open, and a bubble beside it. */
+ 
+@@ -17,7 +19,7 @@ body {
+   -webkit-user-select: none;
+   cursor: default;
+   font: 500 12.5px system-ui, "Segoe UI Variable Text", "Segoe UI", "Noto Sans", sans-serif;
+-  color: #fff;
++  color: var(--eva-text);
+ }
+ 
+ #pill {
+@@ -53,8 +55,8 @@ body {
+   flex: 0 0 auto;
+   border-radius: 999px;
+   overflow: hidden;
+-  background: rgba(0, 0, 0, 0.28);
+-  box-shadow: inset 0 0 0 1.2px rgba(255, 255, 255, 0.42);
++  background: rgba(21, 16, 32, 0.92);
++  box-shadow: inset 0 0 0 1.2px var(--eva-border);
+   transition:
+     width 0.36s cubic-bezier(0.34, 1.36, 0.64, 1),
+     height 0.36s cubic-bezier(0.34, 1.36, 0.64, 1),
+@@ -63,15 +65,15 @@ body {
+ }
+ 
+ .capsule.open {
+-  background: rgba(0, 0, 0, 0.94);
++  background: var(--eva-panel);
+   box-shadow:
+-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
++    inset 0 0 0 1px var(--eva-border),
+     0 4px 10px rgba(0, 0, 0, 0.35);
+ }
+ 
+ .capsule.handsfree {
+   box-shadow:
+-    inset 0 0 0 1.5px rgba(249, 115, 22, 0.85),
++    inset 0 0 0 1.5px var(--eva-attention),
+     0 4px 10px rgba(0, 0, 0, 0.35);
+ }
+ 
+@@ -123,7 +125,7 @@ body {
+   border: 0;
+   border-radius: 50%;
+   background: transparent;
+-  color: #e8e9ec;
++  color: var(--eva-text);
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+@@ -132,19 +134,19 @@ body {
+ }
+ 
+ .pbtn:hover {
+-  background: rgba(255, 255, 255, 0.14);
++  background: var(--eva-hover);
+ }
+ 
+ .pbtn.small {
+   width: 22px;
+   height: 22px;
+   flex-basis: 22px;
+-  background: rgba(255, 255, 255, 0.16);
++  background: var(--eva-card);
+ }
+ 
+ .pbtn.filled {
+-  background: #fff;
+-  color: #000;
++  background: var(--eva-accent);
++  color: var(--eva-on-accent);
+ }
+ 
+ .pbtn svg {
+@@ -174,7 +176,7 @@ body {
+   width: 3.4px;
+   height: 3.4px;
+   border-radius: 2px;
+-  background: rgba(255, 255, 255, 0.94);
++  background: var(--eva-accent);
+ }
+ 
+ .vertical .bars {
+@@ -189,7 +191,7 @@ body {
+ 
+ .message {
+   font: 500 12px system-ui, "Segoe UI", sans-serif;
+-  color: #e8e9ec;
++  color: var(--eva-text);
+   white-space: nowrap;
+ }
+ 
+@@ -197,15 +199,15 @@ body {
+   width: 8px;
+   height: 8px;
+   border-radius: 50%;
+-  background: #ff453a;
+-  box-shadow: 0 0 3px rgba(255, 69, 58, 0.6);
++  background: var(--eva-error);
++  box-shadow: 0 0 3px rgba(var(--eva-error-rgb), 0.6);
+   flex: 0 0 8px;
+ }
+ 
+ .clock {
+   font: 600 12px system-ui, "Segoe UI", sans-serif;
+   font-variant-numeric: tabular-nums;
+-  color: #e8e9ec;
++  color: var(--eva-text);
+ }
+ 
+ .vertical .clock {
+@@ -217,7 +219,7 @@ body {
+   height: 22px;
+   border-radius: 50%;
+   border: 0;
+-  background: rgba(255, 255, 255, 0.16);
++  background: var(--eva-card);
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+@@ -228,14 +230,14 @@ body {
+   width: 8px;
+   height: 8px;
+   border-radius: 2px;
+-  background: #fff;
++  background: var(--eva-accent);
+ }
+ 
+ /* The bubble beside the pill: a tip, a short message, an announcement. */
+ .bubble {
+   flex: 0 0 auto;
+-  background: rgba(0, 0, 0, 0.94);
+-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
++  background: var(--eva-panel);
++  box-shadow: inset 0 0 0 1px var(--eva-border);
+   border-radius: 999px;
+   padding: 0 14px;
+   height: 30px;
+@@ -268,7 +270,7 @@ body {
+ }
+ 
+ .bubble.voice .heard {
+-  color: #9a9ea8;
++  color: var(--eva-secondary);
+   font-weight: 500;
+   line-height: 1.3;
+   display: -webkit-box;
+@@ -278,7 +280,7 @@ body {
+ }
+ 
+ .bubble.voice .answer {
+-  color: #f2f3f5;
++  color: var(--eva-text);
+   font-weight: 500;
+   line-height: 1.35;
+   display: -webkit-box;
+@@ -313,8 +315,8 @@ body {
+   border: 0;
+   border-radius: 999px;
+   padding: 6px 12px;
+-  background: #fff;
+-  color: #000;
++  background: var(--eva-accent);
++  color: var(--eva-on-accent);
+   font: 600 12px system-ui, "Segoe UI", sans-serif;
+   cursor: pointer;
+   white-space: nowrap;
+@@ -325,8 +327,8 @@ body {
+   width: 22px;
+   height: 22px;
+   border-radius: 50%;
+-  background: rgba(255, 255, 255, 0.12);
+-  color: #c7cad0;
++  background: var(--eva-card);
++  color: var(--eva-secondary);
+   cursor: pointer;
+   display: inline-flex;
+   align-items: center;
+diff --git a/windows/src/settings/settings.css b/windows/src/settings/settings.css
+index 792739d..8c1e6f4 100644
+--- a/windows/src/settings/settings.css
++++ b/windows/src/settings/settings.css
+@@ -1,3 +1,5 @@
++@import "../theme.css";
++
+ /* Settings window — same palette as the island, laid out as a normal window. */
+ 
+ :root {
+@@ -10,15 +12,6 @@
+     "Microsoft YaHei", "Noto Sans", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Arabic",
+     "Noto Sans CJK SC", "Noto Sans SC", "Droid Sans Fallback", sans-serif;
+   --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+-  --ink: #f5f6f8;
+-  --dim: #9398a1;
+-  --dim-2: #6b7079;
+-  --bg: #0b0c0e;
+-  --card: #141518;
+-  --hairline: rgba(255, 255, 255, 0.07);
+-  --green: #22c55e;
+-  --red: #f4505e;
+-  --amber: #f5a524;
+ }
+ 
+ * {
+@@ -107,14 +100,14 @@ button {
+   padding: 7px 14px;
+   border: 0;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.09);
++  background: var(--eva-panel);
+   color: var(--ink);
+   cursor: pointer;
+   transition: background 0.14s, transform 0.08s;
+ }
+ 
+ button:hover:not(:disabled) {
+-  background: rgba(255, 255, 255, 0.15);
++  background: var(--eva-hover);
+ }
+ 
+ button:active:not(:disabled) {
+@@ -122,21 +115,22 @@ button:active:not(:disabled) {
+ }
+ 
+ button.primary {
+-  background: var(--ink);
+-  color: #0b0c0e;
++  background: var(--eva-accent);
++  color: var(--eva-on-accent);
+ }
+ 
+ button.primary:hover:not(:disabled) {
+-  background: #fff;
++  background: var(--eva-accent);
++  filter: brightness(1.08);
+ }
+ 
+ button.danger {
+-  background: rgba(244, 80, 94, 0.16);
+-  color: #ff8d97;
++  background: rgba(var(--eva-error-rgb), 0.16);
++  color: var(--eva-error);
+ }
+ 
+ button:disabled {
+-  opacity: 0.45;
++  opacity: 0.65;
+   cursor: default;
+ }
+ 
+@@ -153,7 +147,7 @@ code,
+   width: 36px;
+   height: 20px;
+   border-radius: 10px;
+-  background: rgba(255, 255, 255, 0.15);
++  background: var(--eva-hover);
+   flex: 0 0 36px;
+   padding: 0;
+ }
+@@ -170,11 +164,12 @@ code,
+   width: 16px;
+   height: 16px;
+   border-radius: 50%;
+-  background: #fff;
++  background: var(--eva-text);
+   transition: transform 0.18s;
+ }
+ 
+ .switch.on::after {
++  background: var(--eva-on-accent);
+   transform: translateX(16px);
+ }
+ 
+@@ -183,7 +178,7 @@ input[type="range"] {
+   appearance: none;
+   height: 4px;
+   border-radius: 2px;
+-  background: rgba(255, 255, 255, 0.2);
++  background: var(--eva-hover);
+   width: 140px;
+ }
+ 
+@@ -192,7 +187,7 @@ input[type="range"]::-webkit-slider-thumb {
+   width: 13px;
+   height: 13px;
+   border-radius: 50%;
+-  background: #fff;
++  background: var(--eva-accent);
+ }
+ 
+ input[type="number"],
+@@ -200,7 +195,7 @@ input[type="text"],
+ input[type="password"],
+ select {
+   font: 400 12.5px var(--font);
+-  background: rgba(255, 255, 255, 0.07);
++  background: var(--eva-panel);
+   border: 1px solid var(--hairline);
+   border-radius: 8px;
+   color: var(--ink);
+@@ -214,19 +209,19 @@ input::placeholder {
+ input:focus,
+ select:focus {
+   outline: none;
+-  border-color: rgba(255, 255, 255, 0.28);
++  border-color: var(--eva-accent);
+ }
+ 
+ /* The popup is drawn by the OS: give it an explicit pair of colours rather than
+    inheriting white on white. */
+ select option {
+-  background-color: #1a1c20;
++  background-color: var(--eva-panel);
+   color: var(--ink);
+ }
+ 
+ .diff {
+   font: 400 11.5px/1.5 var(--mono);
+-  background: #08090b;
++  background: var(--eva-bg);
+   border: 1px solid var(--hairline);
+   border-radius: 10px;
+   padding: 10px 12px;
+@@ -237,11 +232,11 @@ select option {
+ }
+ 
+ .diff .add {
+-  color: #86efac;
++  color: var(--eva-accent);
+ }
+ 
+ .diff .del {
+-  color: #ff8d97;
++  color: var(--eva-error);
+ }
+ 
+ .diff .ctx {
+@@ -255,18 +250,18 @@ select option {
+ }
+ 
+ .notice.ok {
+-  background: rgba(34, 197, 94, 0.12);
+-  color: #86efac;
++  background: rgba(var(--eva-accent-rgb), 0.12);
++  color: var(--eva-accent);
+ }
+ 
+ .notice.err {
+-  background: rgba(244, 80, 94, 0.14);
+-  color: #ff8d97;
++  background: rgba(var(--eva-error-rgb), 0.14);
++  color: var(--eva-error);
+ }
+ 
+ .notice.warn {
+-  background: rgba(245, 165, 36, 0.13);
+-  color: #fbc06a;
++  background: rgba(var(--eva-attention-rgb), 0.13);
++  color: var(--eva-attention);
+ }
+ 
+ /* Active pills — one group per catalog category, one row per pill. */
+@@ -302,7 +297,7 @@ select option {
+ }
+ 
+ .color-dot:focus-visible {
+-  outline: 2px solid rgba(255, 255, 255, 0.5);
++  outline: 2px solid var(--eva-accent);
+   outline-offset: 2px;
+ }
+ 
+@@ -385,7 +380,7 @@ select option {
+   min-width: 118px;
+   padding: 5px 10px;
+   border-radius: 8px;
+-  background: rgba(255, 255, 255, 0.07);
++  background: var(--eva-panel);
+   border: 1px solid var(--hairline);
+   color: var(--ink);
+   text-align: center;
+@@ -393,7 +388,7 @@ select option {
+ }
+ 
+ .keycap.recording {
+-  border-color: rgba(255, 255, 255, 0.4);
++  border-color: var(--eva-border);
+   color: var(--dim);
+ }
+ 
+@@ -406,20 +401,20 @@ select option {
+   font: 500 10.5px var(--font);
+   padding: 2px 8px;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.08);
++  background: var(--eva-hover);
+   color: var(--dim);
+   white-space: nowrap;
+   flex: 0 0 auto;
+ }
+ 
+ .tag.warn {
+-  background: rgba(245, 165, 36, 0.13);
+-  color: #fbc06a;
++  background: rgba(var(--eva-attention-rgb), 0.13);
++  color: var(--eva-attention);
+ }
+ 
+ .tag.err {
+-  background: rgba(244, 80, 94, 0.14);
+-  color: #ff8d97;
++  background: rgba(var(--eva-error-rgb), 0.14);
++  color: var(--eva-error);
+ }
+ 
+ /* Arabic: the window reads right to left (main.ts sets <html dir="rtl">);
 diff --git a/windows/src/settings/updates.ts b/windows/src/settings/updates.ts
 index f05e0b2..5b9baa5 100644
 --- a/windows/src/settings/updates.ts
@@ -2804,45 +3777,850 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index e1fff50..938eb96 100644
+index e1fff50..ce77361 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
-@@ -2672,3 +2672,35 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -1,5 +1,6 @@
+-/* Coucou for Windows — same palette, sizes and type scale as the macOS island.
+-   Every colour below is copied from the Swift views. */
++@import "./theme.css";
++
++/* Coucou island — original composition with the shared EVA-01 palette. */
+ 
+ :root {
+   color-scheme: dark;
+@@ -12,22 +13,6 @@
+     "Noto Sans Arabic", "Noto Sans CJK SC", "Noto Sans SC", "Droid Sans Fallback", sans-serif;
+   --mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+ 
+-  --ink: #f5f6f8;        /* primary text */
+-  --ink-2: #f1f2f4;
+-  --dim: #9398a1;
+-  --dim-2: #8e939c;
+-  --dim-3: #6b7079;
+-  --dim-4: #5f646d;
+-  --dim-5: #4b5563;
+-  --card: #141518;
+-  --card-flat: #0e0f11;
+-  --tab-on: #1d1f23;
+-  --hairline: rgba(255, 255, 255, 0.035);
+-  --red: #f4505e;
+-  --red-text: #ff8d97;
+-  --green: #22c55e;
+-  --green-2: #34d399;
+-  --amber: #f5a524;
+   --cyan: #22d3ee;
+   --indigo: #6366f1;
+   --pink: #f472b6;
+@@ -74,7 +59,7 @@ body {
+   position: absolute;
+   top: 0;
+   left: 50%;
+-  background: #000;
++  background: var(--eva-bg);
+   border-radius: 0 0 14px 14px;
+   overflow: visible;
+   will-change: width, height, transform;
+@@ -188,7 +173,7 @@ body {
+   font-size: 12px;
+   font-variant-numeric: tabular-nums;
+   white-space: nowrap;
+-  color: rgba(255, 255, 255, 0.85);
++  color: var(--eva-text);
+   pointer-events: none;
+   transition: opacity 0.25s ease-in-out;
+ }
+@@ -248,13 +233,13 @@ body {
+ }
+ 
+ .tab:hover {
+-  background: rgba(255, 255, 255, 0.07);
+-  color: #b0b5be;
++  background: var(--eva-hover);
++  color: var(--eva-secondary);
+ }
+ 
+ .tab.on {
+   background: var(--tab-on);
+-  color: var(--ink);
++  color: var(--eva-accent);
+ }
+ 
+ .header-actions {
+@@ -360,17 +345,17 @@ body {
+ }
+ 
+ .btn.primary {
+-  background: var(--ink);
+-  color: #0b0c0e;
++  background: var(--eva-accent);
++  color: var(--eva-on-accent);
+ }
+ 
+ .btn.secondary {
+-  background: rgba(255, 255, 255, 0.09);
++  background: var(--eva-panel);
+   color: var(--ink-2);
+ }
+ 
+ .btn.secondary:hover {
+-  background: rgba(255, 255, 255, 0.15);
++  background: var(--eva-hover);
+ }
+ 
+ .btn .kbd {
+@@ -385,7 +370,7 @@ body {
+ }
+ 
+ .btn.secondary .kbd {
+-  border: 1px solid rgba(255, 255, 255, 0.4);
++  border: 1px solid var(--eva-border);
+ }
+ 
+ .link-btn {
+@@ -400,7 +385,7 @@ body {
+   height: 16px;
+   border: 0;
+   border-radius: 50%;
+-  background: rgba(255, 255, 255, 0.07);
++  background: var(--eva-panel);
+   color: var(--dim-4);
+   display: grid;
+   place-items: center;
+@@ -620,7 +605,7 @@ body {
+ 
+ .diff-line .sym {
+   flex: 0 0 12px;
+-  color: #454850;
++  color: var(--eva-secondary);
+ }
+ 
+ .diff-line .txt {
+@@ -632,8 +617,8 @@ body {
+ }
+ 
+ .diff-line.added {
+-  background: rgba(34, 197, 94, 0.12);
+-  color: #86efac;
++  background: rgba(var(--eva-accent-rgb), 0.12);
++  color: var(--eva-accent);
+ }
+ 
+ .diff-line.added .sym {
+@@ -641,8 +626,8 @@ body {
+ }
+ 
+ .diff-line.removed {
+-  background: rgba(244, 80, 94, 0.12);
+-  color: #fca5a5;
++  background: rgba(var(--eva-error-rgb), 0.12);
++  color: var(--eva-error);
+ }
+ 
+ .diff-line.removed .sym {
+@@ -692,7 +677,7 @@ body {
+   height: 28px;
+   border-radius: 999px;
+   background: var(--card-flat);
+-  border: 1px solid rgba(255, 255, 255, 0.14);
++  border: 1px solid var(--eva-border);
+   display: flex;
+   align-items: center;
+   cursor: default;
+@@ -730,7 +715,7 @@ body {
+   width: 14px;
+   height: 14px;
+   border-radius: 50%;
+-  background: #0b0c0e;
++  background: var(--eva-bg);
+   display: grid;
+   place-items: center;
+ }
+@@ -788,9 +773,9 @@ body {
+ 
+ .code {
+   font: 400 12px var(--mono);
+-  color: #e8e9ec;
+-  background: rgba(255, 255, 255, 0.07);
+-  border: 1px solid rgba(255, 255, 255, 0.06);
++  color: var(--eva-text);
++  background: var(--eva-panel);
++  border: 1px solid var(--eva-border);
+   border-radius: 10px;
+   padding: 5px 10px;
+   max-width: 100%;
+@@ -854,7 +839,7 @@ body {
+   align-items: center;
+   gap: 10px;
+   font: 400 12.5px var(--font);
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+ }
+ 
+ .switch {
+@@ -862,7 +847,7 @@ body {
+   width: 32px;
+   height: 18px;
+   border-radius: 9px;
+-  background: rgba(255, 255, 255, 0.15);
++  background: var(--eva-hover);
+   flex: 0 0 32px;
+   transition: background 0.18s;
+   cursor: default;
+@@ -881,11 +866,12 @@ body {
+   width: 14px;
+   height: 14px;
+   border-radius: 50%;
+-  background: #fff;
++  background: var(--eva-text);
+   transition: transform 0.18s;
+ }
+ 
+ .switch.on::after {
++  background: var(--eva-on-accent);
+   transform: translateX(14px);
+ }
+ 
+@@ -894,7 +880,7 @@ input[type="range"] {
+   appearance: none;
+   height: 3px;
+   border-radius: 2px;
+-  background: rgba(255, 255, 255, 0.2);
++  background: var(--eva-hover);
+   width: 72px;
+ }
+ 
+@@ -903,7 +889,7 @@ input[type="range"]::-webkit-slider-thumb {
+   width: 11px;
+   height: 11px;
+   border-radius: 50%;
+-  background: #fff;
++  background: var(--eva-text);
+ }
+ 
+ .seg {
+@@ -923,7 +909,7 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .seg button.on {
+-  background: #252830;
++  background: var(--eva-hover);
+   color: var(--ink);
+ }
+ 
+@@ -963,10 +949,10 @@ input[type="range"]::-webkit-slider-thumb {
+   gap: 6px;
+   padding: 4px 10px;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.1);
++  background: var(--eva-hover);
+   font: 400 11.5px var(--font);
+   color: var(--ink-2);
+-  border: 1.5px solid rgba(255, 255, 255, 0.75);
++  border: 1.5px solid var(--eva-border);
+   transform: scale(1.06);
+   transition: border-color 0.3s ease-out 0.45s, transform 0.3s ease-out 0.45s;
+ }
+@@ -1005,7 +991,7 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .bubble {
+-  background: rgba(255, 255, 255, 0.13);
++  background: var(--eva-hover);
+   border-radius: 12px;
+   padding: 6px 10px;
+   font: 400 12.5px var(--font);
+@@ -1016,7 +1002,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .reply {
+   font: 400 12.5px var(--font);
+-  color: #b0b5be;
++  color: var(--eva-secondary);
+   white-space: pre-wrap;
+   padding-right: 8px;
+   user-select: text;
+@@ -1031,7 +1017,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .md-p {
+   font: 400 12.5px var(--font);
+-  color: #b0b5be;
++  color: var(--eva-secondary);
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
+ }
+@@ -1048,16 +1034,16 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .reply strong {
+-  color: #e8e9ec;
++  color: var(--eva-text);
+   font-weight: 600;
+ }
+ 
+ .md-code {
+   padding: 1px 4px;
+   border-radius: 4px;
+-  background: rgba(255, 255, 255, 0.08);
++  background: var(--eva-panel);
+   font: 400 11.5px var(--mono);
+-  color: #c8cdd4;
++  color: var(--eva-secondary);
+ }
+ 
+ .md-link {
+@@ -1071,16 +1057,16 @@ input[type="range"]::-webkit-slider-thumb {
+   align-items: flex-start;
+   gap: 8px;
+   padding: 10px;
+-  border: 1px solid rgba(255, 255, 255, 0.08);
++  border: 1px solid var(--eva-border);
+   border-radius: 8px;
+-  background: #0d0e12;
++  background: var(--eva-bg);
+ }
+ 
+ .md-pre pre {
+   flex: 1 1 auto;
+   min-width: 0;
+   font: 400 11px var(--mono);
+-  color: #c8cdd4;
++  color: var(--eva-secondary);
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
+ }
+@@ -1094,7 +1080,7 @@ input[type="range"]::-webkit-slider-thumb {
+   padding: 0;
+   border: 0;
+   border-radius: 4px;
+-  background: rgba(255, 255, 255, 0.06);
++  background: var(--eva-panel);
+   color: var(--dim-3);
+   cursor: default;
+ }
+@@ -1133,13 +1119,13 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .md-quote .md-p {
+-  color: #8a8f98;
++  color: var(--eva-secondary);
+ }
+ 
+ .md-rule {
+   width: 100%;
+   border: 0;
+-  border-top: 1px solid rgba(255, 255, 255, 0.3);
++  border-top: 1px solid var(--eva-border);
+   opacity: 0.3;
+ }
+ 
+@@ -1186,14 +1172,14 @@ input[type="range"]::-webkit-slider-thumb {
+   padding: 4px 8px;
+   border: 0;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.06);
+-  color: #5c6370;
++  background: var(--eva-panel);
++  color: var(--eva-secondary);
+   cursor: default;
+ }
+ 
+ .model-btn:hover:not(:disabled),
+ .model-btn.open {
+-  background: rgba(255, 255, 255, 0.1);
++  background: var(--eva-hover);
+ }
+ 
+ .model-btn:disabled {
+@@ -1213,7 +1199,7 @@ input[type="range"]::-webkit-slider-thumb {
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   font: 500 10.5px var(--font);
+-  color: #7b8089;
++  color: var(--eva-secondary);
+ }
+ 
+ .picker {
+@@ -1224,8 +1210,8 @@ input[type="range"]::-webkit-slider-thumb {
+   gap: 8px;
+   padding: 10px;
+   border-radius: 12px;
+-  background: #16171b;
+-  border: 1px solid rgba(255, 255, 255, 0.06);
++  background: var(--eva-panel);
++  border: 1px solid var(--eva-border);
+ }
+ 
+ .chat-body.picking .picker {
+@@ -1249,10 +1235,10 @@ input[type="range"]::-webkit-slider-thumb {
+   gap: 5px;
+   padding: 4px 10px;
+   border-radius: 999px;
+-  border: 1px solid rgba(255, 255, 255, 0.1);
+-  background: rgba(255, 255, 255, 0.06);
++  border: 1px solid var(--eva-border);
++  background: var(--eva-panel);
+   font: 400 11.5px var(--font);
+-  color: #c8cdd4;
++  color: var(--eva-secondary);
+   cursor: default;
+ }
+ 
+@@ -1260,8 +1246,8 @@ input[type="range"]::-webkit-slider-thumb {
+   font-weight: 600;
+   color: var(--ink-2);
+   /* Plain fallbacks for WebKitGTK builds without color-mix(). */
+-  border-color: rgba(255, 255, 255, 0.3);
+-  background: rgba(255, 255, 255, 0.12);
++  border-color: var(--eva-border);
++  background: var(--eva-hover);
+   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+   background: color-mix(in srgb, var(--accent) 18%, transparent);
+ }
+@@ -1275,7 +1261,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .picker-rule {
+   flex: 0 0 1px;
+-  background: rgba(255, 255, 255, 0.2);
++  background: var(--eva-hover);
+   opacity: 0.4;
+ }
+ 
+@@ -1298,19 +1284,19 @@ input[type="range"]::-webkit-slider-thumb {
+   border: 0;
+   border-radius: 6px;
+   background: transparent;
+-  color: #c8cdd4;
++  color: var(--eva-secondary);
+   font: 400 12px var(--font);
+   text-align: left;
+   cursor: default;
+ }
+ 
+ .picker-model:hover {
+-  background: rgba(255, 255, 255, 0.05);
++  background: var(--eva-hover);
+ }
+ 
+ .picker-model.on {
+   color: var(--accent);
+-  background: rgba(255, 255, 255, 0.06);
++  background: var(--eva-hover);
+   background: color-mix(in srgb, var(--accent) 10%, transparent);
+ }
+ 
+@@ -1329,7 +1315,7 @@ input[type="range"]::-webkit-slider-thumb {
+   flex-wrap: wrap;
+   padding: 4px 0;
+   font: 400 11px var(--font);
+-  color: #8a8f98;
++  color: var(--eva-secondary);
+ }
+ 
+ .picker-link {
+@@ -1346,7 +1332,7 @@ input[type="range"]::-webkit-slider-thumb {
+   align-items: center;
+   gap: 8px;
+   padding: 6px 10px;
+-  background: rgba(255, 255, 255, 0.07);
++  background: var(--eva-panel);
+   border-radius: 12px;
+ }
+ 
+@@ -1371,8 +1357,8 @@ input[type="range"]::-webkit-slider-thumb {
+   flex: 0 0 28px;
+   border: 0;
+   border-radius: 50%;
+-  background: var(--ink);
+-  color: #0b0c0e;
++  background: var(--eva-accent);
++  color: var(--eva-on-accent);
+   display: grid;
+   place-items: center;
+   cursor: default;
+@@ -1404,12 +1390,12 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .drop-card.over {
+-  background: radial-gradient(200px 200px at 50% 100%, rgba(34, 197, 94, 0.13), transparent 70%),
++  background: radial-gradient(200px 200px at 50% 100%, rgba(var(--eva-accent-rgb), 0.13), transparent 70%),
+     var(--card-flat);
+ }
+ 
+ .drop-card.over .drop-frame rect {
+-  stroke: rgba(34, 197, 94, 0.65);
++  stroke: rgba(var(--eva-accent-rgb), 0.65);
+   animation: dash-march 1.1s linear infinite;
+ }
+ 
+@@ -1435,7 +1421,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .drop-title {
+   font: 500 13px var(--font);
+-  color: #d5d7db;
++  color: var(--eva-text);
+   transition: color 0.2s;
+ }
+ 
+@@ -1452,19 +1438,19 @@ input[type="range"]::-webkit-slider-thumb {
+   font: 400 11px var(--font);
+   padding: 3px 8px;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.07);
+-  color: #b9bdc4;
++  background: var(--eva-hover);
++  color: var(--eva-secondary);
+ }
+ 
+ /* ── Uploading ──────────────────────────────────────────────────────────── */
+ 
+ .up-card {
+-  background: radial-gradient(260px 260px at 50% 140%, rgba(52, 211, 153, 0.14), transparent 70%),
++  background: radial-gradient(260px 260px at 50% 140%, rgba(var(--eva-accent-rgb), 0.14), transparent 70%),
+     var(--card);
+ }
+ 
+ .up-card.done {
+-  background: radial-gradient(260px 260px at 50% 140%, rgba(52, 211, 153, 0.28), transparent 70%),
++  background: radial-gradient(260px 260px at 50% 140%, rgba(var(--eva-accent-rgb), 0.28), transparent 70%),
+     var(--card);
+ }
+ 
+@@ -1477,7 +1463,7 @@ input[type="range"]::-webkit-slider-thumb {
+   justify-content: space-between;
+   gap: 8px;
+   font: 400 12.5px var(--font);
+-  color: #a9adb5;
++  color: var(--eva-secondary);
+ }
+ 
+ .up-name {
+@@ -1504,13 +1490,13 @@ input[type="range"]::-webkit-slider-thumb {
+   width: 526px;
+   height: 6px;
+   border-radius: 3px;
+-  background: rgba(255, 255, 255, 0.09);
++  background: var(--eva-hover);
+ }
+ 
+ .up-fill {
+   height: 6px;
+   border-radius: 3px;
+-  background: linear-gradient(90deg, #1fa87a, #34d399);
++  background: var(--eva-accent);
+ }
+ 
+ .up-glow {
+@@ -1520,7 +1506,7 @@ input[type="range"]::-webkit-slider-thumb {
+   width: 28px;
+   height: 12px;
+   border-radius: 50%;
+-  background: rgba(110, 231, 183, 0.45);
++  background: rgba(var(--eva-accent-rgb), 0.45);
+   filter: blur(5px);
+   pointer-events: none;
+ }
+@@ -1567,7 +1553,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .int-total span {
+   font: 500 11px var(--font);
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+   font-variant-numeric: tabular-nums;
+ }
+ 
+@@ -1623,7 +1609,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .int-name {
+   font: 500 11px var(--font);
+-  color: #9398a1;
++  color: var(--eva-secondary);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+@@ -1631,7 +1617,7 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .int-row.first .int-name {
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+ }
+ 
+ .int-ago {
+@@ -1642,7 +1628,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .int-sub {
+   font: 400 10px var(--font);
+-  color: #4d5159;
++  color: var(--eva-secondary);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+@@ -1710,7 +1696,7 @@ input[type="range"]::-webkit-slider-thumb {
+ .int-stat-value {
+   margin-left: auto;
+   font: 600 12px var(--font);
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+   font-variant-numeric: tabular-nums;
+ }
+ 
+@@ -1745,7 +1731,7 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .int-page:hover {
+-  background: rgba(255, 255, 255, 0.05);
++  background: var(--eva-hover);
+   border-radius: 5px;
+ }
+ 
+@@ -1811,7 +1797,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .int-commit {
+   font: 400 10.5px var(--font);
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+   display: -webkit-box;
+   -webkit-line-clamp: 2;
+   -webkit-box-orient: vertical;
+@@ -1888,7 +1874,7 @@ input[type="range"]::-webkit-slider-thumb {
+   padding: 4px 8px;
+   border: 1px solid color-mix(in srgb, var(--plan) 14%, transparent);
+   border-radius: 999px;
+-  background: #0e0f11;
++  background: var(--eva-panel);
+   color: var(--dim-3);
+   font: 600 10px var(--font);
+   line-height: 12px;
+@@ -1966,7 +1952,7 @@ input[type="range"]::-webkit-slider-thumb {
+   flex: 0 0 50px;
+   height: 4px;
+   border-radius: 2px;
+-  background: rgba(255, 255, 255, 0.08);
++  background: var(--eva-hover);
+   overflow: hidden;
+ }
+ 
+@@ -1981,7 +1967,7 @@ input[type="range"]::-webkit-slider-thumb {
+   text-align: right;
+   font-weight: 600;
+   font-variant-numeric: tabular-nums;
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+ }
+ 
+ .plan-reset-icon {
+@@ -2000,7 +1986,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .plan-credits {
+   font-weight: 600;
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+ }
+ 
+ /* ── GitHub pulse (GitHubPulseCardView / GitHubDetailView) ─────────────── */
+@@ -2115,12 +2101,12 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .gh-row:hover {
+-  background: rgba(255, 255, 255, 0.05);
++  background: var(--eva-hover);
+ }
+ 
+ /* Ctrl+↓ / Ctrl+↑: the highlighted row (GitHubPRRowView's `selected`, white 12 %). */
+ .gh-row.selected {
+-  background: rgba(255, 255, 255, 0.12);
++  background: var(--eva-hover);
+ }
+ 
+ .gh-gap {
+@@ -2130,14 +2116,14 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .gh-ref {
+   font: 400 10.5px var(--font);
+-  color: #9398a1;
++  color: var(--eva-secondary);
+   white-space: nowrap;
+   flex: 0 0 auto;
+ }
+ 
+ .gh-title {
+   font: 400 11px var(--font);
+-  color: #c5c8cd;
++  color: var(--eva-secondary);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+@@ -2326,8 +2312,8 @@ input[type="range"]::-webkit-slider-thumb {
+   height: 30px;
+   padding: 0;
+   border-radius: 7px;
+-  border: 1px solid rgba(255, 255, 255, 0.08);
+-  background: rgba(255, 255, 255, 0.06);
++  border: 1px solid var(--eva-border);
++  background: var(--eva-panel);
+   display: grid;
+   place-items: center;
+   cursor: default;
+@@ -2335,11 +2321,11 @@ input[type="range"]::-webkit-slider-thumb {
+ }
+ 
+ .wardrobe-item:hover {
+-  background: rgba(255, 255, 255, 0.1);
++  background: var(--eva-hover);
+ }
+ 
+ .wardrobe-item.on {
+-  border-color: rgba(255, 255, 255, 0.4);
++  border-color: var(--eva-border);
+ }
+ 
+ .wardrobe-item canvas {
+@@ -2364,14 +2350,14 @@ input[type="range"]::-webkit-slider-thumb {
+   max-width: 260px;
+   height: 4px;
+   border-radius: 999px;
+-  background: rgba(255, 255, 255, 0.12);
++  background: var(--eva-hover);
+   overflow: hidden;
+ }
+ 
+ .update-bar .fill {
+   height: 100%;
+   width: 0;
+-  background: #34d399;
++  background: var(--eva-accent);
+   transition: width 0.25s linear;
+ }
+ 
+@@ -2449,7 +2435,7 @@ input[type="range"]::-webkit-slider-thumb {
+   width: 36px;
+   height: 36px;
+   border-radius: 6px;
+-  background: rgba(255, 255, 255, 0.06);
++  background: var(--eva-panel);
+   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+   display: grid;
+   place-items: center;
+@@ -2462,7 +2448,7 @@ input[type="range"]::-webkit-slider-thumb {
+   position: absolute;
+   inset: 0;
+   border-radius: 6px;
+-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
++  box-shadow: inset 0 0 0 1px var(--eva-border);
+   pointer-events: none;
+ }
+ 
+@@ -2557,7 +2543,7 @@ input[type="range"]::-webkit-slider-thumb {
+ 
+ .np-track {
+   width: 100%;
+-  background: rgba(255, 255, 255, 0.12);
++  background: var(--eva-hover);
+ }
+ 
+ .np-bar.active .np-track,
+@@ -2672,3 +2658,35 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    unicode-bidi: plaintext;
    text-align: start;
  }
 +
 +/* EVA agent room: hook-driven Mochis at individual desks. */
 +.agent-room { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 8px; }
-+.room-heading { display: flex; align-items: center; justify-content: space-between; color: #b4ff39; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
-+.room-count { color: #ba91ff; font-family: monospace; }
++.room-heading { display: flex; align-items: center; justify-content: space-between; color: var(--eva-accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
++.room-count { color: var(--eva-secondary); font-family: monospace; }
 +.agent-room-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; overflow-y: auto; min-height: 0; flex: 1; align-content: start; padding: 2px; }
-+.agent-desk { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px; border: 1px solid #573b79; border-radius: 10px; background: linear-gradient(160deg, #21162e, #100e18); color: #f0eafa; cursor: pointer; text-align: center; font: inherit; }
-+.agent-desk:hover, .agent-desk:focus-visible { border-color: #b4ff39; outline: 2px solid #b4ff39; outline-offset: -2px; background: #2a1b3b; }
-+.agent-desk.selected { border-color: #b4ff39; }
-+.desk-scene { display: block; position: relative; width: 100%; height: 106px; flex-shrink: 0; background: repeating-linear-gradient(0deg, transparent, transparent 15px, #b18bd608 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, #b18bd608 16px); }
-+.desk-monitor { position: absolute; width: 30px; height: 22px; left: calc(50% + 7px); top: 22px; border: 3px solid #735193; border-radius: 3px; background: #141b17; box-shadow: 0 0 12px #b4ff3918; }
-+.desk-monitor::after { content: ''; display: block; margin: 4px; width: 12px; height: 2px; background: #b4ff39; box-shadow: 0 4px #b4ff3960; }
-+.desk-surface { position: absolute; top: 56px; left: 16%; width: 68%; height: 7px; background: #6f508a; border-bottom: 3px solid #30243f; box-shadow: 0 13px 0 -2px #30243f; }
++.agent-desk { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px; border: 1px solid var(--eva-border); border-radius: 10px; background: linear-gradient(160deg, var(--eva-card), var(--eva-panel)); color: var(--eva-text); cursor: pointer; text-align: center; font: inherit; }
++.agent-desk:hover, .agent-desk:focus-visible { border-color: var(--eva-accent); outline: 2px solid var(--eva-accent); outline-offset: -2px; background: var(--eva-hover); }
++.agent-desk.selected { border-color: var(--eva-accent); }
++.desk-scene { display: block; position: relative; width: 100%; height: 106px; flex-shrink: 0; background: repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(var(--eva-border-rgb), .12) 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(var(--eva-border-rgb), .12) 16px); }
++.desk-monitor { position: absolute; width: 30px; height: 22px; left: calc(50% + 7px); top: 22px; border: 3px solid var(--eva-border); border-radius: 3px; background: var(--eva-bg); box-shadow: 0 0 12px rgba(var(--eva-accent-rgb), .09); }
++.desk-monitor::after { content: ''; display: block; margin: 4px; width: 12px; height: 2px; background: var(--eva-accent); box-shadow: 0 4px rgba(var(--eva-accent-rgb), .38); }
++.desk-surface { position: absolute; top: 56px; left: 16%; width: 68%; height: 7px; background: var(--eva-border); border-bottom: 3px solid var(--eva-hover); box-shadow: 0 13px 0 -2px var(--eva-hover); }
 +.desk-worker { position: absolute; top: 57px; left: calc(50% - 32px); }
 +.desk-name, .desk-status, .desk-step { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 17px; }
 +.desk-name { font-size: 11px; font-weight: 650; }
-+.desk-status { font-size: 10px; color: #c7b7db; }
-+.desk-step { font-size: 10px; color: #aea2bc; }
-+.agent-desk[data-state='working'] .desk-status, .agent-desk[data-state='finished'] .desk-status { color: #b4ff39; }
-+.agent-desk[data-state='approval'] .desk-status, .agent-desk[data-state='question'] .desk-status, .agent-desk[data-state='ratelimit'] .desk-status { color: #ffd078; }
-+.agent-desk[data-state='error'] .desk-status { color: #ff8eae; }
++.desk-status { font-size: 10px; color: var(--eva-secondary); }
++.desk-step { font-size: 10px; color: var(--eva-secondary); }
++.agent-desk[data-state='working'] .desk-status, .agent-desk[data-state='finished'] .desk-status { color: var(--eva-accent); }
++.agent-desk[data-state='approval'] .desk-status, .agent-desk[data-state='question'] .desk-status, .agent-desk[data-state='ratelimit'] .desk-status { color: var(--eva-attention); }
++.agent-desk[data-state='error'] .desk-status { color: var(--eva-error); }
 +.agent-desk[data-state='working'] .desk-monitor::after, .agent-desk[data-state='thinking'] .desk-monitor::after, .agent-desk[data-state='searching'] .desk-monitor::after { animation: desk-activity 1.4s steps(2, end) infinite; }
-+.room-caption { font-size: 10px; color: #b5a6c4; }
-+.room-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #c7b7db; font-size: 12px; }
++.room-caption { font-size: 10px; color: var(--eva-secondary); }
++.room-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--eva-secondary); font-size: 12px; }
 +@keyframes desk-activity { 50% { opacity: .35; } }
 +@media (prefers-reduced-motion: reduce) { .agent-room * { animation: none !important; } }
 +
-+#compact-agent-status { position: absolute; top: 0; left: 64px; width: 164px; line-height: 32px; font-size: 10px; color: #d8efbc; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
++#compact-agent-status { position: absolute; top: 0; left: 64px; width: 164px; line-height: 32px; font-size: 10px; color: var(--eva-secondary); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
 +
-+.room-detail { white-space: pre-line; font-size: 11px; line-height: 18px; padding: 8px 12px; border-left: 2px solid #b4ff39; background: #22172e; color: #ded1ed; flex-shrink: 0; overflow-wrap: anywhere; }
-+.agent-room-grid { background: repeating-linear-gradient(0deg, transparent, transparent 31px, #b18bd60b 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, #b18bd60b 32px); border: 1px solid #402c57; border-radius: 12px; padding: 14px; }
++.room-detail { white-space: pre-line; font-size: 11px; line-height: 18px; padding: 8px 12px; border-left: 2px solid var(--eva-accent); background: var(--eva-card); color: var(--eva-text); flex-shrink: 0; overflow-wrap: anywhere; }
++.agent-room-grid { background: repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(var(--eva-border-rgb), .16) 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, rgba(var(--eva-border-rgb), .16) 32px); border: 1px solid var(--eva-border); border-radius: 12px; padding: 14px; }
 +@media (max-width: 650px) { .agent-room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 6px; } }
+diff --git a/windows/src/theme.css b/windows/src/theme.css
+new file mode 100644
+index 0000000..91a8088
+--- /dev/null
++++ b/windows/src/theme.css
+@@ -0,0 +1,60 @@
++/* EVA-01: shared semantic colours for every Coucou window. */
++:root {
++  color-scheme: dark;
++  --eva-bg: #0C0B12;
++  --eva-panel: #151020;
++  --eva-card: #241733;
++  --eva-hover: #39244F;
++  --eva-border: #62418A;
++  --eva-text: #EEEFF4;
++  --eva-secondary: #B8ABC9;
++  --eva-accent: #A4FF39;
++  --eva-on-accent: #0C0B12;
++  --eva-attention: #FFA34D;
++  --eva-error: #FF647C;
++  --eva-accent-rgb: 164, 255, 57;
++  --eva-attention-rgb: 255, 163, 77;
++  --eva-error-rgb: 255, 100, 124;
++  --eva-border-rgb: 98, 65, 138;
++  --eva-success-soft: rgba(var(--eva-accent-rgb), 0.12);
++  --eva-attention-soft: rgba(var(--eva-attention-rgb), 0.13);
++  --eva-error-soft: rgba(var(--eva-error-rgb), 0.14);
++  --eva-line: rgba(var(--eva-border-rgb), 0.6);
++
++  /* Existing component names remain aliases; module colours stay independent. */
++  --bg: var(--eva-bg);
++  --ink: var(--eva-text);
++  --ink-2: var(--eva-text);
++  --dim: var(--eva-secondary);
++  --dim-2: var(--eva-secondary);
++  --dim-3: var(--eva-secondary);
++  --dim-4: var(--eva-secondary);
++  --dim-5: var(--eva-secondary);
++  --card: var(--eva-card);
++  --card-flat: var(--eva-panel);
++  --tab-on: var(--eva-hover);
++  --hairline: var(--eva-line);
++  --red: var(--eva-error);
++  --red-text: var(--eva-error);
++  --green: var(--eva-accent);
++  --green-2: var(--eva-accent);
++  --amber: var(--eva-attention);
++}
++
++:where(button, a, input, select, textarea, [tabindex]):focus-visible {
++  outline: 2px solid var(--eva-accent);
++  outline-offset: 2px;
++}
++
++::selection {
++  background: var(--eva-accent);
++  color: var(--eva-on-accent);
++}
++
++@media (prefers-reduced-motion: reduce) {
++  *, *::before, *::after {
++    animation-duration: 0.01ms !important;
++    animation-iteration-count: 1 !important;
++    transition-duration: 0.01ms !important;
++  }
++}
 diff --git a/windows/src/views/agent-room.ts b/windows/src/views/agent-room.ts
 new file mode 100644
 index 0000000..fef268a
@@ -3466,6 +5244,33 @@ index 45ec5ce..e07a197 100644
 -  assert.equal(target("Odd", { command: "   ", count: 3 }), "Odd");
 +  assert.equal(target("Odd", { command: "   ", count: 3 }), 'Odd · {"command":"   ","count":3}');
    assert.equal(target(undefined, undefined), "Tool");
+ });
+ 
+diff --git a/windows/tests/pill-colors.test.mjs b/windows/tests/pill-colors.test.mjs
+index c228887..838df38 100644
+--- a/windows/tests/pill-colors.test.mjs
++++ b/windows/tests/pill-colors.test.mjs
+@@ -22,17 +22,17 @@ test("a colour is six hex digits, written #RRGGBB in upper case", () => {
+   }
+ });
+ 
+-test("the palette is ten different colours the catalog already uses", () => {
+-  // The same list as PillColors.palette on macOS (tests/PillColorsTests.swift).
++test("the palette preserves catalog colours and adds EVA green", () => {
++  // Original catalog choices remain available alongside the EVA accent.
+   assert.deepEqual(PILL_PALETTE, [
+     "#F5F6F8", "#F4505E", "#F29B38", "#FACC15", "#4ADE80",
+-    "#2DD4BF", "#38BDF8", "#818CF8", "#C084FC", "#E879F9",
++    "#2DD4BF", "#38BDF8", "#818CF8", "#C084FC", "#E879F9", "#A4FF39",
+   ]);
+   const catalog = new Set(PILL_CATALOG.map((p) => p.color));
+-  assert.equal(new Set(PILL_PALETTE).size, 10);
++  assert.equal(new Set(PILL_PALETTE).size, 11);
+   for (const hex of PILL_PALETTE) {
+     assert.equal(normalizeHex(hex), hex, hex);
+-    assert.ok(catalog.has(hex), `${hex} is not a catalog colour`);
++    assert.ok(catalog.has(hex) || hex === "#A4FF39", `${hex} is not a catalog colour`);
+   }
  });
  
 diff --git a/windows/tests/spotify.test.mjs b/windows/tests/spotify.test.mjs

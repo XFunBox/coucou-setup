@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.1-sendoa.2 — 2026-10-21
+
+- Apariencia EVA-01 compartida entre isla, sala, ajustes, Hub y módulos.
+- Verde EVA seleccionable y Mochi coordinado; colores personalizados conservados.
+
+
 ## 0.5.1-sendoa.1 — 2026-10-21
 
 - Actualizada la base oficial a Linux 0.5.1, conservando Codex, aprobaciones, GitHub, Spotifast, sala EVA-01 y apertura habitual.

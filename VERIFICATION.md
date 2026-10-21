@@ -1,3 +1,14 @@
+# Verificación — 2026-10-21 — EVA-01
+
+Versión **0.5.1-sendoa.2**, sobre la misma base Linux 0.5.1. Tema compartido en isla, Hub, ajustes y módulos, Mochi normal verde EVA y estados coordinados. Conserva colores personalizados e integraciones.
+
+- **440 pruebas Node** correctas; TypeScript, Vite y Tauri release compilados. Contraste mínimo sobre superficies base: texto secundario 6,31:1 y error 4,79:1.
+- Parche completo aplicado a upstream limpio: **57 archivos idénticos** a la fuente compilada; SHA-256 fijado en source-lock.json.
+- QA con componentes reales y datos simulados en Chrome: sala expandida, detalle y plegado, reloj oculto con estado de agentes, Hub, ajustes y selector de módulos. Capturas revisadas y cero errores JavaScript.
+- Instalación local verificada: servicio active/running, versión .2 y overlay layer-shell confirmados en registro. SHA-256 y bibliotecas comprobados antes de instalar; hashes comprobados tras arrancar. Ajustes, hooks y menú byte idénticos; copia previa con reversión preparada.
+
+Compilación con dependencias y cachés previas. Las suites Rust/MPRIS documentadas en .1 se conservan sin repetición para este cambio visual. La QA visual corresponde a Chrome; el arranque nativo KDE se verificó mediante servicio y registro. Sin cambios en paneles ni pantallas. Binarios, copias y registros locales excluidos de Git.
+
 # Verificación — 2026-10-21 — Linux 0.5.1
 
 Versión **0.5.1-sendoa.1**, base oficial `9fe1773296cb857f223acedfd41b2842afc7dcac` (linux-v0.5.1). Conserva las personalizaciones de 0.5.0-sendoa.5.
