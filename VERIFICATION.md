@@ -6,7 +6,7 @@ Versión **0.5.1-sendoa.5**. La vista interna del proveedor de chat conservaba l
 - QA de navegador con componentes reales y puente simulado: tanto Permitir como Denegar llegan al receptor de prueba. La simulación no autoriza herramientas reales.
 - Revisión independiente sin hallazgos accionables; comprobados ocultación, reapertura, cambios de modo y sincronizaciones repetidas. Parche final aplicado a upstream limpio: **62 archivos idénticos** y SHA-256 fijado.
 - TypeScript/Vite y Tauri release compilados con la interfaz final; nueve pruebas Rust del adaptador correctas. Exportación y SHA-256 verificados.
-- Instalación nativa .5: servicio activo/running y overlay layer-shell confirmados; hashes comparados tras el arranque. Ajustes, hooks y menú byte idénticos, autostart conservado. Copia previa con reversión preparada. La recepción de clics se verificó con el puente simulado; queda pendiente confirmación humana del botón nativo.
+- Instalación nativa .5: servicio activo/running y overlay layer-shell confirmados; hashes comparados tras el arranque. Ajustes, hooks y menú byte idénticos, autostart conservado. Copia previa con reversión preparada. Además de la simulación, comprobación nativa real a las 13:18:59: `ui decide allow` → decisión `allow` → hook respondido; el permiso de publicación se completó desde la isla.
 - Mantiene el filtro Guardian de .4. Sin cambios en el protocolo de permisos, confianza de hooks ni preferencias de seguridad.
 
 # Verificación — 2026-10-23 — selector sin revisiones internas
