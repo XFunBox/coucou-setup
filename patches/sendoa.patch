@@ -1,5 +1,5 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 2918633..a41c76f 100644
+index 2918633..17d0920 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -7,7 +7,7 @@ index 2918633..a41c76f 100644
  [[package]]
  name = "coucou"
 -version = "0.5.1"
-+version = "0.5.1-sendoa.2"
++version = "0.5.1-sendoa.3"
  dependencies = [
   "arboard",
   "cpal",
@@ -16,12 +16,12 @@ index 2918633..a41c76f 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.1"
-+version = "0.5.1-sendoa.2"
++version = "0.5.1-sendoa.3"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 435cdab..20d987d 100644
+index 435cdab..2361bba 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -29,31 +29,31 @@ index 435cdab..20d987d 100644
  
  [workspace.package]
 -version = "0.5.1"
-+version = "0.5.1-sendoa.2"
++version = "0.5.1-sendoa.3"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1e18d83..4fc4ca3 100644
+index 1e18d83..6bcaa58 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.2",
++  "version": "0.5.1-sendoa.3",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.1",
-+      "version": "0.5.1-sendoa.2",
++      "version": "0.5.1-sendoa.3",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 78f5c72..96acd6a 100644
+index 78f5c72..0790acc 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -61,7 +61,7 @@ index 78f5c72..96acd6a 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.2",
++  "version": "0.5.1-sendoa.3",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -654,6 +654,433 @@ index 0000000..532d44d
 +        assert!(Cache::default().snapshot(&linked, None).agents.is_empty());
 +    }
 +}
+diff --git a/windows/src-tauri/src/codex_chat.rs b/windows/src-tauri/src/codex_chat.rs
+new file mode 100644
+index 0000000..65ec106
+--- /dev/null
++++ b/windows/src-tauri/src/codex_chat.rs
+@@ -0,0 +1,421 @@
++//! Local Codex desktop follower. This private protocol may change with Codex.
++//! No rollout/credential access, payload logging, approvals, or send retries.
++use serde::Serialize;
++use serde_json::{json, Value};
++use std::collections::HashMap;
++use std::io::{Read, Seek, SeekFrom};
++use std::path::PathBuf;
++
++const MAX_FRAME: usize = 16 * 1024 * 1024;
++const MAX_INDEX: u64 = 2 * 1024 * 1024;
++const MAX_QUERY: usize = 32 * 1024;
++const UNAVAILABLE: &str = "No se pudo conectar con el chat de Codex. Abre Codex y vuelve a intentarlo.";
++
++#[derive(Serialize, Debug)]
++pub struct Thread { pub id: String, pub title: String }
++#[derive(Serialize, Debug, PartialEq)]
++pub struct Message { pub role: &'static str, pub content: String }
++#[derive(Serialize, Debug)]
++#[serde(rename_all = "camelCase")]
++pub struct Snapshot {
++    pub thread_id: String,
++    pub messages: Vec<Message>,
++    pub active: bool,
++    pub active_turn_id: Option<String>,
++    pub pending: bool,
++    pub truncated: bool,
++}
++
++pub fn validate_thread(id: &str) -> Result<(), String> {
++    if id.len() == 36 && id.bytes().enumerate().all(|(i, c)| {
++        if [8, 13, 18, 23].contains(&i) { c == b'-' } else { c.is_ascii_hexdigit() }
++    }) { Ok(()) } else { Err("Identificador de chat inválido.".into()) }
++}
++
++fn codex_home() -> Result<PathBuf, String> {
++    let path = if let Some(value) = std::env::var_os("CODEX_HOME").filter(|v| !v.is_empty()) {
++        PathBuf::from(value)
++    } else {
++        PathBuf::from(std::env::var_os("HOME").filter(|v| !v.is_empty()).ok_or_else(|| UNAVAILABLE.to_owned())?).join(".codex")
++    };
++    if !path.is_absolute() { return Err("CODEX_HOME debe ser una ruta absoluta.".into()); }
++    Ok(path)
++}
++
++/// Only bounded metadata from the native selector index, never conversation files.
++pub fn threads() -> Result<Vec<Thread>, String> {
++    let path = codex_home()?.join("session_index.jsonl");
++    let meta = match std::fs::symlink_metadata(&path) {
++        Ok(m) if m.is_file() && !m.file_type().is_symlink() => m,
++        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
++        _ => return Err("No se pudo leer el índice de chats de Codex.".into()),
++    };
++    let mut file = std::fs::File::open(path).map_err(|_| UNAVAILABLE.to_owned())?;
++    let start = meta.len().saturating_sub(MAX_INDEX);
++    file.seek(SeekFrom::Start(start)).map_err(|_| UNAVAILABLE.to_owned())?;
++    let mut bytes = Vec::new();
++    file.take(MAX_INDEX).read_to_end(&mut bytes).map_err(|_| UNAVAILABLE.to_owned())?;
++    Ok(parse_index(&bytes, start != 0))
++}
++
++fn parse_index(bytes: &[u8], partial: bool) -> Vec<Thread> {
++    let mut entries = HashMap::new();
++    for (n, line) in bytes.split(|b| *b == b'\n').enumerate() {
++        if (partial && n == 0) || line.len() > 16 * 1024 { continue; }
++        let Ok(v) = serde_json::from_slice::<Value>(line) else { continue };
++        let (Some(id), Some(title)) = (v["id"].as_str(), v["thread_name"].as_str()) else { continue };
++        if validate_thread(id).is_err() { continue; }
++        let title: String = title.chars().filter(|c| !c.is_control()).take(200).collect();
++        if title.trim().is_empty() { continue; }
++        entries.insert(id.to_owned(), (title, v["updated_at"].as_str().unwrap_or("").to_owned()));
++    }
++    let mut result: Vec<_> = entries.into_iter().collect();
++    result.sort_by(|a, b| b.1.1.cmp(&a.1.1).then_with(|| a.0.cmp(&b.0)));
++    result.into_iter().take(100).map(|(id, (title, _))| Thread { id, title }).collect()
++}
++
++fn text_input(value: &Value) -> String {
++    value.as_array().into_iter().flatten().filter(|v| v["type"] == "text")
++        .filter_map(|v| v["text"].as_str()).collect::<Vec<_>>().join("\n")
++}
++
++fn turn_key(turn: &Value) -> Option<&str> {
++    turn["turnId"].as_str().or_else(|| turn["params"]["clientUserMessageId"].as_str())
++}
++
++fn normalize(thread: &str, state: &Value) -> Snapshot {
++    let canonical = state["turnHistory"]["kind"] == "canonical";
++    let history = &state["turnHistory"]["history"];
++    let mut truncated = canonical && history["isComplete"] != true;
++    let mut turns: Vec<Value> = vec![];
++    if canonical {
++        for island in history["islands"].as_array().into_iter().flatten() {
++            for entry in island["entries"].as_array().into_iter().flatten() {
++                if let Some(key) = entry["value"].as_str() {
++                    if let Some(turn) = history["entitiesByKey"].get(key) { turns.push(turn.clone()); }
++                    else { truncated = true; }
++                }
++            }
++        }
++    }
++    for overlay in state["turns"].as_array().into_iter().flatten() {
++        if let Some(i) = turn_key(overlay).and_then(|key| turns.iter().position(|t| turn_key(t) == Some(key))) {
++            // Canonical items remain unless a live item with the same id replaces them.
++            let mut items = turns[i]["items"].as_array().cloned().unwrap_or_default();
++            for item in overlay["items"].as_array().into_iter().flatten() {
++                if let Some(p) = item["id"].as_str().and_then(|id| items.iter().position(|v| v["id"] == id)) {
++                    items[p] = item.clone();
++                } else if !items.contains(item) { items.push(item.clone()); }
++            }
++            let mut merged = turns[i].as_object().cloned().unwrap_or_default();
++            if let Some(fields) = overlay.as_object() { merged.extend(fields.clone()); }
++            merged.insert("items".into(), Value::Array(items));
++            turns[i] = Value::Object(merged);
++        } else { turns.push(overlay.clone()); }
++    }
++    let active_turn_id = turns.iter().rev().find(|t| t["status"] == "inProgress")
++        .and_then(|t| t["turnId"].as_str()).filter(|v| !v.is_empty()).map(str::to_owned);
++    let active = turns.iter().any(|t| t["status"] == "inProgress") || state["threadRuntimeStatus"]["type"] == "active";
++    let mut messages = Vec::new();
++    for turn in &turns {
++        let items = turn["items"].as_array().map(Vec::as_slice).unwrap_or(&[]);
++        if !items.iter().any(|i| i["type"] == "userMessage") {
++            let content = text_input(&turn["params"]["input"]);
++            if !content.is_empty() { messages.push(Message { role: "user", content }); }
++        }
++        for item in items {
++            let (role, content) = match item["type"].as_str() {
++                Some("userMessage") => ("user", text_input(&item["content"])),
++                Some("agentMessage") => ("assistant", item["text"].as_str().unwrap_or("").to_owned()),
++                _ => continue,
++            };
++            if !content.is_empty() { messages.push(Message { role, content }); }
++        }
++    }
++    if messages.len() > 100 { messages.drain(..messages.len() - 100); truncated = true; }
++    let mut remaining = 256 * 1024;
++    for message in messages.iter_mut().rev() {
++        let limit = remaining.min(32 * 1024);
++        if message.content.len() > limit {
++            let mut boundary = limit;
++            while !message.content.is_char_boundary(boundary) { boundary -= 1; }
++            message.content.truncate(boundary);
++            truncated = true;
++        }
++        remaining -= message.content.len();
++    }
++    messages.retain(|m| !m.content.is_empty());
++    Snapshot { thread_id: thread.to_owned(), messages, active, active_turn_id,
++        pending: state["requests"].as_array().is_some_and(|v| !v.is_empty()), truncated }
++}
++
++#[cfg(target_os = "linux")]
++mod ipc {
++    use super::*;
++    use std::io::Write;
++    use std::os::fd::{AsRawFd, FromRawFd};
++    use std::os::unix::{fs::{FileTypeExt, MetadataExt}, net::UnixStream};
++    use std::sync::atomic::{AtomicU64, Ordering};
++    use std::time::{Duration, Instant};
++
++    const BUDGET: Duration = Duration::from_secs(20);
++    static NEXT: AtomicU64 = AtomicU64::new(1);
++    fn unique() -> String { format!("coucou-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)) }
++    fn message_id() -> Result<String, String> {
++        let mut bytes = [0u8; 16];
++        std::fs::File::open("/dev/urandom").and_then(|mut file| file.read_exact(&mut bytes)).map_err(|_| err())?;
++        bytes[6] = (bytes[6] & 0x0f) | 0x40;
++        bytes[8] = (bytes[8] & 0x3f) | 0x80;
++        Ok(bytes.iter().enumerate().map(|(i, b)| format!("{}{b:02x}", if [4,6,8,10].contains(&i) { "-" } else { "" })).collect())
++    }
++    fn err() -> String { UNAVAILABLE.into() }
++    fn secure(meta: &std::fs::Metadata, uid: u32, socket: bool) -> bool {
++        meta.uid() == uid && !meta.file_type().is_symlink() &&
++            if socket { meta.file_type().is_socket() && meta.mode() & 0o777 == 0o600 }
++            else { meta.is_dir() && meta.mode() & 0o077 == 0 }
++    }
++
++    fn connect(path: &std::path::Path, deadline: Instant) -> Result<UnixStream, String> {
++        let uid = unsafe { libc::geteuid() };
++        let parent = path.parent().ok_or_else(err)?;
++        if !secure(&std::fs::symlink_metadata(parent).map_err(|_| err())?, uid, false) ||
++            !secure(&std::fs::symlink_metadata(path).map_err(|_| err())?, uid, true) { return Err(err()); }
++        let bytes = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str());
++        let mut addr: libc::sockaddr_un = unsafe { std::mem::zeroed() };
++        if bytes.len() >= addr.sun_path.len() { return Err(err()); }
++        addr.sun_family = libc::AF_UNIX as _;
++        for (out, byte) in addr.sun_path.iter_mut().zip(bytes) { *out = *byte as _; }
++        let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC, 0) };
++        if fd < 0 { return Err(err()); }
++        let stream = unsafe { UnixStream::from_raw_fd(fd) };
++        let result = unsafe { libc::connect(fd, &addr as *const _ as *const libc::sockaddr, std::mem::size_of_val(&addr) as _) };
++        if result != 0 {
++            let code = std::io::Error::last_os_error().raw_os_error();
++            if code != Some(libc::EINPROGRESS) { return Err(err()); }
++            let mut poll = libc::pollfd { fd, events: libc::POLLOUT, revents: 0 };
++            let millis = deadline.saturating_duration_since(Instant::now()).as_millis().min(i32::MAX as u128) as i32;
++            if unsafe { libc::poll(&mut poll, 1, millis) } <= 0 || stream.take_error().map_err(|_| err())?.is_some() { return Err(err()); }
++        }
++        // Peer credentials also protect against replacing the socket after stat.
++        let mut peer: libc::ucred = unsafe { std::mem::zeroed() };
++        let mut len = std::mem::size_of_val(&peer) as libc::socklen_t;
++        if unsafe { libc::getsockopt(stream.as_raw_fd(), libc::SOL_SOCKET, libc::SO_PEERCRED,
++            &mut peer as *mut _ as *mut _, &mut len) } != 0 || peer.uid != uid { return Err(err()); }
++        stream.set_nonblocking(false).map_err(|_| err())?;
++        Ok(stream)
++    }
++
++    pub(super) struct Client {
++        socket: UnixStream, deadline: Instant, client: String, owner: String, thread: String,
++        state: Option<Value>, revision: u64, serial: usize, frames: usize, bytes: usize, following: bool,
++    }
++    impl Client {
++        pub(super) fn new(thread: &str) -> Result<Self, String> {
++            validate_thread(thread)?;
++            let deadline = Instant::now() + BUDGET;
++            let socket = connect(&codex_home()?.join("ipc/ipc.sock"), deadline)?;
++            let mut c = Self { socket, deadline, client: "initializing-client".into(), owner: String::new(),
++                thread: thread.into(), state: None, revision: 0, serial: 0, frames: 0, bytes: 0, following: false };
++            let init = c.request("initialize", json!({"clientType":"coucou"}), 0, false)?;
++            c.client = init["result"]["clientId"].as_str().filter(|v| !v.is_empty()).ok_or_else(err)?.into();
++            let found = c.request("thread-owner-discovery", json!({"hostId":"local","conversationId":thread}), 1, false)?;
++            c.owner = found["handledByClientId"].as_str().filter(|v| !v.is_empty()).ok_or_else(err)?.into();
++            if found["result"]["supportsUntrustedAppInput"] != true { return Err("Esta versión de Codex no permite integrar el chat.".into()); }
++            c.following = true;
++            c.follow(true)?;
++            let loaded = c.request("thread-follower-load-complete-history", json!({"conversationId":thread}), 1, true)?;
++            let revision = loaded["result"]["revision"].as_u64().ok_or_else(err)?;
++            let serial = c.serial;
++            // Repeated following=true explicitly asks the owner for a fresh full snapshot.
++            c.follow(true)?;
++            while c.serial == serial || c.revision < revision { c.receive()?; }
++            Ok(c)
++        }
++        fn timeout(&self) -> Result<Duration, String> {
++            self.deadline.checked_duration_since(Instant::now()).filter(|v| !v.is_zero()).ok_or_else(err)
++        }
++        fn send(&mut self, value: &Value) -> Result<(), String> {
++            let data = serde_json::to_vec(value).map_err(|_| err())?;
++            if data.is_empty() || data.len() > MAX_FRAME { return Err(err()); }
++            let mut framed = (data.len() as u32).to_le_bytes().to_vec(); framed.extend(data);
++            let mut at = 0;
++            while at < framed.len() {
++                self.socket.set_write_timeout(Some(self.timeout()?)).map_err(|_| err())?;
++                let n = self.socket.write(&framed[at..]).map_err(|_| err())?;
++                if n == 0 { return Err(err()); } at += n;
++            }
++            Ok(())
++        }
++        fn exact(&mut self, bytes: &mut [u8]) -> Result<(), String> {
++            let mut at = 0;
++            while at < bytes.len() {
++                self.socket.set_read_timeout(Some(self.timeout()?)).map_err(|_| err())?;
++                let n = self.socket.read(&mut bytes[at..]).map_err(|_| err())?;
++                if n == 0 { return Err(err()); } at += n;
++            }
++            Ok(())
++        }
++        fn receive(&mut self) -> Result<Value, String> {
++            self.frames += 1; if self.frames > 2048 { return Err(err()); }
++            let mut header = [0; 4]; self.exact(&mut header)?;
++            let size = frame_size(header)?;
++            self.bytes += size; if self.bytes > 64 * 1024 * 1024 { return Err(err()); }
++            let mut body = vec![0; size]; self.exact(&mut body)?;
++            let m: Value = serde_json::from_slice(&body).map_err(|_| err())?;
++            if m["type"] == "client-discovery-request" {
++                self.send(&json!({"type":"client-discovery-response","requestId":m["requestId"],"response":{"canHandle":false}}))?;
++            }
++            if m["type"] == "broadcast" && m["method"] == "thread-stream-state-changed" && m["version"] == 11 &&
++                m["sourceClientId"] == self.owner && m["params"]["conversationId"] == self.thread && m["params"]["hostId"] == "local" {
++                let change = &m["params"]["change"];
++                if change["type"] == "snapshot" && change["conversationState"].is_object() {
++                    self.revision = change["revision"].as_u64().ok_or_else(err)?;
++                    self.state = Some(change["conversationState"].clone()); self.serial += 1;
++                }
++            }
++            Ok(m)
++        }
++        fn request(&mut self, method: &str, params: Value, version: u32, target: bool) -> Result<Value, String> {
++            let id = unique();
++            let mut message = json!({"type":"request","requestId":id,"sourceClientId":self.client,
++                "method":method,"version":version,"params":params,"timeoutMs":15000});
++            if target { message["targetClientId"] = self.owner.clone().into(); }
++            self.send(&message)?;
++            loop {
++                let response = self.receive()?;
++                if response["type"] == "response" && response["requestId"] == id {
++                    if response["resultType"] != "success" { return Err("Codex rechazó la operación del chat.".into()); }
++                    return Ok(response);
++                }
++            }
++        }
++        fn follow(&mut self, following: bool) -> Result<(), String> {
++            self.send(&json!({"type":"broadcast","sourceClientId":self.client,"version":1,
++                "method":"thread-stream-following-changed","targetClientIds":[self.owner],
++                "params":{"hostId":"local","conversationId":self.thread,"following":following}}))
++        }
++        pub(super) fn snapshot(&self) -> Result<Snapshot, String> {
++            Ok(normalize(&self.thread, self.state.as_ref().ok_or_else(err)?))
++        }
++        pub(super) fn start(&mut self, query: &str) -> Result<(), String> {
++            let snapshot = self.snapshot()?;
++            if snapshot.active || snapshot.pending { return Err("Espera a que termine Codex o resuelve su petición en el chat completo.".into()); }
++            let result = self.request("thread-follower-start-turn", json!({"conversationId":self.thread,
++                "turnStart":{"request":{"threadId":self.thread,"input":[{"type":"text","text":query,"text_elements":[]}],
++                "clientUserMessageId":message_id()?}}}), 2, true);
++            // A lost response can follow an accepted send. Never retry automatically.
++            result.map(|_| ()).map_err(|_| "No se confirmó el envío. Comprueba el chat antes de volver a enviar.".into())
++        }
++        pub(super) fn interrupt(&mut self, expected: &str) -> Result<(), String> {
++            if self.snapshot()?.active_turn_id.as_deref() != Some(expected) {
++                return Err("El turno activo ha cambiado. Actualiza el chat antes de detenerlo.".into());
++            }
++            let result = self.request("thread-follower-interrupt-turn", json!({"conversationId":self.thread,
++                "mode":"user-stop","expectedTurnId":expected}), 4, true)?;
++            if result["result"]["ok"] != true || result["result"]["interruptedTurnId"] != expected {
++                return Err("Codex no confirmó la parada de este turno.".into());
++            }
++            Ok(())
++        }
++    }
++    impl Drop for Client {
++        fn drop(&mut self) {
++            if self.following {
++                self.deadline = Instant::now() + Duration::from_millis(100);
++                let _ = self.follow(false);
++            }
++        }
++    }
++    fn frame_size(bytes: [u8; 4]) -> Result<usize, String> {
++        let size = u32::from_le_bytes(bytes) as usize;
++        if size == 0 || size > MAX_FRAME { Err(err()) } else { Ok(size) }
++    }
++    #[cfg(test)]
++    mod tests {
++        use super::*;
++        #[test] fn framing_is_little_endian_and_bounded() {
++            assert_eq!(frame_size([0, 1, 0, 0]).unwrap(), 256);
++            assert!(frame_size([0; 4]).is_err()); assert!(frame_size(u32::MAX.to_le_bytes()).is_err());
++        }
++        #[test] fn fragmented_frames_are_read_completely_and_eof_fails() {
++            let (socket, mut peer) = UnixStream::pair().unwrap();
++            let worker = std::thread::spawn(move || {
++                for byte in b"\x02\x00\x00\x00{}" { peer.write_all(&[*byte]).unwrap(); }
++            });
++            let mut client = Client { socket, deadline: Instant::now() + Duration::from_secs(1),
++                client: "test".into(), owner: "owner".into(), thread: "test".into(), state: None,
++                revision: 0, serial: 0, frames: 0, bytes: 0, following: false };
++            assert_eq!(client.receive().unwrap(), json!({}));
++            worker.join().unwrap(); assert!(client.receive().is_err());
++        }
++        #[test] fn generated_message_ids_are_v4_uuids() {
++            let id = message_id().unwrap(); assert!(validate_thread(&id).is_ok());
++            assert_eq!(id.as_bytes()[14], b'4'); assert!(b"89ab".contains(&id.as_bytes()[19]));
++        }
++        #[test] fn socket_permissions_and_type_are_required() {
++            use std::os::unix::fs::PermissionsExt;
++            let dir = std::env::temp_dir().join(unique()); std::fs::create_dir(&dir).unwrap();
++            std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
++            let path = dir.join("ipc.sock"); let _server = std::os::unix::net::UnixListener::bind(&path).unwrap();
++            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
++            let uid = unsafe { libc::geteuid() };
++            assert!(secure(&std::fs::symlink_metadata(&path).unwrap(), uid, true));
++            assert!(!secure(&std::fs::symlink_metadata(&path).unwrap(), uid + 1, true));
++            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666)).unwrap();
++            assert!(!secure(&std::fs::symlink_metadata(&path).unwrap(), uid, true));
++            let link = dir.join("link"); std::os::unix::fs::symlink(&path, &link).unwrap();
++            assert!(!secure(&std::fs::symlink_metadata(&link).unwrap(), uid, true));
++            std::fs::remove_dir_all(dir).unwrap();
++        }
++    }
++}
++
++pub fn snapshot(thread: &str) -> Result<Snapshot, String> {
++    validate_thread(thread)?;
++    #[cfg(target_os = "linux")] { ipc::Client::new(thread)?.snapshot() }
++    #[cfg(not(target_os = "linux"))] { Err("El chat compartido de Codex requiere Linux.".into()) }
++}
++pub fn send(thread: &str, query: &str) -> Result<(), String> {
++    validate_thread(thread)?;
++    if query.trim().is_empty() || query.len() > MAX_QUERY { return Err("Escribe un mensaje de hasta 32768 bytes.".into()); }
++    #[cfg(target_os = "linux")] { ipc::Client::new(thread)?.start(query) }
++    #[cfg(not(target_os = "linux"))] { Err("El chat compartido de Codex requiere Linux.".into()) }
++}
++pub fn interrupt(thread: &str, expected: &str) -> Result<(), String> {
++    validate_thread(thread)?;
++    if expected.is_empty() || expected.len() > 256 || expected.chars().any(char::is_control) { return Err("Identificador de turno inválido.".into()); }
++    #[cfg(target_os = "linux")] { ipc::Client::new(thread)?.interrupt(expected) }
++    #[cfg(not(target_os = "linux"))] { Err("El chat compartido de Codex requiere Linux.".into()) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    const ID: &str = "01a16761-4bfd-7843-9503-01408a766f44";
++    #[test] fn thread_ids_reject_urls_paths_and_injection() {
++        assert!(validate_thread(ID).is_ok());
++        for id in ["", "../ipc.sock", "codex://threads/01a16761-4bfd-7843-9503-01408a766f44", "01a16761-4bfd-7843-9503-01408a766f4z"] { assert!(validate_thread(id).is_err()); }
++    }
++    #[test] fn metadata_index_is_bounded_deduplicated_and_ignores_partial() {
++        let row = |title: &str| json!({"id":ID,"thread_name":title,"updated_at":"2026-10-23"}).to_string();
++        let bytes = format!("partial\n{}\n{}\n{{}}\n", row("old"), row("new"));
++        let entries = parse_index(bytes.as_bytes(), true);
++        assert_eq!(entries.len(), 1); assert_eq!(entries[0].title, "new");
++    }
++    #[test] fn canonical_history_and_live_overlay_merge_without_duplicate_users() {
++        let state = json!({"turnHistory":{"kind":"canonical","history":{"isComplete":true,
++            "islands":[{"entries":[{"value":"t1"}]}],"entitiesByKey":{"t1":{"turnId":"one","status":"completed",
++            "params":{"input":[{"type":"text","text":"question"}]},"items":[{"id":"a","type":"agentMessage","text":"old"}]}}}},
++            "turns":[{"turnId":"one","status":"inProgress","items":[{"id":"a","type":"agentMessage","text":"answer"}]}],
++            "requests":[{"method":"approval"}]});
++        let out = normalize(ID, &state);
++        assert_eq!(out.messages, vec![Message{role:"user",content:"question".into()},Message{role:"assistant",content:"answer".into()}]);
++        assert!(out.active && out.pending && !out.truncated); assert_eq!(out.active_turn_id.as_deref(),Some("one"));
++    }
++    #[test] fn messages_skip_tools_and_keep_unicode_with_explicit_truncation() {
++        let state = json!({"turns":[{"items":[{"type":"userMessage","content":[{"type":"text","text":"hello"}]},
++            {"type":"commandExecution","text":"private tool output"},{"type":"agentMessage","text":"é".repeat(20000)}]}]});
++        let out = normalize(ID, &state); assert_eq!(out.messages.len(),2); assert!(out.truncated);
++        assert_eq!(out.messages[1].content.len(),32768); assert!(!out.active);
++    }
++}
 diff --git a/windows/src-tauri/src/desktop.rs b/windows/src-tauri/src/desktop.rs
 index 5b57f21..93d19b0 100644
 --- a/windows/src-tauri/src/desktop.rs
@@ -1078,18 +1505,19 @@ index b7cf921..d200ffb 100644
      let y = mp.y;
  
 diff --git a/windows/src-tauri/src/lib.rs b/windows/src-tauri/src/lib.rs
-index 72d420e..85537a8 100644
+index 72d420e..73dc8c5 100644
 --- a/windows/src-tauri/src/lib.rs
 +++ b/windows/src-tauri/src/lib.rs
-@@ -4,6 +4,7 @@ mod agent_hooks;
+@@ -4,6 +4,8 @@ mod agent_hooks;
  mod agents;
  mod chat;
  mod claude;
 +mod codex_agents;
++mod codex_chat;
  mod codex_plan;
  mod config_file;
  mod desktop;
-@@ -445,6 +446,25 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
+@@ -445,6 +447,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
      tauri::async_runtime::spawn_blocking(codex_plan::read).await.ok().flatten()
  }
  
@@ -1097,6 +1525,44 @@ index 72d420e..85537a8 100644
 +async fn codex_agent_snapshot(root_thread_id: Option<String>) -> Result<codex_agents::Snapshot, String> {
 +    tauri::async_runtime::spawn_blocking(move || codex_agents::read(root_thread_id))
 +        .await.map_err(|_| "Codex session monitor unavailable".to_owned())?
++}
++
++#[tauri::command]
++async fn codex_chat_threads() -> Result<Vec<codex_chat::Thread>, String> {
++    tauri::async_runtime::spawn_blocking(codex_chat::threads).await
++        .map_err(|_| "No se pudo consultar Codex.".to_owned())?
++}
++
++#[tauri::command]
++async fn codex_chat_snapshot(thread_id: String) -> Result<codex_chat::Snapshot, String> {
++    tauri::async_runtime::spawn_blocking(move || codex_chat::snapshot(&thread_id)).await
++        .map_err(|_| "No se pudo consultar Codex.".to_owned())?
++}
++
++#[tauri::command]
++async fn codex_chat_send(thread_id: String, query: String) -> Result<(), String> {
++    tauri::async_runtime::spawn_blocking(move || codex_chat::send(&thread_id, &query)).await
++        .map_err(|_| "No se confirmó el envío. Comprueba el chat antes de volver a enviar.".to_owned())?
++}
++
++#[tauri::command]
++async fn codex_chat_interrupt(thread_id: String, expected_turn_id: String) -> Result<(), String> {
++    tauri::async_runtime::spawn_blocking(move || codex_chat::interrupt(&thread_id, &expected_turn_id)).await
++        .map_err(|_| "No se confirmó la parada en Codex.".to_owned())?
++}
++
++#[tauri::command]
++fn codex_chat_open(thread_id: String) -> Result<(), String> {
++    codex_chat::validate_thread(&thread_id)?;
++    platform::open_url(&format!("codex://threads/{thread_id}"));
++    Ok(())
++}
++
++/// Diagnostic CLI: same read-only IPC snapshot as the chat view.
++pub fn codex_chat_json(thread_id: Option<String>) -> Result<String, String> {
++    let id = thread_id.ok_or_else(|| "Falta el identificador del chat.".to_owned())?;
++    serde_json::to_string(&codex_chat::snapshot(&id)?)
++        .map_err(|_| "No se pudo consultar Codex.".to_owned())
 +}
 +
 +/// The CLI monitor shares the same bounded metadata reader as the webview.
@@ -1115,25 +1581,36 @@ index 72d420e..85537a8 100644
  #[tauri::command]
  fn approval_decision(app: AppHandle, request_id: String, decision: String) {
      recap::record_decision(&app, &request_id, &decision);
-@@ -783,6 +803,7 @@ pub fn run() {
+@@ -783,6 +842,12 @@ pub fn run() {
              status_line_preview,
              status_line_apply,
              codex_plan_usage,
 +            codex_agent_snapshot,
++            codex_chat_threads,
++            codex_chat_snapshot,
++            codex_chat_send,
++            codex_chat_interrupt,
++            codex_chat_open,
              approval_decision,
              approval_answer,
              approval_ack,
 diff --git a/windows/src-tauri/src/main.rs b/windows/src-tauri/src/main.rs
-index 1893b83..b038dfb 100644
+index 1893b83..c2b2983 100644
 --- a/windows/src-tauri/src/main.rs
 +++ b/windows/src-tauri/src/main.rs
-@@ -2,5 +2,13 @@
+@@ -2,5 +2,19 @@
  #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
  
  fn main() {
 +    let mut args = std::env::args().skip(1);
-+    if args.next().as_deref() == Some("--agent-monitor-json") {
-+        match coucou_lib::agent_monitor_json(args.next()) {
++    let mode = args.next();
++    if matches!(mode.as_deref(), Some("--agent-monitor-json" | "--codex-chat-json")) {
++        let result = if mode.as_deref() == Some("--codex-chat-json") {
++            coucou_lib::codex_chat_json(args.next())
++        } else {
++            coucou_lib::agent_monitor_json(args.next())
++        };
++        match result {
 +            Ok(snapshot) => println!("{snapshot}"),
 +            Err(error) => { eprintln!("{error}"); std::process::exit(1); }
 +        }
@@ -2007,7 +2484,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index f289dc5..3f9890f 100644
+index f289dc5..60a4c6f 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -2015,7 +2492,7 @@ index f289dc5..3f9890f 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.2",
++  "version": "0.5.1-sendoa.3",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -2055,10 +2532,26 @@ index 0000000..bcc44bc
 +  return `${symbol} ${t(label)}`;
 +}
 diff --git a/windows/src/core/bridge.ts b/windows/src/core/bridge.ts
-index 4fd245c..72a6e98 100644
+index 4fd245c..6164cd4 100644
 --- a/windows/src/core/bridge.ts
 +++ b/windows/src/core/bridge.ts
-@@ -181,6 +181,7 @@ export interface PhoneAnswersStatus {
+@@ -23,6 +23,15 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
+   }
+ }
+ 
++export interface CodexChatSnapshot {
++  threadId: string;
++  messages: { role: "user" | "assistant"; content: string }[];
++  active: boolean;
++  activeTurnId: string | null;
++  pending: boolean;
++  truncated: boolean;
++}
++
+ export interface BootInfo {
+   settings: Settings;
+   /** Logical screen rect of the monitor the island lives on. */
+@@ -181,6 +190,7 @@ export interface PhoneAnswersStatus {
  
  export const Bridge = {
    boot: () => call<BootInfo>("boot"),
@@ -2066,6 +2559,19 @@ index 4fd245c..72a6e98 100644
    /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
    setSystemLanguages: (languages: string[]) => call<void>("set_system_languages", { languages }),
  
+@@ -329,6 +339,12 @@ export const Bridge = {
+ 
+   // ── Chat, files, secrets ──────────────────────────────────────────────────
+   /** One chat turn. The API key and any file bytes never leave Rust. */
++  codexChatThreads: () => callOrThrow<{ id: string; title: string }[]>("codex_chat_threads"),
++  codexChatSnapshot: (threadId: string) => callOrThrow<CodexChatSnapshot>("codex_chat_snapshot", { threadId }),
++  codexChatSend: (threadId: string, query: string) => callOrThrow<void>("codex_chat_send", { threadId, query }),
++  codexChatInterrupt: (threadId: string, expectedTurnId: string) => callOrThrow<void>("codex_chat_interrupt", { threadId, expectedTurnId }),
++  codexChatOpen: (threadId: string) => callOrThrow<void>("codex_chat_open", { threadId }),
++
+   chatSend: (query: string, context: ChatContext | null) =>
+     callOrThrow<{ text: string }>("chat_send", { query, context }),
+   chatReset: () => call<void>("chat_reset"),
 diff --git a/windows/src/core/codex-flow.ts b/windows/src/core/codex-flow.ts
 new file mode 100644
 index 0000000..0423783
@@ -3101,27 +3607,38 @@ index 0000000..8232d13
 +  window.setInterval(() => void poll(), 2500);
 +}
 diff --git a/windows/src/island/fsm.ts b/windows/src/island/fsm.ts
-index 23b65ee..29f5ed1 100644
+index 23b65ee..6dc0ec9 100644
 --- a/windows/src/island/fsm.ts
 +++ b/windows/src/island/fsm.ts
-@@ -29,6 +29,8 @@ export class IslandStateMachine {
+@@ -29,6 +29,10 @@ export class IslandStateMachine {
    greetHoverCollapseDelay = 10;
    /** An alert waiting for an answer stays open, even when the mouse leaves. */
    pinned = false;
 +  /** The large flow room folds promptly even after a click. */
 +  roomOpen = false;
++  /** Keep an explicitly opened chat available while typing. */
++  chatOpen = false;
    /**
     * Hovering opens the island all the way instead of peeking (Settings →
     * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
-@@ -170,7 +172,7 @@ export class IslandStateMachine {
+@@ -169,14 +173,14 @@ export class IslandStateMachine {
+ 
    private scheduleHomeCollapse() {
      this.clear("homeCollapse");
-     if (this.pinned) return;
+-    if (this.pinned) return;
 -    const ms = (this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
++    if (this.pinned || this.chatOpen) return;
 +    const ms = (this.roomOpen || this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
      this.homeCollapseDueAt = performance.now() + ms;
      this.homeCollapse = window.setTimeout(() => {
        this.homeCollapse = null;
+       this.homeCollapseDueAt = null;
+       // An alert pinned while the countdown ran keeps the island open.
+-      if (this.state === "home" && !this.pinned) {
++      if (this.state === "home" && !this.pinned && !this.chatOpen) {
+         this.byHover = false;
+         this.transition("petit");
+       }
 diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
 index b39ecc2..e3a93f0 100644
 --- a/windows/src/island/hooks.ts
@@ -3138,7 +3655,7 @@ index b39ecc2..e3a93f0 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index dde0f32..2642337 100644
+index dde0f32..d1d0660 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -20,6 +20,7 @@ import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
@@ -3191,10 +3708,11 @@ index dde0f32..2642337 100644
    }
  
    reveal() {
-@@ -649,6 +657,10 @@ export class Island {
+@@ -649,6 +657,11 @@ export class Island {
  
    private targetSize(): { w: number; h: number; r: number } {
      let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
++    if (State.mode === "expanded" && State.view === "prompt") h = this.chatHeight;
 +    if (State.mode === "expanded" && State.view === "agents") {
 +      w = Math.min(w, Math.max(288, window.innerWidth - 32));
 +      h = Math.min(h, Math.max(240, window.innerHeight - 24));
@@ -3202,7 +3720,7 @@ index dde0f32..2642337 100644
      if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
        h = QUESTION_PICKER_H;
      }
-@@ -862,6 +874,7 @@ export class Island {
+@@ -862,6 +875,7 @@ export class Island {
        this.fsm.mouseEntered();
      }
      if (!inIsland && wasIn) {
@@ -3210,7 +3728,7 @@ index dde0f32..2642337 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1029,7 +1042,7 @@ export class Island {
+@@ -1029,7 +1043,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -3219,7 +3737,23 @@ index dde0f32..2642337 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1182,14 +1195,22 @@ export class Island {
+@@ -1143,6 +1157,7 @@ export class Island {
+ 
+   private syncDom() {
+     const expanded = State.mode === "expanded";
++    this.fsm.chatOpen = expanded && State.view === "prompt";
+     const greetingActive = expanded && State.view === "greeting";
+ 
+     const live = expanded && !greetingActive;
+@@ -1163,6 +1178,7 @@ export class Island {
+     for (const [name, view] of this.views) {
+       const on = name === State.view;
+       view.el.classList.toggle("on", on);
++      view.setVisible?.(on && expanded);
+       if (on) view.sync();
+     }
+ 
+@@ -1182,14 +1198,22 @@ export class Island {
      // Compact mini grid
      const showGrid = State.mode === "compact";
      this.miniGrid.style.opacity = showGrid ? "1" : "0";
@@ -3244,7 +3778,7 @@ index dde0f32..2642337 100644
          }
          pruneMiniBots();
        }
-@@ -1197,14 +1218,19 @@ export class Island {
+@@ -1197,14 +1221,19 @@ export class Island {
  
      this.updateClock();
  
@@ -3266,6 +3800,14 @@ index dde0f32..2642337 100644
      if (!on) return;
      const now = new Date();
      const date = now.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+@@ -1229,6 +1258,6 @@ export class Island {
+   }
+ 
+   get chatHeight() {
+-    return chatPromptHeight(State.chatHistory.length);
++    return this.views.get("prompt")?.height?.() ?? chatPromptHeight(State.chatHistory.length);
+   }
+ }
 diff --git a/windows/src/main.ts b/windows/src/main.ts
 index b3b4cee..6a4a960 100644
 --- a/windows/src/main.ts
@@ -3777,7 +4319,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index e1fff50..ce77361 100644
+index e1fff50..afaa3d0 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -4151,7 +4693,14 @@ index e1fff50..ce77361 100644
  }
  
  .chat-body.picking .picker {
-@@ -1249,10 +1235,10 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1243,25 +1229,25 @@ input[type="range"]::-webkit-slider-thumb {
+   gap: 6px;
+ }
+ 
+-.picker-chip {
++.picker-chip, .chat-mode-btn {
+   display: inline-flex;
+   align-items: center;
    gap: 5px;
    padding: 4px 10px;
    border-radius: 999px;
@@ -4165,7 +4714,8 @@ index e1fff50..ce77361 100644
    cursor: default;
  }
  
-@@ -1260,8 +1246,8 @@ input[type="range"]::-webkit-slider-thumb {
+-.picker-chip.on {
++.picker-chip.on, .chat-mode-btn.on {
    font-weight: 600;
    color: var(--ink-2);
    /* Plain fallbacks for WebKitGTK builds without color-mix(). */
@@ -4519,7 +5069,7 @@ index e1fff50..ce77361 100644
  }
  
  .np-bar.active .np-track,
-@@ -2672,3 +2658,35 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -2672,3 +2658,52 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    unicode-bidi: plaintext;
    text-align: start;
  }
@@ -4555,6 +5105,23 @@ index e1fff50..ce77361 100644
 +.room-detail { white-space: pre-line; font-size: 11px; line-height: 18px; padding: 8px 12px; border-left: 2px solid var(--eva-accent); background: var(--eva-card); color: var(--eva-text); flex-shrink: 0; overflow-wrap: anywhere; }
 +.agent-room-grid { background: repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(var(--eva-border-rgb), .16) 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, rgba(var(--eva-border-rgb), .16) 32px); border: 1px solid var(--eva-border); border-radius: 12px; padding: 14px; }
 +@media (max-width: 650px) { .agent-room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 6px; } }
++
++/* Codex desktop follower: reuse the existing chat card and EVA palette. */
++.chat-modes > .picker-chips { padding: 0 8px 5px; }
++.chat-modes.on { display: flex; flex-direction: column; }
++.chat-modes > .view { display: block; position: relative; inset: auto; flex: 1; min-height: 0; }
++.codex-chat { --wash: rgba(157,78,221,.35); display: flex; flex-direction: column; gap: 6px; }
++.codex-toolbar { display: flex; align-items: center; gap: 8px; font-size: 10px; }
++.codex-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.codex-status { font-size: 10px; color: var(--dim); line-height: 1.4; }
++.codex-threads { max-height: 170px; overflow-y: auto; }
++.codex-threads:empty { display: none; }
++.codex-threads .picker-model { width: 100%; text-align: left; }
++.codex-chat .chat-log { min-height: 0; max-height: 150px; overflow-y: auto; }
++.codex-chat { flex: 1; min-height: 0; padding: 10px 12px 12px 84px; }
++.codex-chat .chat-bar, .codex-toolbar, .codex-status { flex-shrink: 0; }
++.codex-chat .chat-input { min-width: 0; }
++.codex-chat button:disabled { opacity: .4; cursor: default; }
 diff --git a/windows/src/theme.css b/windows/src/theme.css
 new file mode 100644
 index 0000000..91a8088
@@ -4709,6 +5276,227 @@ index 0000000..fef268a
 +      desk.button.title = `${task.name} — ${status}\n${activity}`;
 +      desk.button.style.setProperty("--agent-color", task.color);
 +    }
++  } };
++}
+diff --git a/windows/src/views/chat.ts b/windows/src/views/chat.ts
+index f11fea1..d19bd1b 100644
+--- a/windows/src/views/chat.ts
++++ b/windows/src/views/chat.ts
+@@ -1,3 +1,4 @@
++import { chatPromptHeight } from "../core/layout";
+ // Chat view — DOM port of PromptView / ChatBubble / TypingDotsView /
+ // ModelPickerView from IslandViewContent.swift.
+ //
+@@ -6,6 +7,7 @@
+ // model name above the text field opens the picker: provider chips, then the
+ // models of the chosen provider, asked for only once it is picked.
+ 
++import { buildCodexChat } from "./codex-chat";
+ import { h, svg, clear } from "./dom";
+ import { ICONS } from "./icons";
+ import { renderMarkdown } from "./markdown";
+@@ -201,7 +203,7 @@ function buildPicker(onChange: () => void): Picker {
+ 
+ // ── View ──────────────────────────────────────────────────────────────────────
+ 
+-export function buildPrompt(onHeightChange: () => void): ViewHost {
++function buildProviderPrompt(onHeightChange: () => void): ViewHost {
+   const chipRow = h("div", { class: "chip-row" });
+   const log = h("div", { class: "chat-log" });
+   const input = h("input", {
+@@ -350,3 +352,32 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
+     },
+   };
+ }
++
++// Both modes retain their own state; Codex messages never enter provider history.
++export function buildPrompt(onHeightChange: () => void): ViewHost {
++  const provider = buildProviderPrompt(onHeightChange);
++  const codex = buildCodexChat(onHeightChange);
++  let desktop = false;
++  const providerButton = h("button", { class: "chat-mode-btn on", text: "Chat Coucou" });
++  const codexButton = h("button", { class: "chat-mode-btn", text: "Codex escritorio" });
++  const el = h("div", { class: "view chat-modes" }, h("div", { class: "picker-chips" }, providerButton, codexButton), provider.el, codex.el);
++  function sync() {
++    provider.el.style.display = desktop ? "none" : "";
++    provider.el.classList.toggle("on", !desktop);
++    codex.el.style.display = desktop ? "" : "none";
++    codex.setVisible(desktop && State.view === "prompt" && State.mode === "expanded");
++    if (!desktop) provider.sync();
++  }
++  function select(on: boolean) {
++    desktop = on;
++    providerButton.classList.toggle("on", !on);
++    codexButton.classList.toggle("on", on);
++    sync();
++    onHeightChange();
++    if (on) codex.focus(); else provider.focus?.();
++  }
++  providerButton.addEventListener("click", () => select(false));
++  codexButton.addEventListener("click", () => select(true));
++  sync();
++  return { el, sync, height: () => desktop ? 360 : chatPromptHeight(State.chatHistory.length) + 30, setVisible: on => codex.setVisible(on && desktop), focus: () => desktop ? codex.focus() : provider.focus?.() };
++}
+diff --git a/windows/src/views/codex-chat.ts b/windows/src/views/codex-chat.ts
+new file mode 100644
+index 0000000..b8f26fe
+--- /dev/null
++++ b/windows/src/views/codex-chat.ts
+@@ -0,0 +1,156 @@
++// A follower of an explicitly selected desktop chat. No local conversation copy.
++import { h, clear } from "./dom";
++import { renderMarkdown } from "./markdown";
++import { Bridge, type CodexChatSnapshot } from "../core/bridge";
++
++export function buildCodexChat(onHeightChange: () => void) {
++  const threads = h("div", { class: "codex-threads" });
++  const log = h("div", { class: "chat-log", role: "log", "aria-label": "Historial de Codex" });
++  const status = h("div", { class: "codex-status", role: "status", text: "Selecciona un chat abierto en Codex." });
++  const input = h("input", { class: "chat-input codex-input", type: "text", placeholder: "Escribir en el chat seleccionado…", "aria-label": "Mensaje para Codex" }) as HTMLInputElement;
++  const send = h("button", { class: "codex-send chat-mode-btn", text: "Enviar" });
++  const stop = h("button", { class: "codex-stop chat-mode-btn", text: "Detener" });
++  const choose = h("button", { class: "picker-link", text: "Cambiar chat" });
++  const open = h("button", { class: "picker-link", text: "Abrir en Codex" });
++  const title = h("span", { class: "codex-title", text: "Codex escritorio · experimental" });
++  const el = h("div", { class: "card wash codex-chat" },
++    h("div", { class: "codex-toolbar" }, title, choose, open), threads, log, status,
++    h("div", { class: "chat-bar" }, input, send, stop));
++  let threadId: string | null = null;
++  let snapshot: CodexChatSnapshot | null = null;
++  let visible = false;
++  let busy = false;
++  let refreshing = false;
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  let generation = 0;
++  let lastMessages = "";
++  let actionWarning = "";
++  const drafts = new Map<string, string>();
++
++  function buttons() {
++    input.disabled = busy || !snapshot || snapshot.active || snapshot.pending;
++    send.disabled = input.disabled || refreshing;
++    stop.disabled = busy || refreshing || !snapshot?.activeTurnId;
++    choose.disabled = busy || refreshing;
++    open.disabled = !threadId;
++  }
++  function cancelPoll() { clearTimeout(timer); timer = undefined; }
++  function schedule() {
++    cancelPoll();
++    if (visible && threadId) timer = setTimeout(() => void refresh(), 2500);
++  }
++  async function refresh() {
++    if (!visible || !threadId || busy || refreshing) return;
++    const ticket = generation;
++    refreshing = true;
++    buttons();
++    try {
++      const next = await Bridge.codexChatSnapshot(threadId);
++      if (ticket !== generation) return;
++      snapshot = next;
++      const key = JSON.stringify(next.messages);
++      if (key !== lastMessages) {
++        lastMessages = key;
++        const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 40;
++        clear(log);
++        for (const message of next.messages) {
++          const content = h("div", { class: message.role === "user" ? "bubble" : "reply" });
++          if (message.role === "user") content.textContent = message.content;
++          else renderMarkdown(content, message.content);
++          log.append(h("div", { class: message.role === "user" ? "chat-row user" : "chat-row" }, content));
++        }
++        if (atBottom || log.scrollTop === 0) log.scrollTop = log.scrollHeight;
++        onHeightChange();
++      }
++      status.textContent = next.pending ? "Codex requiere tu decisión. Abre el chat completo para responder." :
++        next.active ? "Codex está trabajando…" : "Conectado al chat seleccionado.";
++      if (next.truncated) status.textContent += " Se muestra solo el historial reciente.";
++      if (actionWarning) status.textContent += ` ${actionWarning}`;
++    } catch (error) {
++      if (ticket !== generation) return;
++      snapshot = null;
++      status.textContent = String(error).replace(/^Error:\s*/, "");
++    } finally {
++      refreshing = false;
++      buttons();
++      if (ticket === generation) schedule();
++    }
++  }
++  async function list() {
++    cancelPoll();
++    generation++;
++    if (threadId) drafts.set(threadId, input.value);
++    threadId = null;
++    input.value = "";
++    title.textContent = "Codex escritorio · experimental";
++    snapshot = null;
++    lastMessages = "";
++    actionWarning = "";
++    clear(log);
++    clear(threads);
++    buttons();
++    status.textContent = "Selecciona un chat abierto en Codex. Las decisiones se responden en Codex.";
++    try {
++      const ticket = generation;
++      const entries = await Bridge.codexChatThreads();
++      if (!visible || ticket !== generation) return;
++      for (const entry of entries) {
++        const button = h("button", { class: "picker-model codex-thread", text: entry.title, title: entry.id });
++        button.addEventListener("click", () => {
++          generation++;
++          threadId = entry.id;
++          input.value = drafts.get(entry.id) ?? "";
++          title.textContent = `Codex · ${entry.title}`;
++          clear(threads);
++          status.textContent = "Conectando…";
++          void refresh();
++        });
++        threads.append(button);
++      }
++      if (!entries.length) status.textContent = "No hay chats locales. Abre un chat en Codex primero.";
++    } catch (error) { status.textContent = String(error); }
++  }
++  async function action(interrupt: boolean) {
++    const query = input.value.trim();
++    if (!threadId || busy || refreshing || (interrupt ? !snapshot?.activeTurnId : !query || send.disabled)) return;
++    cancelPoll();
++    busy = true;
++    actionWarning = "";
++    buttons();
++    try {
++      if (interrupt) await Bridge.codexChatInterrupt(threadId, snapshot!.activeTurnId!);
++      else {
++        await Bridge.codexChatSend(threadId, query);
++        input.value = "";
++      }
++      status.textContent = interrupt ? "Interrupción solicitada." : "Mensaje entregado a Codex.";
++    } catch (error) {
++      // An uncertain acknowledgement must never cause an automatic resend.
++      snapshot = null;
++      actionWarning = `${String(error).replace(/^Error:\s*/, "")} Comprueba el chat en Codex antes de volver a enviar.`;
++      status.textContent = actionWarning;
++      busy = false;
++      buttons();
++      schedule();
++      return;
++    }
++    busy = false;
++    await refresh();
++    if (visible) input.focus();
++  }
++  choose.addEventListener("click", () => void list());
++  open.addEventListener("click", () => { if (threadId) void Bridge.codexChatOpen(threadId).catch(error => { status.textContent = String(error); }); });
++  send.addEventListener("click", () => void action(false));
++  stop.addEventListener("click", () => void action(true));
++  input.addEventListener("keydown", event => {
++    if ((event as KeyboardEvent).key === "Enter") { event.preventDefault(); void action(false); }
++    event.stopPropagation();
++  });
++  buttons();
++  return { el, focus: () => input.focus(), setVisible(on: boolean) {
++    if (visible === on) return;
++    visible = on;
++    cancelPoll();
++    if (on) { if (threadId) void refresh(); else void list(); }
 +  } };
 +}
 diff --git a/windows/src/views/github.ts b/windows/src/views/github.ts
@@ -4958,7 +5746,7 @@ index e851100..3bcc407 100644
            btn(t("Yes, tell me"), "primary", () => Updates.answer(true)),
            btn(t("No thanks"), "secondary", () => Updates.answer(false)),
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index 067825f..2dc1e3f 100644
+index 067825f..df27179 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
 @@ -19,6 +19,7 @@ import {
@@ -4969,7 +5757,17 @@ index 067825f..2dc1e3f 100644
  import { buildRecap } from "./recap";
  import { buildWardrobe } from "./wardrobe";
  import { buildUpdate } from "./update";
-@@ -109,6 +110,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
+@@ -59,6 +60,9 @@ export interface ViewActions {
+ export interface ViewHost {
+   el: HTMLElement;
+   sync(): void;
++  /** Stop background subscriptions when a view is hidden or folded. */
++  setVisible?(on: boolean): void;
++  height?(): number;
+   /** Called when the view becomes active, for views with a text field. */
+   focus?(): void;
+   /** Called every frame while the view is on screen. True = needs another frame. */
+@@ -109,6 +113,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
  
  export function buildHeader(actions: ViewActions): ViewHost {
    const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 13));
@@ -4977,7 +5775,7 @@ index 067825f..2dc1e3f 100644
    const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
    const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 13));
  
-@@ -128,7 +130,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -128,7 +133,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
    const el = h(
      "div",
      { id: "header" },
@@ -4986,7 +5784,7 @@ index 067825f..2dc1e3f 100644
      h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
    );
    const headerActions = el.lastElementChild as HTMLElement;
-@@ -138,6 +140,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -138,6 +143,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
      sync() {
        const v = State.view;
        tabHome.classList.toggle("on", v === "overview" || v === "empty");
@@ -4994,7 +5792,7 @@ index 067825f..2dc1e3f 100644
        tabChat.classList.toggle("on", v === "prompt");
        tabDrop.classList.toggle("on", v === "upload");
        gearBtn.classList.toggle("on", v === "settings");
-@@ -533,6 +536,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+@@ -533,6 +539,7 @@ function buildApproval(actions: ViewActions): ViewHost {
        // is the command, the file path or the URL being authorised, not just the
        // name of the tool asking.
        code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
@@ -5002,7 +5800,7 @@ index 067825f..2dc1e3f 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
-@@ -808,6 +812,7 @@ export function buildViews(
+@@ -808,6 +815,7 @@ export function buildViews(
  ): Map<IslandViewName, ViewHost> {
    const map = new Map<IslandViewName, ViewHost>();
    map.set("overview", buildOverview(actions));
@@ -5048,6 +5846,101 @@ index 0000000..0c8e0f5
 + State.mode='compact';room.sync();assert.equal(room.el.find('.agent-desk').length,0);
 + State.mode='expanded';room.sync();assert.equal(room.el.find('.agent-desk').length,1);
 + State.tasks=[];room.sync();assert.equal(room.el.find('.agent-desk').length,0);assert.ok(room.el.textContent.includes('Conecta'));
++});
+diff --git a/windows/tests/codex-chat.test.mjs b/windows/tests/codex-chat.test.mjs
+new file mode 100644
+index 0000000..1f7890f
+--- /dev/null
++++ b/windows/tests/codex-chat.test.mjs
+@@ -0,0 +1,89 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { installFakeDom } from './fakedom.mjs';
++import { calls, internals, sent } from './tauri.mjs';
++installFakeDom();
++const { buildCodexChat } = await import('../src/views/codex-chat.ts');
++const original = internals.invoke;
++let snapshotCalls = 0;
++internals.invoke = async (cmd, args) => {
++  await original(cmd, args);
++  if (cmd === 'codex_chat_threads') return [{ id: 'test', title: 'Prueba' }];
++  if (cmd === 'codex_chat_snapshot') { snapshotCalls++; return { threadId: args.threadId, messages: [{role:'assistant', content:'LISTO'}], active: false, pending: false, truncated: false }; }
++  if (cmd === 'codex_chat_send') throw new Error('Desconectado: entrega desconocida');
++  return null;
++};
++const flush = () => new Promise(resolve => setTimeout(resolve, 0));
++test('Codex requires explicit selection, keeps a failed draft, and does not retry send', async () => {
++  const view = buildCodexChat(() => {});
++  calls.length = 0;
++  view.setVisible(true);
++  await flush(); await flush();
++  assert.equal(snapshotCalls, 0);
++  view.el.querySelector('.codex-thread').fire('click');
++  await flush(); await flush();
++  assert.match(view.el.textContent, /LISTO/);
++  const input = view.el.querySelector('.codex-input');
++  input.value = 'mensaje';
++  view.el.querySelector('.codex-send').fire('click');
++  await flush(); await flush();
++  assert.equal(input.value, 'mensaje');
++  assert.equal(sent('codex_chat_send').length, 1);
++  assert.match(view.el.textContent, /entrega desconocida/);
++  await new Promise(resolve => setTimeout(resolve, 2700));
++  assert.equal(input.value, 'mensaje');
++  assert.equal(sent('codex_chat_send').length, 1);
++  assert.match(view.el.textContent, /entrega desconocida/);
++  assert.equal(input.disabled, false);
++  view.setVisible(false);
++});
++
++test('stop carries the displayed turn id; pending decisions block send', async () => {
++  let pending = false;
++  internals.invoke = async (cmd, args) => {
++    await original(cmd, args);
++    if (cmd === 'codex_chat_threads') return [{id:'test',title:'Prueba'}];
++    if (cmd === 'codex_chat_snapshot') return {threadId:'test',messages:[],active:!pending,activeTurnId:pending?null:'turn-1',pending,truncated:false};
++    if (cmd === 'codex_chat_interrupt') pending = true;
++    return null;
++  };
++  const view = buildCodexChat(() => {});
++  view.setVisible(true);
++  await flush(); await flush();
++  view.el.querySelector('.codex-thread').fire('click');
++  await flush(); await flush();
++  assert.equal(view.el.querySelector('.codex-send').disabled, true);
++  view.el.querySelector('.codex-stop').fire('click');
++  await flush(); await flush();
++  assert.equal(sent('codex_chat_interrupt').at(-1).expectedTurnId, 'turn-1');
++  assert.match(view.el.textContent,/requiere tu decisión/);
++  assert.equal(view.el.querySelector('.codex-send').disabled,true);
++  view.setVisible(false);
++});
++
++
++test('a rejected stop resumes status reads without repeating the action', async () => {
++  let stopped = false;
++  internals.invoke = async (cmd, args) => {
++    await original(cmd, args);
++    if (cmd === 'codex_chat_threads') return [{id:'test',title:'Prueba'}];
++    if (cmd === 'codex_chat_snapshot') return {threadId:'test',messages:[],active:!stopped,activeTurnId:stopped?null:'old-turn',pending:false,truncated:false};
++    if (cmd === 'codex_chat_interrupt') { stopped = true; throw new Error('El turno activo ha cambiado'); }
++    return null;
++  };
++  calls.length = 0;
++  const view = buildCodexChat(() => {});
++  try {
++    view.setVisible(true);
++    await flush(); await flush();
++    view.el.querySelector('.codex-thread').fire('click');
++    await flush(); await flush();
++    view.el.querySelector('.codex-stop').fire('click');
++    await flush(); await flush();
++    assert.match(view.el.textContent,/turno activo ha cambiado/);
++    await new Promise(resolve => setTimeout(resolve, 2700));
++    assert.equal(view.el.querySelector('.codex-input').disabled,false);
++    assert.match(view.el.textContent,/Conectado al chat seleccionado/);
++    assert.equal(sent('codex_chat_interrupt').length,1);
++  } finally { view.setVisible(false); }
 +});
 diff --git a/windows/tests/codex-flow.test.mjs b/windows/tests/codex-flow.test.mjs
 new file mode 100644
@@ -5128,10 +6021,10 @@ index 0000000..e100838
 +  }
 +});
 diff --git a/windows/tests/fsm.test.mjs b/windows/tests/fsm.test.mjs
-index f1685dd..210c7c5 100644
+index f1685dd..2d5c30d 100644
 --- a/windows/tests/fsm.test.mjs
 +++ b/windows/tests/fsm.test.mjs
-@@ -377,3 +377,11 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
+@@ -377,3 +377,21 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
    seconds(2);
    assert.equal(fsm.state, "petit");
  });
@@ -5142,6 +6035,16 @@ index f1685dd..210c7c5 100644
 +});
 +test("the flow room still respects pending-answer pinning", () => {
 +  fsm.forceHome();fsm.roomOpen=true;fsm.pinned=true;fsm.mouseLeft();seconds(2);assert.equal(fsm.state,"home");
++});
++
++test("an open chat stays available while typing, but explicit close still works", () => {
++  fsm.forceHome();
++  fsm.mouseLeft();
++  fsm.chatOpen = true;
++  seconds(60);
++  assert.equal(fsm.state, "home");
++  fsm.forcePetit();
++  assert.equal(fsm.state, "petit");
 +});
 diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs
 new file mode 100644

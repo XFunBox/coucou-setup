@@ -1,3 +1,18 @@
+# Verificación — 2026-10-23 — chat compartido con Codex
+
+Versión **0.5.1-sendoa.3**, sobre Linux 0.5.1 y las personalizaciones EVA-01 existentes.
+
+- Integración experimental con el IPC privado local del escritorio Codex 26.928.31416 / backend 0.159.2: selección explícita, historial canónico con actividad reciente, envío único y parada con el identificador del turno mostrado. En el chat de prueba autorizado se verificaron lectura, respuesta y parada mediante IPC y el adaptador Rust antes de la interrupción del equipo; no se repiten envíos durante la recuperación.
+- Pruebas de recuperación: **444 pruebas Node** pasan en el contenedor final (31 archivos pasan también con el Node local). Rust release: **516 pruebas de la aplicación y 34 del relé**, sin fallos; 11 ignoradas en la ejecución general. **Cinco MPRIS** ejecutadas aparte con bus privado, correctas. También pasan las **10 Python** del instalador, sintaxis Bash y revisión de espacios.
+- Una revisión independiente detectó que un rechazo de parada suspendía las actualizaciones. Se corrigió y se comprobó primero la regresión fallida y después su éxito: se reanuda la lectura, sin repetir acciones. Si un envío queda sin confirmar, conserva el borrador y el aviso después de actualizar el estado.
+- Parche aplicado a la fuente canónica limpia: **61 archivos idénticos** a la fuente final. SHA-256 fijado en `source-lock.json`.
+- QA visual previa al apagado con componentes reales y datos simulados en Chrome; captura conservada. Las regresiones de apertura/autocierre y del chat se comprueban con DOM simulado. No se presenta como una inspección visual completa de la ventana nativa KDE.
+
+- TypeScript/Vite y Tauri release compilados con la interfaz final. Instalación real Ubuntu/KDE: servicio activo y ejecutándose, versión .3 y overlay layer-shell confirmados en registro, hashes de binarios verificados y `ldd` sin dependencias ausentes. Ajustes, hooks y entrada del menú byte idénticos; inicio automático conserva su comando. Copia previa y reversión preparadas.
+- El binario instalado lee por IPC el chat de prueba correcto: **34 mensajes**, turno activo, sin decisiones pendientes y sin truncación en esa comprobación. La consulta fue de solo lectura y el informe conserva únicamente recuentos y estados.
+
+La compilación local reutiliza dependencias y cachés de Docker; la receta pública conserva su construcción desde imágenes base. No se repitió una construcción sin cachés. Se mantiene el chat propio de Coucou y su configuración. El IPC es privado y puede cambiar con Codex; las aprobaciones se responden en la app. Las pruebas que requieren modelos/portal, micrófono, Android y controles sobre un reproductor real quedan fuera de esta validación.
+
 # Verificación — 2026-10-21 — EVA-01
 
 Versión **0.5.1-sendoa.2**, sobre la misma base Linux 0.5.1. Tema compartido en isla, Hub, ajustes y módulos, Mochi normal verde EVA y estados coordinados. Conserva colores personalizados e integraciones.

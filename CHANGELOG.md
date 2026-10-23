@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.5.1-sendoa.3 — 2026-10-23
+
+- Chat compartido con Codex escritorio: selección explícita, historial reciente, envío de texto y parada del turno mostrado.
+- Conserva el chat propio de Coucou y sus proveedores; las decisiones pendientes del chat compartido se responden en Codex.
+- IPC local experimental con validación de propietario, límites de lectura y sin reintentos automáticos de envío.
+- El chat permanece abierto mientras escribes; la consulta se suspende al ocultar la vista.
+
 ## 0.5.1-sendoa.2 — 2026-10-21
 
 - Apariencia EVA-01 compartida entre isla, sala, ajustes, Hub y módulos.

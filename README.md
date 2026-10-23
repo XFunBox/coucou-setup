@@ -2,7 +2,7 @@
 
 Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
 
-Setup de **Coucou 0.5.1-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.1, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.1-sendoa.3** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.1, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
@@ -63,7 +63,11 @@ GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de l
 
 El monitor lee metadatos de los registros locales de Codex (`CODEX_HOME/sessions` o `~/.codex/sessions`), cada 2,5 s, sin iniciar otra sesión. Usa el chat identificado por el hook activo o el chat con registro modificado más recientemente; muestra su identificador abreviado. Solo incluye subagentes `thread_spawn`, excluye guardianes y no muestra mensajes ni argumentos de herramientas. El formato de estos registros puede cambiar: una lectura parcial o desconocida se indica, y la actividad antigua no confirma que un proceso siga vivo. La consola `coucou --agent-monitor-json [UUID]` permite consultar los mismos metadatos desde otras herramientas. Si no hay árbol disponible, conserva la vista de agentes de hooks. Las preguntas usan el canal existente de cada integración: no se añade un canal nuevo de respuestas para Codex.
 
-El chat propio de Coucou es independiente de los chats de Codex. El perfil base del setup usa OpenAI para ese chat y requiere su propia clave de API; iniciar sesión en Codex no configura esa clave. No se incluyen credenciales, sesiones, historial ni confianza de hooks.
+En la pestaña de chat hay dos modos. **Chat Coucou** conserva su conversación independiente y requiere su propia clave de API. **Codex escritorio** permite seleccionar un chat local y abierto de la aplicación Codex, leer sus mensajes, enviar texto y detener el turno mostrado. Comparte el chat y la ejecución de la aplicación, usando su cuenta, modelo y permisos; no necesita una clave de API adicional. La isla permanece abierta mientras está el chat, y puedes cerrarla con Escape.
+
+El enlace con Codex es **experimental**: usa su IPC privado local, comprobado con la aplicación 26.928.31416 / backend 0.159.2. Una actualización de Codex puede romper la compatibilidad. El selector usa títulos recientes del índice local; un chat debe tener un propietario disponible en la aplicación para conectar. El historial se consulta solo con la vista visible y se muestra acotado. No se copian conversaciones a GitHub ni se escriben las bases de datos o archivos de sesiones. Si un envío falla, se conserva el borrador: comprueba el chat completo antes de reenviarlo, porque el mensaje podría haberse aceptado.
+
+Las decisiones pendientes se muestran con **Abrir en Codex** para responder en la aplicación. Este modo no añade aprobaciones automáticas, envío de archivos, ejecución remota ni modificación del modelo. Las aprobaciones de los hooks existentes conservan su canal habitual. No se incluyen credenciales, sesiones, historial ni confianza de hooks. La consulta de diagnóstico `coucou --codex-chat-json UUID` imprime mensajes del chat elegido: úsala solo en una terminal privada.
 
 La base 0.5.0 incorpora el hub, dictado Flow y notas de voz. El setup no activa la escucha ni descarga modelos de voz automáticamente. Al arrancar, upstream migra el acceso de inicio de sesión para añadir `--autostart` y mantener oculto el hub al entrar.
 
