@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.5.1-sendoa.4 — 2026-10-23
+
+- Excluye del selector de chat las revisiones internas «Guardian review» que Codex también guarda en su índice. Conserva los chats normales, sin borrar ni modificar sesiones. Regresión del selector añadida.
+
 ## 0.5.1-sendoa.3 — 2026-10-23
 
 - Chat compartido con Codex escritorio: selección explícita, historial reciente, envío de texto y parada del turno mostrado.

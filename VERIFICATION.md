@@ -1,3 +1,12 @@
+# Verificación — 2026-10-23 — selector sin revisiones internas
+
+Versión **0.5.1-sendoa.4**. El índice nativo incluye «Guardian review» junto a los chats del usuario. Su origen `subagent.other=guardian` se comprobó mediante metadatos SQLite en modo solo lectura. El índice JSONL carece de ese campo: el selector excluye el nombre interno reservado, sin distinguir mayúsculas ni espacios exteriores, después de deduplicar y antes del límite de 100 chats. No se excluyen otros títulos por contener la palabra guardian.
+
+- Regresión del código Rust real: falla sin el filtro y pasa con él. Las **nueve pruebas del adaptador** pasan. Selector contra el índice nativo: **76 chats y cero Guardian review**, sin mostrar ni guardar títulos o mensajes.
+- Parche aplicado a upstream limpio: **61 archivos idénticos** y SHA-256 fijado. Sintaxis Bash y revisión de espacios correctas. No se modifican el protocolo, envío/parada, interfaz ni dependencias; las verificaciones de .3 siguen documentadas abajo.
+- Pruebas afectadas dentro de la aplicación Rust release: **nueve correctas**. TypeScript/Vite y Tauri release compilados; aplicación y relé .4 exportados y SHA-256 verificado. Se reutilizan las dependencias locales y la interfaz sin cambios.
+- Instalación nativa: servicio activo/running, versión .4 y overlay layer-shell confirmados en registro. Binarios comparados después del arranque; ajustes, hooks y menú byte idénticos, autostart conservado. Copia previa con reversión preparada. No se han enviado mensajes ni modificado sesiones para esta corrección.
+
 # Verificación — 2026-10-23 — chat compartido con Codex
 
 Versión **0.5.1-sendoa.3**, sobre Linux 0.5.1 y las personalizaciones EVA-01 existentes.
