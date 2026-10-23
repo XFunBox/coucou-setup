@@ -1,3 +1,14 @@
+# Verificación — 2026-10-23 — botones de permisos
+
+Versión **0.5.1-sendoa.5**. La vista interna del proveedor de chat conservaba la clase `on` al ocultar el panel padre. Su `pointer-events: auto` interceptaba clics destinados a la tarjeta de permisos. La visibilidad del chat ahora desactiva esa vista interna y la reactiva al abrirlo; las notificaciones repetidas de visibilidad no vuelven a renderizarla.
+
+- Regresión de ciclo visible → aprobación → visible: falla antes del cambio y pasa después. Pasan los archivos de pruebas de chat, chat Codex, hooks y FSM, más la comprobación TypeScript.
+- QA de navegador con componentes reales y puente simulado: tanto Permitir como Denegar llegan al receptor de prueba. La simulación no autoriza herramientas reales.
+- Revisión independiente sin hallazgos accionables; comprobados ocultación, reapertura, cambios de modo y sincronizaciones repetidas. Parche final aplicado a upstream limpio: **62 archivos idénticos** y SHA-256 fijado.
+- TypeScript/Vite y Tauri release compilados con la interfaz final; nueve pruebas Rust del adaptador correctas. Exportación y SHA-256 verificados.
+- Instalación nativa .5: servicio activo/running y overlay layer-shell confirmados; hashes comparados tras el arranque. Ajustes, hooks y menú byte idénticos, autostart conservado. Copia previa con reversión preparada. La recepción de clics se verificó con el puente simulado; queda pendiente confirmación humana del botón nativo.
+- Mantiene el filtro Guardian de .4. Sin cambios en el protocolo de permisos, confianza de hooks ni preferencias de seguridad.
+
 # Verificación — 2026-10-23 — selector sin revisiones internas
 
 Versión **0.5.1-sendoa.4**. El índice nativo incluye «Guardian review» junto a los chats del usuario. Su origen `subagent.other=guardian` se comprobó mediante metadatos SQLite en modo solo lectura. El índice JSONL carece de ese campo: el selector excluye el nombre interno reservado, sin distinguir mayúsculas ni espacios exteriores, después de deduplicar y antes del límite de 100 chats. No se excluyen otros títulos por contener la palabra guardian.

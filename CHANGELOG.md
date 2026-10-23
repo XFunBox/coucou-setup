@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.5.1-sendoa.5 — 2026-10-23
+
+- Corrige los botones de permisos de la isla: el chat oculto retira su vista interna activa para dejar pasar los clics a la tarjeta de aprobación. Conserva el estado del chat al volver a abrirlo.
+
 ## 0.5.1-sendoa.4 — 2026-10-23
 
 - Excluye del selector de chat las revisiones internas «Guardian review» que Codex también guarda en su índice. Conserva los chats normales, sin borrar ni modificar sesiones. Regresión del selector añadida.

@@ -2,7 +2,7 @@
 
 Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
 
-Setup de **Coucou 0.5.1-sendoa.4** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.1, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.1-sendoa.5** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.1, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
