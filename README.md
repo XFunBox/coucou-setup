@@ -2,11 +2,11 @@
 
 Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
 
-Setup de **Coucou 0.5.1-sendoa.5** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.1, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.3-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.3, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 Incluye:
 
-- Base Linux 0.5.1: corrección de CPU del hub cerrado en KDE, reloj compacto optativo y nuevas traducciones. El reloj cede espacio al estado de subagentes cuando hay actividad.
+- Base Linux 0.5.3: conserva las novedades oficiales de 0.5.2 y 0.5.3, incluidos GitLab/Gitea, WhatsApp experimental y la pantalla de novedades. Mantiene el reloj compacto optativo con prioridad visual para los subagentes.
 - Avisos optativos de nuevas versiones del fork `XFunBox/coucou-setup`; el enlace abre su release para actualizar conservando las personalizaciones.
 
 - Sala EVA-01 ampliada (880 × 480): el agente principal y sus subagentes reales de Codex, con rol, modelo, esfuerzo, última herramienta y relación padre/hijo. La isla abre su vista habitual; la oficina se abre desde la pestaña «Sala de agentes». Pulsar un puesto muestra su ficha. Al salir el cursor se recoge al notch en 0,6 s; mantiene las solicitudes pendientes. En compacto muestra cuántos subagentes siguen activos.

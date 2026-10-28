@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.5.3-sendoa.1 — 2026-10-28
+
+- Actualiza la base oficial a Linux 0.5.3, conservando EVA-01, Codex IPC, monitor y sala de agentes, filtro Guardian, permisos, GitHub y Spotifast/MPRIS.
+- Combina el panel GitHub de repositorios, commits y pipelines con las nuevas tarjetas GitLab/Gitea de upstream; cada proveedor conserva su navegación.
+- Conserva las novedades de upstream, incluido WhatsApp experimental. La pantalla de novedades reconoce la versión Sendoa y enlaza su release del fork.
+- Fuente y parche fijados mediante SHA-256. Compilación release y suites Node/Rust/MPRIS verificadas.
+
 ## 0.5.1-sendoa.5 — 2026-10-23
 
 - Corrige los botones de permisos de la isla: el chat oculto retira su vista interna activa para dejar pasar los clics a la tarjeta de aprobación. Conserva el estado del chat al volver a abrirlo.

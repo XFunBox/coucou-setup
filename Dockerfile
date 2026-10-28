@@ -15,6 +15,7 @@ WORKDIR /app/windows
 COPY windows/package.json windows/package-lock.json ./
 RUN npm ci --include=optional
 COPY windows ./
+COPY docs /app/docs
 COPY NotchBuddy/Resources/sounds /app/NotchBuddy/Resources/sounds
 COPY NotchBuddy/Resources/Localizable.xcstrings /app/NotchBuddy/Resources/Localizable.xcstrings
 COPY NotchBuddy/Resources/Info.plist /app/NotchBuddy/Resources/Info.plist

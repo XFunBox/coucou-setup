@@ -1,67 +1,67 @@
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 2918633..e3afa0c 100644
+index 79ad9b1..0da59a9 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
  
  [[package]]
  name = "coucou"
--version = "0.5.1"
-+version = "0.5.1-sendoa.5"
+-version = "0.5.3"
++version = "0.5.3-sendoa.1"
  dependencies = [
   "arboard",
   "cpal",
-@@ -754,7 +754,7 @@ dependencies = [
+@@ -755,7 +755,7 @@ dependencies = [
  
  [[package]]
  name = "coucou-hook"
--version = "0.5.1"
-+version = "0.5.1-sendoa.5"
+-version = "0.5.3"
++version = "0.5.3-sendoa.1"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 435cdab..1f256ae 100644
+index 9c8410e..2daf4f7 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
  resolver = "2"
  
  [workspace.package]
--version = "0.5.1"
-+version = "0.5.1-sendoa.5"
+-version = "0.5.3"
++version = "0.5.3-sendoa.1"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index 1e18d83..efa417f 100644
+index d5977dc..3729693 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
--  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.5",
+-  "version": "0.5.3",
++  "version": "0.5.3-sendoa.1",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
--      "version": "0.5.1",
-+      "version": "0.5.1-sendoa.5",
+-      "version": "0.5.3",
++      "version": "0.5.3-sendoa.1",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 78f5c72..60357f7 100644
+index 9113b8f..e74416e 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
  {
    "name": "coucou-windows",
    "private": true,
--  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.5",
+-  "version": "0.5.3",
++  "version": "0.5.3-sendoa.1",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1248,15 +1248,15 @@ index 36aa761..49603b5 100644
              candidates.push(parent.join("../release").join(platform::HOOK_EXE));
              // Belt and braces: where the old glob form used to land it.
 diff --git a/windows/src-tauri/src/integrations.rs b/windows/src-tauri/src/integrations.rs
-index 14969e4..ec537c0 100644
+index e41e226..b794ab7 100644
 --- a/windows/src-tauri/src/integrations.rs
 +++ b/windows/src-tauri/src/integrations.rs
 @@ -17,7 +17,7 @@ use serde_json::{json, Value};
  use tauri::{AppHandle, Emitter, Manager};
  use tokio::sync::Notify;
  
--use crate::github::{self, GitHubActivity, GitHubPulse};
-+use crate::github::{self, GitHubActivity, GitHubPulse, GitHubDashboard, GitHubRepository, GitHubCommit, GitHubPipeline};
+-use crate::github::{self, CiState, ContributionDay, GitHubActivity, GitHubPr, GitHubPulse, GitHubRepoCi, ReviewState};
++use crate::github::{self, CiState, ContributionDay, GitHubActivity, GitHubPr, GitHubPulse, GitHubRepoCi, ReviewState, GitHubDashboard, GitHubRepository, GitHubCommit, GitHubPipeline};
  use crate::island::WINDOW_LABEL;
  use crate::log;
  use crate::secrets;
@@ -1265,19 +1265,19 @@ index 14969e4..ec537c0 100644
      spawn(app.clone(), "integration_stripe", 6, 30, poll_stripe);
      spawn(app.clone(), "integration_resend", 6, 60, poll_resend);
 -    spawn(app.clone(), "integration_github", 7, 300, poll_github);
+     spawn(app.clone(), "integration_gitlab", 7, 300, poll_gitlab);
+     spawn(app.clone(), "integration_gitea", 7, 300, poll_gitea);
      spawn_github_loops(app.clone());
-     spawn(app.clone(), "integration_calcom", 8, 300, poll_calcom);
-     spawn(app, "integration_notion", 9, 300, poll_notion);
-@@ -113,7 +112,7 @@ pub async fn poll_once(app: AppHandle, id: &str) {
+@@ -115,7 +114,7 @@ pub async fn poll_once(app: AppHandle, id: &str) {
          "integration_github" => {
              wake_github_pulse();
              github_refresh_if_stale("activity");
 -            poll_github(app).await
 +            GITHUB.dashboard_wake.notify_one();
          }
-         "integration_vercel" => poll_vercel(app).await,
-         "integration_n8n" => poll_n8n(app).await,
-@@ -275,6 +274,7 @@ async fn poll_stripe(app: AppHandle) {
+         "integration_gitlab" => poll_gitlab(app).await,
+         "integration_gitea" => poll_gitea(app).await,
+@@ -522,6 +521,7 @@ async fn poll_stripe(app: AppHandle) {
  
  async fn poll_github(app: AppHandle) {
      let Some(token) = secrets::get("github-token") else { return };
@@ -1285,7 +1285,7 @@ index 14969e4..ec537c0 100644
      let http = client();
  
      let user = http
-@@ -302,32 +302,78 @@ async fn poll_github(app: AppHandle) {
+@@ -549,32 +549,78 @@ async fn poll_github(app: AppHandle) {
          .and_then(Value::as_i64)
          .unwrap_or(0);
  
@@ -1387,7 +1387,7 @@ index 14969e4..ec537c0 100644
  // ── GitHub pulse and activity (GithubPoller.swift) ────────────────────────────
  //
  // Two more loops next to the stats above, with the Mac cadence: the pulse (my
-@@ -348,6 +394,7 @@ struct GitHubCache {
+@@ -595,6 +641,7 @@ struct GitHubCache {
      stats: Option<(i64, i64)>,
      pulse: Option<GitHubPulse>,
      activity: Option<GitHubActivity>,
@@ -1395,7 +1395,7 @@ index 14969e4..ec537c0 100644
  }
  
  struct GitHubLoops {
-@@ -358,6 +405,8 @@ struct GitHubLoops {
+@@ -605,6 +652,8 @@ struct GitHubLoops {
      activity_wake: Notify,
      pulse_busy: AtomicBool,
      activity_busy: AtomicBool,
@@ -1404,7 +1404,7 @@ index 14969e4..ec537c0 100644
  }
  
  static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| GitHubLoops {
-@@ -367,6 +416,8 @@ static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| Gi
+@@ -614,6 +663,8 @@ static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| Gi
      activity_wake: Notify::new(),
      pulse_busy: AtomicBool::new(false),
      activity_busy: AtomicBool::new(false),
@@ -1413,7 +1413,7 @@ index 14969e4..ec537c0 100644
  });
  
  fn now_ms() -> u64 {
-@@ -389,6 +440,9 @@ fn github_card_data(cache: &GitHubCache) -> Value {
+@@ -636,6 +687,9 @@ fn github_card_data(cache: &GitHubCache) -> Value {
      if let Some(activity) = &cache.activity {
          data.insert("activity".into(), serde_json::to_value(activity).unwrap_or(Value::Null));
      }
@@ -1423,7 +1423,7 @@ index 14969e4..ec537c0 100644
      Value::Object(data)
  }
  
-@@ -398,6 +452,23 @@ fn emit_github(app: &AppHandle) {
+@@ -645,6 +699,23 @@ fn emit_github(app: &AppHandle) {
  }
  
  fn spawn_github_loops(app: AppHandle) {
@@ -1447,7 +1447,7 @@ index 14969e4..ec537c0 100644
      let pulse_app = app.clone();
      tauri::async_runtime::spawn(async move {
          let mut wait = Duration::from_secs(10);
-@@ -510,6 +581,10 @@ pub fn github_refresh_if_stale(section: &str) {
+@@ -757,6 +828,10 @@ pub fn github_refresh_if_stale(section: &str) {
      let cache = GITHUB.cache.lock().unwrap();
      match section {
          "pulse" => {
@@ -1458,7 +1458,7 @@ index 14969e4..ec537c0 100644
              let fetched = cache.pulse.as_ref().map(|p| p.fetched_at);
              if !GITHUB.pulse_busy.load(Ordering::SeqCst) && github::is_stale(fetched, now, 60) {
                  GITHUB.pulse_wake.notify_one();
-@@ -534,6 +609,7 @@ pub fn github_token_changed(app: &AppHandle) {
+@@ -781,6 +856,7 @@ pub fn github_token_changed(app: &AppHandle) {
          let mut cache = GITHUB.cache.lock().unwrap();
          cache.pulse = None;
          cache.activity = None;
@@ -1466,7 +1466,7 @@ index 14969e4..ec537c0 100644
          if !has_token {
              cache.stats = None;
          }
-@@ -542,7 +618,7 @@ pub fn github_token_changed(app: &AppHandle) {
+@@ -789,7 +865,7 @@ pub fn github_token_changed(app: &AppHandle) {
      GITHUB.pulse_wake.notify_one();
      GITHUB.activity_wake.notify_one();
      if has_token && !PAUSED.load(Ordering::Relaxed) && enabled(app, GITHUB_ID) {
@@ -1475,7 +1475,7 @@ index 14969e4..ec537c0 100644
      }
  }
  
-@@ -552,11 +628,13 @@ pub fn settings_saved(app: &AppHandle, active_integrations: &[String]) {
+@@ -799,11 +875,13 @@ pub fn settings_saved(app: &AppHandle, active_integrations: &[String]) {
      if active_integrations.iter().any(|id| id == GITHUB_ID) {
          return;
      }
@@ -1517,7 +1517,7 @@ index b7cf921..d200ffb 100644
      let y = mp.y;
  
 diff --git a/windows/src-tauri/src/lib.rs b/windows/src-tauri/src/lib.rs
-index 72d420e..73dc8c5 100644
+index 5e544f8..4d5828f 100644
 --- a/windows/src-tauri/src/lib.rs
 +++ b/windows/src-tauri/src/lib.rs
 @@ -4,6 +4,8 @@ mod agent_hooks;
@@ -1529,7 +1529,7 @@ index 72d420e..73dc8c5 100644
  mod codex_plan;
  mod config_file;
  mod desktop;
-@@ -445,6 +447,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
+@@ -489,6 +491,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
      tauri::async_runtime::spawn_blocking(codex_plan::read).await.ok().flatten()
  }
  
@@ -1593,7 +1593,7 @@ index 72d420e..73dc8c5 100644
  #[tauri::command]
  fn approval_decision(app: AppHandle, request_id: String, decision: String) {
      recap::record_decision(&app, &request_id, &decision);
-@@ -783,6 +842,12 @@ pub fn run() {
+@@ -836,6 +895,12 @@ pub fn run() {
              status_line_preview,
              status_line_apply,
              codex_plan_usage,
@@ -2496,15 +2496,15 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index f289dc5..cdf2d2e 100644
+index 0be3d46..a3a515d 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
  {
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
--  "version": "0.5.1",
-+  "version": "0.5.1-sendoa.5",
+-  "version": "0.5.3",
++  "version": "0.5.3-sendoa.1",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -2544,10 +2544,10 @@ index 0000000..bcc44bc
 +  return `${symbol} ${t(label)}`;
 +}
 diff --git a/windows/src/core/bridge.ts b/windows/src/core/bridge.ts
-index 4fd245c..6164cd4 100644
+index ce2f2c4..62f8bef 100644
 --- a/windows/src/core/bridge.ts
 +++ b/windows/src/core/bridge.ts
-@@ -23,6 +23,15 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
+@@ -24,6 +24,15 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
    }
  }
  
@@ -2563,7 +2563,7 @@ index 4fd245c..6164cd4 100644
  export interface BootInfo {
    settings: Settings;
    /** Logical screen rect of the monitor the island lives on. */
-@@ -181,6 +190,7 @@ export interface PhoneAnswersStatus {
+@@ -205,6 +214,7 @@ export interface PhoneAnswersStatus {
  
  export const Bridge = {
    boot: () => call<BootInfo>("boot"),
@@ -2571,7 +2571,7 @@ index 4fd245c..6164cd4 100644
    /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
    setSystemLanguages: (languages: string[]) => call<void>("set_system_languages", { languages }),
  
-@@ -329,6 +339,12 @@ export const Bridge = {
+@@ -362,6 +372,12 @@ export const Bridge = {
  
    // ── Chat, files, secrets ──────────────────────────────────────────────────
    /** One chat turn. The API key and any file bytes never leave Rust. */
@@ -2668,7 +2668,7 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/core/layout.ts b/windows/src/core/layout.ts
-index ba07e13..9684919 100644
+index 3b88a1d..8314232 100644
 --- a/windows/src/core/layout.ts
 +++ b/windows/src/core/layout.ts
 @@ -5,6 +5,7 @@
@@ -2679,7 +2679,7 @@ index ba07e13..9684919 100644
    | "overview"
    | "empty"
    | "approval"
-@@ -53,8 +54,8 @@ export interface ViewLayout {
+@@ -54,8 +55,8 @@ export interface ViewLayout {
  
  // The window is a fixed 720×320 (largest view) like the macOS panel; the island is
  // drawn inside it, glued to the top edge and horizontally centred.
@@ -2690,7 +2690,7 @@ index ba07e13..9684919 100644
  
  // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
  export const NOTCH_W = 184;
-@@ -70,6 +71,7 @@ export const WAKE_STRIP_W = 240;
+@@ -71,6 +72,7 @@ export const WAKE_STRIP_W = 240;
  export const WAKE_STRIP_H = 6;
  
  export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
@@ -2698,7 +2698,7 @@ index ba07e13..9684919 100644
    overview: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "pills" },
    empty: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
    approval: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "column" },
-@@ -124,7 +126,7 @@ export function islandSize(
+@@ -128,7 +130,7 @@ export function islandSize(
        return { w: COMPACT_W, h: NOTCH_H };
      case "expanded": {
        const h = view === "prompt" ? chatPromptHeight(chatCount) : VIEW_LAYOUTS[view].height;
@@ -2707,7 +2707,7 @@ index ba07e13..9684919 100644
      }
    }
  }
-@@ -178,16 +180,17 @@ export function botGlowColor(s: BotStateName): string {
+@@ -182,16 +184,17 @@ export function botGlowColor(s: BotStateName): string {
        return "#A78BFA";
      case "searching":
        return "#6366F1";
@@ -2730,7 +2730,7 @@ index ba07e13..9684919 100644
    }
  }
  
-@@ -237,13 +240,13 @@ export type Wash = "red" | "green" | "pink" | "amber" | "cyan" | "indigo" | "sof
+@@ -241,13 +244,13 @@ export type Wash = "red" | "green" | "pink" | "amber" | "cyan" | "indigo" | "sof
  export function washRGBA(wash: Wash): string {
    switch (wash) {
      case "red":
@@ -3243,349 +3243,349 @@ index 252a0f1..ff2a971 100644
      }
      statusLine.append(h("i", { class: "dot", style: `background:${color}` }), h("span", { text }));
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 4bbfe79..f0e2270 100644
+index 06e3c49..677fcb8 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
-@@ -1811,7 +1811,7 @@
-   "Ready": {
-    "zh-Hans": "就绪",
-    "hi": "तैयार",
--   "es": "Listo",
-+   "es": "Disponible",
-    "ar": "جاهز",
-    "fr": "Prêt",
-    "bn": "প্রস্তুত",
-@@ -5116,6 +5116,331 @@
-    "id": "Perbarui Coucou ke {version}…",
-    "de": "Coucou auf {version} aktualisieren…",
-    "tr": "Coucou'yu {version} sürümüne güncelle…"
-+  },
-+  "Latest commits": {
-+   "es": "Últimos commits",
-+   "zh-Hans": "最新提交",
-+   "hi": "नवीनतम कमिट",
-+   "ar": "أحدث عمليات الإيداع",
-+   "fr": "Derniers commits",
-+   "bn": "সর্বশেষ কমিট",
-+   "pt-BR": "Últimos commits",
-+   "ru": "Последние коммиты",
-+   "id": "Commit terbaru",
-+   "de": "Letzte Commits",
-+   "tr": "Son commitler"
-+  },
-+  "Running pipelines": {
-+   "es": "Pipelines activos",
-+   "zh-Hans": "运行中的流水线",
-+   "hi": "चल रही पाइपलाइन",
-+   "ar": "خطوط التنفيذ النشطة",
-+   "fr": "Pipelines en cours",
-+   "bn": "চলমান পাইপলাইন",
-+   "pt-BR": "Pipelines em execução",
-+   "ru": "Выполняющиеся пайплайны",
-+   "id": "Pipeline yang berjalan",
-+   "de": "Laufende Pipelines",
-+   "tr": "Çalışan işlem hatları"
-+  },
-+  "No repositories visible. Check token access.": {
-+   "es": "Sin repositorios visibles. Revisa el acceso del token.",
-+   "zh-Hans": "没有可见的仓库。请检查令牌的访问权限。",
-+   "hi": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। टोकन की पहुँच जाँचें।",
-+   "ar": "لا توجد مستودعات مرئية. تحقق من وصول الرمز.",
-+   "fr": "Aucun dépôt visible. Vérifiez les accès du jeton.",
-+   "bn": "কোনো রিপোজিটরি দেখা যাচ্ছে না। টোকেনের অ্যাক্সেস পরীক্ষা করুন।",
-+   "pt-BR": "Nenhum repositório visível. Verifique o acesso do token.",
-+   "ru": "Нет доступных репозиториев. Проверьте доступ токена.",
-+   "id": "Tidak ada repositori yang terlihat. Periksa akses token.",
-+   "de": "Keine Repositorys sichtbar. Token-Zugriff prüfen.",
-+   "tr": "Görünür depo yok. Token erişimini kontrol edin."
-+  },
-+  "No commits available.": {
-+   "es": "Sin commits disponibles.",
-+   "zh-Hans": "没有可用的提交。",
-+   "hi": "कोई कमिट उपलब्ध नहीं है।",
-+   "ar": "لا توجد عمليات إيداع متاحة.",
-+   "fr": "Aucun commit disponible.",
-+   "bn": "কোনো কমিট পাওয়া যায়নি।",
-+   "pt-BR": "Nenhum commit disponível.",
-+   "ru": "Нет доступных коммитов.",
-+   "id": "Tidak ada commit yang tersedia.",
-+   "de": "Keine Commits verfügbar.",
-+   "tr": "Kullanılabilir commit yok."
-+  },
-+  "No pipelines running.": {
-+   "es": "No hay pipelines en ejecución.",
-+   "zh-Hans": "没有正在运行的流水线。",
-+   "hi": "कोई पाइपलाइन नहीं चल रही।",
-+   "ar": "لا توجد خطوط تنفيذ نشطة.",
-+   "fr": "Aucun pipeline en cours.",
-+   "bn": "কোনো পাইপলাইন চলছে না।",
-+   "pt-BR": "Nenhum pipeline em execução.",
-+   "ru": "Нет выполняющихся пайплайнов.",
-+   "id": "Tidak ada pipeline yang berjalan.",
-+   "de": "Keine Pipelines aktiv.",
-+   "tr": "Çalışan işlem hattı yok."
-+  },
-+  "Check token permissions to load this section.": {
-+   "es": "Revisa los permisos del token para ver este apartado.",
-+   "zh-Hans": "请检查令牌权限以加载此部分。",
-+   "hi": "यह अनुभाग लोड करने के लिए टोकन की अनुमतियाँ जाँचें।",
-+   "ar": "تحقق من أذونات الرمز لتحميل هذا القسم.",
-+   "fr": "Vérifiez les permissions du jeton pour charger cette section.",
-+   "bn": "এই বিভাগ লোড করতে টোকেনের অনুমতি পরীক্ষা করুন।",
-+   "pt-BR": "Verifique as permissões do token para carregar esta seção.",
-+   "ru": "Проверьте разрешения токена для загрузки этого раздела.",
-+   "id": "Periksa izin token untuk memuat bagian ini.",
-+   "de": "Token-Berechtigungen prüfen, um diesen Bereich zu laden.",
-+   "tr": "Bu bölümü yüklemek için token izinlerini kontrol edin."
-+  },
-+  "Partial": {
-+   "es": "Parcial",
-+   "zh-Hans": "部分",
-+   "hi": "आंशिक",
-+   "ar": "جزئي",
-+   "fr": "Partiel",
-+   "bn": "আংশিক",
-+   "pt-BR": "Parcial",
-+   "ru": "Частично",
-+   "id": "Sebagian",
-+   "de": "Teilweise",
-+   "tr": "Kısmi"
-+  },
-+  "Private": {
-+   "es": "Privado",
-+   "zh-Hans": "私有",
-+   "hi": "निजी",
-+   "ar": "خاص",
-+   "fr": "Privé",
-+   "bn": "ব্যক্তিগত",
-+   "pt-BR": "Privado",
-+   "ru": "Приватный",
-+   "id": "Pribadi",
-+   "de": "Privat",
-+   "tr": "Özel"
-+  },
-+  "Last updated": {
-+   "es": "Última actualización",
-+   "zh-Hans": "最后更新",
-+   "hi": "अंतिम अपडेट",
-+   "ar": "آخر تحديث",
-+   "fr": "Dernière mise à jour",
-+   "bn": "সর্বশেষ আপডেট",
-+   "pt-BR": "Última atualização",
-+   "ru": "Последнее обновление",
-+   "id": "Terakhir diperbarui",
-+   "de": "Zuletzt aktualisiert",
-+   "tr": "Son güncelleme"
-+  },
-+  "Reviews": {
-+   "es": "Revisiones",
-+   "zh-Hans": "审查",
-+   "hi": "समीक्षाएँ",
-+   "ar": "المراجعات",
-+   "fr": "Revues",
-+   "bn": "পর্যালোচনা",
-+   "pt-BR": "Revisões",
-+   "ru": "Проверки",
-+   "id": "Ulasan",
-+   "de": "Reviews",
-+   "tr": "İncelemeler"
-+  },
-+  "Open {player}": {
-+   "zh-Hans": "打开 {player}",
-+   "hi": "{player} खोलें",
-+   "es": "Abrir {player}",
-+   "ar": "فتح {player}",
-+   "fr": "Ouvrir {player}",
-+   "bn": "{player} খুলুন",
-+   "pt-BR": "Abrir o {player}",
-+   "ru": "Открыть {player}",
-+   "id": "Buka {player}",
-+   "de": "{player} öffnen",
-+   "tr": "{player} aç"
-+  },
-+  "{0} — open {player}": {
-+   "zh-Hans": "{0} — 打开 {player}",
-+   "hi": "{0} — {player} खोलें",
-+   "es": "{0} — abrir {player}",
-+   "ar": "{0} — فتح {player}",
-+   "fr": "{0} — ouvrir {player}",
-+   "bn": "{0} — {player} খুলুন",
-+   "pt-BR": "{0} — abrir o {player}",
-+   "ru": "{0} — открыть {player}",
-+   "id": "{0} — buka {player}",
-+   "de": "{0} — {player} öffnen",
-+   "tr": "{0} — {player} aç"
-+  },
-+  "Agent room": {
-+   "es": "Sala de agentes",
-+   "zh-Hans": "智能体工作室",
-+   "hi": "एजेंट कक्ष",
-+   "ar": "غرفة الوكلاء",
-+   "fr": "Salle des agents",
-+   "bn": "এজেন্ট কক্ষ",
-+   "pt-BR": "Sala de agentes",
-+   "ru": "Комната агентов",
-+   "id": "Ruang agen",
-+   "de": "Agentenraum",
-+   "tr": "Ajan odası"
-+  },
-+  "Connect an agent in Settings to see its activity here.": {
-+   "es": "Conecta un agente en Ajustes para ver su actividad aquí.",
-+   "zh-Hans": "在设置中连接智能体，即可在此查看其活动。",
-+   "hi": "यहाँ गतिविधि देखने के लिए सेटिंग में एजेंट जोड़ें।",
-+   "ar": "اربط وكيلاً في الإعدادات لعرض نشاطه هنا.",
-+   "fr": "Connectez un agent dans les réglages pour voir son activité ici.",
-+   "bn": "এখানে কাজ দেখতে সেটিংসে একটি এজেন্ট সংযুক্ত করুন।",
-+   "pt-BR": "Conecte um agente nos Ajustes para ver sua atividade aqui.",
-+   "ru": "Подключите агента в настройках, чтобы видеть его действия здесь.",
-+   "id": "Hubungkan agen di Pengaturan untuk melihat aktivitasnya di sini.",
-+   "de": "Verbinde einen Agenten in den Einstellungen, um hier seine Aktivität zu sehen.",
-+   "tr": "Etkinliğini burada görmek için Ayarlar bölümünde bir ajan bağlayın."
-+  },
-+  "Live hook activity · Select a desk to see details": {
-+   "es": "Actividad recibida en directo · Pulsa un puesto para ver el detalle",
-+   "zh-Hans": "实时钩子活动 · 选择工位查看详情",
-+   "hi": "लाइव हुक गतिविधि · विवरण के लिए डेस्क चुनें",
-+   "ar": "نشاط مباشر عبر الخطافات · اختر مكتباً لعرض التفاصيل",
-+   "fr": "Activité des hooks en direct · Sélectionnez un bureau pour les détails",
-+   "bn": "সরাসরি হুক কার্যকলাপ · বিস্তারিত দেখতে ডেস্ক বাছুন",
-+   "pt-BR": "Atividade dos hooks ao vivo · Selecione uma mesa para ver detalhes",
-+   "ru": "События хуков в реальном времени · Выберите стол для подробностей",
-+   "id": "Aktivitas hook langsung · Pilih meja untuk melihat detail",
-+   "de": "Live-Hook-Aktivität · Wähle einen Arbeitsplatz für Details",
-+   "tr": "Canlı hook etkinliği · Ayrıntılar için bir masa seçin"
-+  },
-+  "Waiting for activity": {
-+   "es": "Esperando actividad",
-+   "zh-Hans": "等待活动",
-+   "hi": "गतिविधि की प्रतीक्षा",
-+   "ar": "بانتظار النشاط",
-+   "fr": "En attente d’activité",
-+   "bn": "কাজের অপেক্ষায়",
-+   "pt-BR": "Aguardando atividade",
-+   "ru": "Ожидание активности",
-+   "id": "Menunggu aktivitas",
-+   "de": "Warten auf Aktivität",
-+   "tr": "Etkinlik bekleniyor"
-+  },
-+  "Working": {
-+   "es": "Trabajando",
-+   "zh-Hans": "工作中",
-+   "hi": "काम जारी",
-+   "ar": "يعمل",
-+   "fr": "Au travail",
-+   "bn": "কাজ করছে",
-+   "pt-BR": "Trabalhando",
-+   "ru": "Работает",
-+   "id": "Bekerja",
-+   "de": "Arbeitet",
-+   "tr": "Çalışıyor"
-+  },
-+  "Thinking": {
-+   "es": "Pensando",
-+   "zh-Hans": "思考中",
-+   "hi": "सोच रहा है",
-+   "ar": "يفكر",
-+   "fr": "Réfléchit",
-+   "bn": "ভাবছে",
-+   "pt-BR": "Pensando",
-+   "ru": "Думает",
-+   "id": "Berpikir",
-+   "de": "Denkt nach",
-+   "tr": "Düşünüyor"
-+  },
-+  "Searching": {
-+   "es": "Buscando",
-+   "zh-Hans": "搜索中",
-+   "hi": "खोज जारी",
-+   "ar": "يبحث",
-+   "fr": "Recherche",
-+   "bn": "খুঁজছে",
-+   "pt-BR": "Buscando",
-+   "ru": "Ищет",
-+   "id": "Mencari",
-+   "de": "Sucht",
-+   "tr": "Arıyor"
-+  },
-+  "Needs permission": {
-+   "es": "Necesita permiso",
-+   "zh-Hans": "需要许可",
-+   "hi": "अनुमति चाहिए",
-+   "ar": "يحتاج إلى إذن",
-+   "fr": "Autorisation requise",
-+   "bn": "অনুমতি প্রয়োজন",
-+   "pt-BR": "Precisa de permissão",
-+   "ru": "Нужно разрешение",
-+   "id": "Perlu izin",
-+   "de": "Benötigt Erlaubnis",
-+   "tr": "İzin gerekiyor"
-+  },
-+  "Needs an answer": {
-+   "es": "Espera una respuesta",
-+   "zh-Hans": "等待回答",
-+   "hi": "जवाब चाहिए",
-+   "ar": "ينتظر إجابة",
-+   "fr": "Attend une réponse",
-+   "bn": "উত্তর প্রয়োজন",
-+   "pt-BR": "Aguardando resposta",
-+   "ru": "Ждёт ответа",
-+   "id": "Menunggu jawaban",
-+   "de": "Benötigt eine Antwort",
-+   "tr": "Yanıt gerekiyor"
-+  },
-+  "Finished": {
-+   "es": "Terminado",
-+   "zh-Hans": "已完成",
-+   "hi": "पूरा हुआ",
-+   "ar": "مكتمل",
-+   "fr": "Terminé",
-+   "bn": "সম্পন্ন",
-+   "pt-BR": "Concluído",
-+   "ru": "Завершено",
-+   "id": "Selesai",
-+   "de": "Fertig",
-+   "tr": "Tamamlandı"
-+  },
-+  "Rate limited": {
-+   "es": "Límite alcanzado",
-+   "zh-Hans": "达到速率限制",
-+   "hi": "दर सीमा पहुँची",
-+   "ar": "تم بلوغ حد المعدل",
-+   "fr": "Limite atteinte",
-+   "bn": "সীমায় পৌঁছেছে",
-+   "pt-BR": "Limite atingido",
-+   "ru": "Достигнут лимит",
-+   "id": "Batas tercapai",
-+   "de": "Ratenlimit erreicht",
-+   "tr": "Hız sınırına ulaşıldı"
-+  },
-+  "Sleeping": {
-+   "es": "Descansando",
-+   "zh-Hans": "休息中",
-+   "hi": "विश्राम",
-+   "ar": "يستريح",
-+   "fr": "Au repos",
-+   "bn": "বিশ্রাম নিচ্ছে",
-+   "pt-BR": "Descansando",
-+   "ru": "Отдыхает",
-+   "id": "Beristirahat",
-+   "de": "Schläft",
-+   "tr": "Uyuyor"
-+  },
-+  "Recovering": {
-+   "es": "Recuperándose",
-+   "zh-Hans": "恢复中",
-+   "hi": "पुनर्प्राप्ति जारी",
-+   "ar": "جارٍ التعافي",
-+   "fr": "Récupération",
-+   "bn": "পুনরুদ্ধার চলছে",
-+   "pt-BR": "Recuperando",
-+   "ru": "Восстанавливается",
-+   "id": "Memulihkan",
-+   "de": "Erholt sich",
-+   "tr": "Toparlanıyor"
+@@ -1824,7 +1824,7 @@
+     "Ready": {
+       "zh-Hans": "就绪",
+       "hi": "तैयार",
+-      "es": "Listo",
++      "es": "Disponible",
+       "ar": "جاهز",
+       "fr": "Prêt",
+       "bn": "প্রস্তুত",
+@@ -6091,6 +6091,331 @@
+       "id": "Matikan pil lain untuk memberi tempat bagi WhatsApp (maksimal {max}).",
+       "de": "Schalte eine andere Pill aus, um Platz für WhatsApp zu schaffen (höchstens {max}).",
+       "tr": "WhatsApp’a yer açmak için başka bir hapı kapat (en fazla {max})."
++    },
++    "Latest commits": {
++      "es": "Últimos commits",
++      "zh-Hans": "最新提交",
++      "hi": "नवीनतम कमिट",
++      "ar": "أحدث عمليات الإيداع",
++      "fr": "Derniers commits",
++      "bn": "সর্বশেষ কমিট",
++      "pt-BR": "Últimos commits",
++      "ru": "Последние коммиты",
++      "id": "Commit terbaru",
++      "de": "Letzte Commits",
++      "tr": "Son commitler"
++    },
++    "Running pipelines": {
++      "es": "Pipelines activos",
++      "zh-Hans": "运行中的流水线",
++      "hi": "चल रही पाइपलाइन",
++      "ar": "خطوط التنفيذ النشطة",
++      "fr": "Pipelines en cours",
++      "bn": "চলমান পাইপলাইন",
++      "pt-BR": "Pipelines em execução",
++      "ru": "Выполняющиеся пайплайны",
++      "id": "Pipeline yang berjalan",
++      "de": "Laufende Pipelines",
++      "tr": "Çalışan işlem hatları"
++    },
++    "No repositories visible. Check token access.": {
++      "es": "Sin repositorios visibles. Revisa el acceso del token.",
++      "zh-Hans": "没有可见的仓库。请检查令牌的访问权限。",
++      "hi": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। टोकन की पहुँच जाँचें।",
++      "ar": "لا توجد مستودعات مرئية. تحقق من وصول الرمز.",
++      "fr": "Aucun dépôt visible. Vérifiez les accès du jeton.",
++      "bn": "কোনো রিপোজিটরি দেখা যাচ্ছে না। টোকেনের অ্যাক্সেস পরীক্ষা করুন।",
++      "pt-BR": "Nenhum repositório visível. Verifique o acesso do token.",
++      "ru": "Нет доступных репозиториев. Проверьте доступ токена.",
++      "id": "Tidak ada repositori yang terlihat. Periksa akses token.",
++      "de": "Keine Repositorys sichtbar. Token-Zugriff prüfen.",
++      "tr": "Görünür depo yok. Token erişimini kontrol edin."
++    },
++    "No commits available.": {
++      "es": "Sin commits disponibles.",
++      "zh-Hans": "没有可用的提交。",
++      "hi": "कोई कमिट उपलब्ध नहीं है।",
++      "ar": "لا توجد عمليات إيداع متاحة.",
++      "fr": "Aucun commit disponible.",
++      "bn": "কোনো কমিট পাওয়া যায়নি।",
++      "pt-BR": "Nenhum commit disponível.",
++      "ru": "Нет доступных коммитов.",
++      "id": "Tidak ada commit yang tersedia.",
++      "de": "Keine Commits verfügbar.",
++      "tr": "Kullanılabilir commit yok."
++    },
++    "No pipelines running.": {
++      "es": "No hay pipelines en ejecución.",
++      "zh-Hans": "没有正在运行的流水线。",
++      "hi": "कोई पाइपलाइन नहीं चल रही।",
++      "ar": "لا توجد خطوط تنفيذ نشطة.",
++      "fr": "Aucun pipeline en cours.",
++      "bn": "কোনো পাইপলাইন চলছে না।",
++      "pt-BR": "Nenhum pipeline em execução.",
++      "ru": "Нет выполняющихся пайплайнов.",
++      "id": "Tidak ada pipeline yang berjalan.",
++      "de": "Keine Pipelines aktiv.",
++      "tr": "Çalışan işlem hattı yok."
++    },
++    "Check token permissions to load this section.": {
++      "es": "Revisa los permisos del token para ver este apartado.",
++      "zh-Hans": "请检查令牌权限以加载此部分。",
++      "hi": "यह अनुभाग लोड करने के लिए टोकन की अनुमतियाँ जाँचें।",
++      "ar": "تحقق من أذونات الرمز لتحميل هذا القسم.",
++      "fr": "Vérifiez les permissions du jeton pour charger cette section.",
++      "bn": "এই বিভাগ লোড করতে টোকেনের অনুমতি পরীক্ষা করুন।",
++      "pt-BR": "Verifique as permissões do token para carregar esta seção.",
++      "ru": "Проверьте разрешения токена для загрузки этого раздела.",
++      "id": "Periksa izin token untuk memuat bagian ini.",
++      "de": "Token-Berechtigungen prüfen, um diesen Bereich zu laden.",
++      "tr": "Bu bölümü yüklemek için token izinlerini kontrol edin."
++    },
++    "Partial": {
++      "es": "Parcial",
++      "zh-Hans": "部分",
++      "hi": "आंशिक",
++      "ar": "جزئي",
++      "fr": "Partiel",
++      "bn": "আংশিক",
++      "pt-BR": "Parcial",
++      "ru": "Частично",
++      "id": "Sebagian",
++      "de": "Teilweise",
++      "tr": "Kısmi"
++    },
++    "Private": {
++      "es": "Privado",
++      "zh-Hans": "私有",
++      "hi": "निजी",
++      "ar": "خاص",
++      "fr": "Privé",
++      "bn": "ব্যক্তিগত",
++      "pt-BR": "Privado",
++      "ru": "Приватный",
++      "id": "Pribadi",
++      "de": "Privat",
++      "tr": "Özel"
++    },
++    "Last updated": {
++      "es": "Última actualización",
++      "zh-Hans": "最后更新",
++      "hi": "अंतिम अपडेट",
++      "ar": "آخر تحديث",
++      "fr": "Dernière mise à jour",
++      "bn": "সর্বশেষ আপডেট",
++      "pt-BR": "Última atualização",
++      "ru": "Последнее обновление",
++      "id": "Terakhir diperbarui",
++      "de": "Zuletzt aktualisiert",
++      "tr": "Son güncelleme"
++    },
++    "Reviews": {
++      "es": "Revisiones",
++      "zh-Hans": "审查",
++      "hi": "समीक्षाएँ",
++      "ar": "المراجعات",
++      "fr": "Revues",
++      "bn": "পর্যালোচনা",
++      "pt-BR": "Revisões",
++      "ru": "Проверки",
++      "id": "Ulasan",
++      "de": "Reviews",
++      "tr": "İncelemeler"
++    },
++    "Open {player}": {
++      "zh-Hans": "打开 {player}",
++      "hi": "{player} खोलें",
++      "es": "Abrir {player}",
++      "ar": "فتح {player}",
++      "fr": "Ouvrir {player}",
++      "bn": "{player} খুলুন",
++      "pt-BR": "Abrir o {player}",
++      "ru": "Открыть {player}",
++      "id": "Buka {player}",
++      "de": "{player} öffnen",
++      "tr": "{player} aç"
++    },
++    "{0} — open {player}": {
++      "zh-Hans": "{0} — 打开 {player}",
++      "hi": "{0} — {player} खोलें",
++      "es": "{0} — abrir {player}",
++      "ar": "{0} — فتح {player}",
++      "fr": "{0} — ouvrir {player}",
++      "bn": "{0} — {player} খুলুন",
++      "pt-BR": "{0} — abrir o {player}",
++      "ru": "{0} — открыть {player}",
++      "id": "{0} — buka {player}",
++      "de": "{0} — {player} öffnen",
++      "tr": "{0} — {player} aç"
++    },
++    "Agent room": {
++      "es": "Sala de agentes",
++      "zh-Hans": "智能体工作室",
++      "hi": "एजेंट कक्ष",
++      "ar": "غرفة الوكلاء",
++      "fr": "Salle des agents",
++      "bn": "এজেন্ট কক্ষ",
++      "pt-BR": "Sala de agentes",
++      "ru": "Комната агентов",
++      "id": "Ruang agen",
++      "de": "Agentenraum",
++      "tr": "Ajan odası"
++    },
++    "Connect an agent in Settings to see its activity here.": {
++      "es": "Conecta un agente en Ajustes para ver su actividad aquí.",
++      "zh-Hans": "在设置中连接智能体，即可在此查看其活动。",
++      "hi": "यहाँ गतिविधि देखने के लिए सेटिंग में एजेंट जोड़ें।",
++      "ar": "اربط وكيلاً في الإعدادات لعرض نشاطه هنا.",
++      "fr": "Connectez un agent dans les réglages pour voir son activité ici.",
++      "bn": "এখানে কাজ দেখতে সেটিংসে একটি এজেন্ট সংযুক্ত করুন।",
++      "pt-BR": "Conecte um agente nos Ajustes para ver sua atividade aqui.",
++      "ru": "Подключите агента в настройках, чтобы видеть его действия здесь.",
++      "id": "Hubungkan agen di Pengaturan untuk melihat aktivitasnya di sini.",
++      "de": "Verbinde einen Agenten in den Einstellungen, um hier seine Aktivität zu sehen.",
++      "tr": "Etkinliğini burada görmek için Ayarlar bölümünde bir ajan bağlayın."
++    },
++    "Live hook activity · Select a desk to see details": {
++      "es": "Actividad recibida en directo · Pulsa un puesto para ver el detalle",
++      "zh-Hans": "实时钩子活动 · 选择工位查看详情",
++      "hi": "लाइव हुक गतिविधि · विवरण के लिए डेस्क चुनें",
++      "ar": "نشاط مباشر عبر الخطافات · اختر مكتباً لعرض التفاصيل",
++      "fr": "Activité des hooks en direct · Sélectionnez un bureau pour les détails",
++      "bn": "সরাসরি হুক কার্যকলাপ · বিস্তারিত দেখতে ডেস্ক বাছুন",
++      "pt-BR": "Atividade dos hooks ao vivo · Selecione uma mesa para ver detalhes",
++      "ru": "События хуков в реальном времени · Выберите стол для подробностей",
++      "id": "Aktivitas hook langsung · Pilih meja untuk melihat detail",
++      "de": "Live-Hook-Aktivität · Wähle einen Arbeitsplatz für Details",
++      "tr": "Canlı hook etkinliği · Ayrıntılar için bir masa seçin"
++    },
++    "Waiting for activity": {
++      "es": "Esperando actividad",
++      "zh-Hans": "等待活动",
++      "hi": "गतिविधि की प्रतीक्षा",
++      "ar": "بانتظار النشاط",
++      "fr": "En attente d’activité",
++      "bn": "কাজের অপেক্ষায়",
++      "pt-BR": "Aguardando atividade",
++      "ru": "Ожидание активности",
++      "id": "Menunggu aktivitas",
++      "de": "Warten auf Aktivität",
++      "tr": "Etkinlik bekleniyor"
++    },
++    "Working": {
++      "es": "Trabajando",
++      "zh-Hans": "工作中",
++      "hi": "काम जारी",
++      "ar": "يعمل",
++      "fr": "Au travail",
++      "bn": "কাজ করছে",
++      "pt-BR": "Trabalhando",
++      "ru": "Работает",
++      "id": "Bekerja",
++      "de": "Arbeitet",
++      "tr": "Çalışıyor"
++    },
++    "Thinking": {
++      "es": "Pensando",
++      "zh-Hans": "思考中",
++      "hi": "सोच रहा है",
++      "ar": "يفكر",
++      "fr": "Réfléchit",
++      "bn": "ভাবছে",
++      "pt-BR": "Pensando",
++      "ru": "Думает",
++      "id": "Berpikir",
++      "de": "Denkt nach",
++      "tr": "Düşünüyor"
++    },
++    "Searching": {
++      "es": "Buscando",
++      "zh-Hans": "搜索中",
++      "hi": "खोज जारी",
++      "ar": "يبحث",
++      "fr": "Recherche",
++      "bn": "খুঁজছে",
++      "pt-BR": "Buscando",
++      "ru": "Ищет",
++      "id": "Mencari",
++      "de": "Sucht",
++      "tr": "Arıyor"
++    },
++    "Needs permission": {
++      "es": "Necesita permiso",
++      "zh-Hans": "需要许可",
++      "hi": "अनुमति चाहिए",
++      "ar": "يحتاج إلى إذن",
++      "fr": "Autorisation requise",
++      "bn": "অনুমতি প্রয়োজন",
++      "pt-BR": "Precisa de permissão",
++      "ru": "Нужно разрешение",
++      "id": "Perlu izin",
++      "de": "Benötigt Erlaubnis",
++      "tr": "İzin gerekiyor"
++    },
++    "Needs an answer": {
++      "es": "Espera una respuesta",
++      "zh-Hans": "等待回答",
++      "hi": "जवाब चाहिए",
++      "ar": "ينتظر إجابة",
++      "fr": "Attend une réponse",
++      "bn": "উত্তর প্রয়োজন",
++      "pt-BR": "Aguardando resposta",
++      "ru": "Ждёт ответа",
++      "id": "Menunggu jawaban",
++      "de": "Benötigt eine Antwort",
++      "tr": "Yanıt gerekiyor"
++    },
++    "Finished": {
++      "es": "Terminado",
++      "zh-Hans": "已完成",
++      "hi": "पूरा हुआ",
++      "ar": "مكتمل",
++      "fr": "Terminé",
++      "bn": "সম্পন্ন",
++      "pt-BR": "Concluído",
++      "ru": "Завершено",
++      "id": "Selesai",
++      "de": "Fertig",
++      "tr": "Tamamlandı"
++    },
++    "Rate limited": {
++      "es": "Límite alcanzado",
++      "zh-Hans": "达到速率限制",
++      "hi": "दर सीमा पहुँची",
++      "ar": "تم بلوغ حد المعدل",
++      "fr": "Limite atteinte",
++      "bn": "সীমায় পৌঁছেছে",
++      "pt-BR": "Limite atingido",
++      "ru": "Достигнут лимит",
++      "id": "Batas tercapai",
++      "de": "Ratenlimit erreicht",
++      "tr": "Hız sınırına ulaşıldı"
++    },
++    "Sleeping": {
++      "es": "Descansando",
++      "zh-Hans": "休息中",
++      "hi": "विश्राम",
++      "ar": "يستريح",
++      "fr": "Au repos",
++      "bn": "বিশ্রাম নিচ্ছে",
++      "pt-BR": "Descansando",
++      "ru": "Отдыхает",
++      "id": "Beristirahat",
++      "de": "Schläft",
++      "tr": "Uyuyor"
++    },
++    "Recovering": {
++      "es": "Recuperándose",
++      "zh-Hans": "恢复中",
++      "hi": "पुनर्प्राप्ति जारी",
++      "ar": "جارٍ التعافي",
++      "fr": "Récupération",
++      "bn": "পুনরুদ্ধার চলছে",
++      "pt-BR": "Recuperando",
++      "ru": "Восстанавливается",
++      "id": "Memulihkan",
++      "de": "Erholt sich",
++      "tr": "Toparlanıyor"
+     }
    }
-  }
  }
 diff --git a/windows/src/island/codex-flow.ts b/windows/src/island/codex-flow.ts
 new file mode 100644
@@ -3667,7 +3667,7 @@ index b39ecc2..e3a93f0 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index dde0f32..d1d0660 100644
+index 9248cce..88c88d9 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -20,6 +20,7 @@ import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
@@ -3678,7 +3678,7 @@ index dde0f32..d1d0660 100644
  import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
  import { h } from "../views/dom";
  import { IslandStateMachine } from "./fsm";
-@@ -57,6 +58,7 @@ export class Island {
+@@ -60,6 +61,7 @@ export class Island {
    private botGlow!: HTMLElement;
    private greetingCanvas!: HTMLCanvasElement;
    private miniGrid!: HTMLElement;
@@ -3686,7 +3686,7 @@ index dde0f32..d1d0660 100644
    private clockEl!: HTMLElement;
    private clockTimer?: number;
    private countdown!: HTMLElement;
-@@ -260,6 +262,7 @@ export class Island {
+@@ -286,6 +288,7 @@ export class Island {
      this.botCanvas = h("canvas", { id: "bot-canvas" });
      this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
      this.miniGrid = h("div", { id: "mini-grid" });
@@ -3694,7 +3694,7 @@ index dde0f32..d1d0660 100644
      this.clockEl = h("div", { id: "island-clock" });
      this.countdown = h("div", { id: "countdown" });
  
-@@ -295,6 +298,7 @@ export class Island {
+@@ -321,6 +324,7 @@ export class Island {
        this.botGlow,
        this.botCanvas,
        this.miniGrid,
@@ -3702,7 +3702,7 @@ index dde0f32..d1d0660 100644
        this.clockEl,
        this.countdown,
      );
-@@ -396,6 +400,7 @@ export class Island {
+@@ -422,6 +426,7 @@ export class Island {
    }
  
    setView(view: IslandViewName) {
@@ -3710,7 +3710,7 @@ index dde0f32..d1d0660 100644
      this.stopSequenceIfLeaving(view);
      if (view !== "overview") closePlanCard();
      if (State.mode !== "expanded") {
-@@ -431,6 +436,9 @@ export class Island {
+@@ -457,6 +462,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -3719,8 +3719,8 @@ index dde0f32..d1d0660 100644
 +    if (!this.wasInIsland) this.fsm.mouseLeft();
    }
  
-   reveal() {
-@@ -649,6 +657,11 @@ export class Island {
+   /** A new Coucou waits and Mochi has nothing else to say (he is blue). */
+@@ -689,6 +697,11 @@ export class Island {
  
    private targetSize(): { w: number; h: number; r: number } {
      let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
@@ -3732,7 +3732,7 @@ index dde0f32..d1d0660 100644
      if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
        h = QUESTION_PICKER_H;
      }
-@@ -862,6 +875,7 @@ export class Island {
+@@ -902,6 +915,7 @@ export class Island {
        this.fsm.mouseEntered();
      }
      if (!inIsland && wasIn) {
@@ -3740,7 +3740,7 @@ index dde0f32..d1d0660 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1029,7 +1043,7 @@ export class Island {
+@@ -1073,7 +1087,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -3749,7 +3749,7 @@ index dde0f32..d1d0660 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1143,6 +1157,7 @@ export class Island {
+@@ -1195,6 +1209,7 @@ export class Island {
  
    private syncDom() {
      const expanded = State.mode === "expanded";
@@ -3757,7 +3757,7 @@ index dde0f32..d1d0660 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1163,6 +1178,7 @@ export class Island {
+@@ -1215,6 +1230,7 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -3765,7 +3765,7 @@ index dde0f32..d1d0660 100644
        if (on) view.sync();
      }
  
-@@ -1182,14 +1198,22 @@ export class Island {
+@@ -1234,14 +1250,22 @@ export class Island {
      // Compact mini grid
      const showGrid = State.mode === "compact";
      this.miniGrid.style.opacity = showGrid ? "1" : "0";
@@ -3790,7 +3790,7 @@ index dde0f32..d1d0660 100644
          }
          pruneMiniBots();
        }
-@@ -1197,14 +1221,19 @@ export class Island {
+@@ -1249,14 +1273,19 @@ export class Island {
  
      this.updateClock();
  
@@ -3812,7 +3812,7 @@ index dde0f32..d1d0660 100644
      if (!on) return;
      const now = new Date();
      const date = now.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
-@@ -1229,6 +1258,6 @@ export class Island {
+@@ -1281,6 +1310,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -3821,7 +3821,7 @@ index dde0f32..d1d0660 100644
    }
  }
 diff --git a/windows/src/main.ts b/windows/src/main.ts
-index b3b4cee..6a4a960 100644
+index 0a4f48e..7c35ae9 100644
 --- a/windows/src/main.ts
 +++ b/windows/src/main.ts
 @@ -5,6 +5,7 @@ import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
@@ -3832,7 +3832,7 @@ index b3b4cee..6a4a960 100644
  import { registerHookHandlers } from "./island/hooks";
  import { registerPhoneLink } from "./island/phone-link";
  import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
-@@ -142,6 +143,7 @@ async function main() {
+@@ -156,6 +157,7 @@ async function main() {
    });
  
    registerHookHandlers(island);
@@ -3841,7 +3841,7 @@ index b3b4cee..6a4a960 100644
    registerIntegrationHandlers(island);
    registerShortcutHandlers(island, () => setPaused(false));
 diff --git a/windows/src/mochi/engine.ts b/windows/src/mochi/engine.ts
-index 86d8ce6..35b9494 100644
+index a33d03d..a606206 100644
 --- a/windows/src/mochi/engine.ts
 +++ b/windows/src/mochi/engine.ts
 @@ -67,8 +67,8 @@ const EYE_W = 0.25;
@@ -4331,7 +4331,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index e1fff50..afaa3d0 100644
+index ebc4093..b429a39 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -5054,7 +5054,7 @@ index e1fff50..afaa3d0 100644
    transition: width 0.25s linear;
  }
  
-@@ -2449,7 +2435,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2535,7 +2521,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 36px;
    height: 36px;
    border-radius: 6px;
@@ -5063,7 +5063,7 @@ index e1fff50..afaa3d0 100644
    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
    display: grid;
    place-items: center;
-@@ -2462,7 +2448,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2548,7 +2534,7 @@ input[type="range"]::-webkit-slider-thumb {
    position: absolute;
    inset: 0;
    border-radius: 6px;
@@ -5072,7 +5072,7 @@ index e1fff50..afaa3d0 100644
    pointer-events: none;
  }
  
-@@ -2557,7 +2543,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2643,7 +2629,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .np-track {
    width: 100%;
@@ -5081,7 +5081,7 @@ index e1fff50..afaa3d0 100644
  }
  
  .np-bar.active .np-track,
-@@ -2672,3 +2658,52 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -3026,3 +3012,52 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    unicode-bidi: plaintext;
    text-align: start;
  }
@@ -5515,7 +5515,7 @@ index 0000000..b8f26fe
 +  } };
 +}
 diff --git a/windows/src/views/github.ts b/windows/src/views/github.ts
-index 86fba2f..f8be7d3 100644
+index 11f0065..adb9039 100644
 --- a/windows/src/views/github.ts
 +++ b/windows/src/views/github.ts
 @@ -14,8 +14,9 @@ import {
@@ -5528,8 +5528,17 @@ index 86fba2f..f8be7d3 100644
 +import { t, language } from "../i18n/i18n";
  
  const GITHUB_RED = "#F4505E";
+ export interface ForgeCardOptions {
+@@ -28,7 +29,7 @@ export interface ForgeCardOptions {
+ /** Each provider keeps its selected list across re-renders. */
+ const openSections = new Map<string, GitHubSection>();
  
-@@ -49,10 +50,11 @@ function statButton(icon: SVGSVGElement, color: string, label: string, value: st
+-function open(url: string, forge: ForgeCardOptions) {
++function open(url: string, forge: ForgeCardOptions = { title: "GitHub", color: GITHUB_RED }) {
+   if (forge.provider === "gitlab") { void Bridge.openGitLabUrl(url); return; }
+   if (forge.provider === "gitea") { void Bridge.openGiteaUrl(url); return; }
+   const safe = safeGitHubUrl(url);
+@@ -57,11 +58,12 @@ function statButton(icon: SVGSVGElement, color: string, label: string, value: st
  // ── Card ──────────────────────────────────────────────────────────────────────
  
  export function githubPulseCard(
@@ -5538,11 +5547,12 @@ index 86fba2f..f8be7d3 100644
    stats: GitHubStats | null,
    activity: GitHubActivity | null,
    openDetail: () => void,
+   options: ForgeCardOptions = { title: "GitHub", color: GITHUB_RED },
 +  dashboard: GitHubDashboard | null = null,
  ): HTMLElement {
+   const forge = options;
    const show = (section: GitHubSection) => {
-     openSection = section;
-@@ -70,9 +72,27 @@ export function githubPulseCard(
+@@ -80,9 +82,27 @@ export function githubPulseCard(
      head.append(h("span", { text: GH_STRINGS.overview }));
    }
  
@@ -5573,7 +5583,7 @@ index 86fba2f..f8be7d3 100644
  
    return h(
      "div",
-@@ -81,7 +101,7 @@ export function githubPulseCard(
+@@ -91,7 +111,7 @@ export function githubPulseCard(
      h(
        "div",
        { class: "int-stats gh-rows" },
@@ -5582,16 +5592,16 @@ index 86fba2f..f8be7d3 100644
          () => show("myPRs")),
        statButton(svg(ICONS.eye, 10, { stroke: 2.2 }), reviews > 0 ? "#8AB4F8" : "#6B7079", GH_STRINGS.toReview,
          String(reviews), () => show("toReview")),
-@@ -161,7 +181,7 @@ export function openRow(el: HTMLElement | undefined) {
+@@ -171,7 +191,7 @@ export function openRow(el: HTMLElement | undefined) {
    if (el) rowOpens.get(el)?.();
  }
  
--function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPulse, onBack: () => void): HTMLElement {
-+function listDetail(section: "myPRs" | "toReview" | "mainCI", pulse: GitHubPulse, onBack: () => void): HTMLElement {
+-function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPulse, onBack: () => void, forge: ForgeCardOptions): HTMLElement {
++function listDetail(section: "myPRs" | "toReview" | "mainCI", pulse: GitHubPulse, onBack: () => void, forge: ForgeCardOptions): HTMLElement {
    const rows: HTMLElement[] =
      section === "mainCI"
-       ? pulse.mainCI.map(repoRow)
-@@ -179,6 +199,54 @@ function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPu
+       ? pulse.mainCI.map((repo) => repoRow(repo, forge))
+@@ -189,6 +209,54 @@ function listDetail(section: Exclude<GitHubSection, "activity">, pulse: GitHubPu
    );
  }
  
@@ -5646,7 +5656,7 @@ index 86fba2f..f8be7d3 100644
  // ── Detail: contribution grid ─────────────────────────────────────────────────
  
  function activityDetail(
-@@ -226,12 +294,18 @@ function activityDetail(
+@@ -237,15 +305,21 @@ function activityDetail(
  }
  
  export function githubDetail(
@@ -5655,21 +5665,24 @@ index 86fba2f..f8be7d3 100644
    stats: GitHubStats | null,
    activity: GitHubActivity | null,
    onBack: () => void,
+   options: ForgeCardOptions = { title: "GitHub", color: GITHUB_RED },
 +  dashboard: GitHubDashboard | null = null,
  ): HTMLElement {
+   const forge = options;
+   const openSection = openSections.get(forge.provider ?? "github") ?? "myPRs";
 +  if (openSection === "repositories" || openSection === "commits" || openSection === "pipelines") {
 +    return dashboard ? dashboardDetail(openSection, dashboard, onBack)
 +      : h("div", { class: "int-card" }, backButton(sectionTitle(openSection), onBack), h("div", { class: "gh-empty", text: GH_STRINGS.loading }));
 +  }
    return openSection === "activity"
--    ? activityDetail(activity, stats, pulse.login, onBack)
--    : listDetail(openSection, pulse, onBack);
-+    ? activityDetail(activity, stats, dashboard?.login ?? pulse?.login ?? "", onBack)
-+    : pulse ? listDetail(openSection, pulse, onBack)
+-    ? activityDetail(activity, stats, pulse.login, onBack, forge)
+-    : listDetail(openSection, pulse, onBack, forge);
++    ? activityDetail(activity, stats, dashboard?.login ?? pulse?.login ?? "", onBack, forge)
++    : pulse ? listDetail(openSection, pulse, onBack, forge)
 +      : h("div", { class: "int-card" }, backButton(sectionTitle(openSection), onBack), h("div", { class: "gh-empty", text: t("Check token permissions to load this section.") }));
  }
 diff --git a/windows/src/views/integrations.ts b/windows/src/views/integrations.ts
-index 4f448b5..4446d00 100644
+index 4932b60..d64906a 100644
 --- a/windows/src/views/integrations.ts
 +++ b/windows/src/views/integrations.ts
 @@ -10,7 +10,7 @@ import { State, type AgentTask } from "../core/state";
@@ -5678,10 +5691,10 @@ index 4f448b5..4446d00 100644
  import { refreshHookPills } from "../island/integrations";
 -import { readActivity, readPulse, readStats } from "../core/github";
 +import { readActivity, readPulse, readStats, readDashboard } from "../core/github";
- import { githubDetail, githubPulseCard } from "./github";
+ import { githubDetail, githubPulseCard, type ForgeCardOptions } from "./github";
  import { N_, language, t } from "../i18n/i18n";
  
-@@ -461,10 +461,11 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
+@@ -479,10 +479,11 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
    if (task.id === "integration_github") {
      const d = get(task.id);
      const pulse = readPulse(d);
@@ -5691,11 +5704,11 @@ index 4f448b5..4446d00 100644
        return hooks.detailOpen
 -        ? githubDetail(pulse, readStats(d), readActivity(d), hooks.closeDetail)
 -        : githubPulseCard(pulse, readStats(d), readActivity(d), hooks.openDetail);
-+        ? githubDetail(pulse, readStats(d), readActivity(d), hooks.closeDetail, dashboard)
-+        : githubPulseCard(pulse, readStats(d), readActivity(d), hooks.openDetail, dashboard);
++        ? githubDetail(pulse, readStats(d), readActivity(d), hooks.closeDetail, undefined, dashboard)
++        : githubPulseCard(pulse, readStats(d), readActivity(d), hooks.openDetail, undefined, dashboard);
      }
    }
- 
+   if (task.id === "integration_gitlab") {
 diff --git a/windows/src/views/spotify.ts b/windows/src/views/spotify.ts
 index 27fc2e5..9eaa3bf 100644
 --- a/windows/src/views/spotify.ts
@@ -5761,7 +5774,7 @@ index e851100..3bcc407 100644
            btn(t("Yes, tell me"), "primary", () => Updates.answer(true)),
            btn(t("No thanks"), "secondary", () => Updates.answer(false)),
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index 067825f..df27179 100644
+index 491bc9b..b1a5e07 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
 @@ -19,6 +19,7 @@ import {
@@ -5772,7 +5785,7 @@ index 067825f..df27179 100644
  import { buildRecap } from "./recap";
  import { buildWardrobe } from "./wardrobe";
  import { buildUpdate } from "./update";
-@@ -59,6 +60,9 @@ export interface ViewActions {
+@@ -66,6 +67,9 @@ export interface ViewActions {
  export interface ViewHost {
    el: HTMLElement;
    sync(): void;
@@ -5782,7 +5795,7 @@ index 067825f..df27179 100644
    /** Called when the view becomes active, for views with a text field. */
    focus?(): void;
    /** Called every frame while the view is on screen. True = needs another frame. */
-@@ -109,6 +113,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
+@@ -116,6 +120,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
  
  export function buildHeader(actions: ViewActions): ViewHost {
    const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 13));
@@ -5790,7 +5803,7 @@ index 067825f..df27179 100644
    const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
    const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 13));
  
-@@ -128,7 +133,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -135,7 +140,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
    const el = h(
      "div",
      { id: "header" },
@@ -5799,7 +5812,7 @@ index 067825f..df27179 100644
      h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
    );
    const headerActions = el.lastElementChild as HTMLElement;
-@@ -138,6 +143,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -145,6 +150,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
      sync() {
        const v = State.view;
        tabHome.classList.toggle("on", v === "overview" || v === "empty");
@@ -5807,7 +5820,7 @@ index 067825f..df27179 100644
        tabChat.classList.toggle("on", v === "prompt");
        tabDrop.classList.toggle("on", v === "upload");
        gearBtn.classList.toggle("on", v === "settings");
-@@ -533,6 +539,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+@@ -555,6 +561,7 @@ function buildApproval(actions: ViewActions): ViewHost {
        // is the command, the file path or the URL being authorised, not just the
        // name of the tool asking.
        code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
@@ -5815,7 +5828,7 @@ index 067825f..df27179 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
-@@ -808,6 +815,7 @@ export function buildViews(
+@@ -830,6 +837,7 @@ export function buildViews(
  ): Map<IslandViewName, ViewHost> {
    const map = new Map<IslandViewName, ViewHost>();
    map.set("overview", buildOverview(actions));
@@ -5823,6 +5836,31 @@ index 067825f..df27179 100644
    map.set("empty", buildEmpty(actions));
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
+diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
+index 0c338b4..320c63f 100644
+--- a/windows/src/whats-new/whats-new.json
++++ b/windows/src/whats-new/whats-new.json
+@@ -2,7 +2,7 @@
+   "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 12 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
+   "releases": [
+     {
+-      "version": "0.5.3",
++      "version": "0.5.3-sendoa.1",
+       "items": [
+         {
+           "icon": "chat",
+diff --git a/windows/src/whats-new/whats-new.ts b/windows/src/whats-new/whats-new.ts
+index d21fb96..8be8906 100644
+--- a/windows/src/whats-new/whats-new.ts
++++ b/windows/src/whats-new/whats-new.ts
+@@ -186,6 +186,7 @@ export function showsUpdateHint(waiting: boolean, state: BotStateName, pending:
+ 
+ /** The release page of this version, for "All changes". */
+ export function releasePage(platform: "windows" | "linux", version: string): string {
++  if (version.includes("-sendoa.")) return `https://github.com/XFunBox/coucou-setup/releases/tag/v${encodeURIComponent(version)}`;
+   return `https://github.com/Louis-CFM/coucou/releases/tag/${platform}-v${encodeURIComponent(version)}`;
+ }
+ 
 diff --git a/windows/tests/agent-room.test.mjs b/windows/tests/agent-room.test.mjs
 new file mode 100644
 index 0000000..0c8e0f5
@@ -6082,7 +6120,7 @@ index f1685dd..2d5c30d 100644
 +});
 diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs
 new file mode 100644
-index 0000000..bd3cc66
+index 0000000..43314f8
 --- /dev/null
 +++ b/windows/tests/github-dashboard.test.mjs
 @@ -0,0 +1,50 @@
@@ -6110,12 +6148,12 @@ index 0000000..bd3cc66
 +      {repo:'me/private',url:'https://github.com/me/private/actions/runs/2',name:'Old',branch:'main',status:'completed',startedAt:''}],
 +    commitsUnavailable:0,pipelinesUnavailable:0,truncated:false,fetchedAt:1,
 +  };
-+  const card = githubPulseCard(null,null,null,()=>{},dashboard);
++  const card = githubPulseCard(null,null,null,()=>{},undefined,dashboard);
 +  const buttons = card.querySelector('.gh-rows').children;
 +  const targets = [dashboard.repositories[0].url, dashboard.commits[0].url, dashboard.pipelines[0].url];
 +  for (let i=0; i<3; i++) {
 +    buttons[i].fire('click');
-+    const detail = githubDetail(null,null,null,()=>{},dashboard);
++    const detail = githubDetail(null,null,null,()=>{},undefined,dashboard);
 +    const rows = listRows(detail);
 +    assert.equal(rows.length,1);
 +    calls.length=0;
@@ -6125,7 +6163,7 @@ index 0000000..bd3cc66
 +  }
 +  dashboard.pipelines=[];
 +  dashboard.pipelinesUnavailable=1;
-+  assert.ok(githubDetail(null,null,null,()=>{},dashboard).textContent.includes('Check token permissions'));
++  assert.ok(githubDetail(null,null,null,()=>{},undefined,dashboard).textContent.includes('Check token permissions'));
 +});
 +
 +test('new sections have Spanish labels and links retain GitHub-only validation', () => {
@@ -6248,4 +6286,20 @@ index 36cd5d4..5cc17f8 100644
 +  emit("spotify", playing({ playerName: "Spotifast / EVA-01", track: track({ id: "spotify:ad:1", title: "" }) }));
 +  pill.sync();
 +  assert.equal(pill.el.querySelector("lbl").textContent, "Advertisement");
++});
+diff --git a/windows/tests/whats-new.test.mjs b/windows/tests/whats-new.test.mjs
+index 4647a57..62d5e10 100644
+--- a/windows/tests/whats-new.test.mjs
++++ b/windows/tests/whats-new.test.mjs
+@@ -159,3 +159,11 @@ test("All changes and the coffee", () => {
+   const site = readFileSync(new URL("../../docs/index.html", import.meta.url), "utf8");
+   assert.ok(site.includes(COFFEE_URL), "the same link as the Coucou page");
+ });
++
++
++test("Sendoa revisions compare numerically and keep the fork release link", () => {
++  assert.equal(compareVersions("0.5.3-sendoa.10", "0.5.3-sendoa.9"), 1);
++  assert.equal(compareVersions("0.5.3-sendoa.1", "0.5.3"), 1);
++  assert.equal(compareVersions("0.5.3", "0.5.2-sendoa.10"), 1);
++  assert.equal(releasePage("linux", "0.5.3-sendoa.1"), "https://github.com/XFunBox/coucou-setup/releases/tag/v0.5.3-sendoa.1");
 +});

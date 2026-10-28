@@ -1,3 +1,22 @@
+# Verificación — 2026-10-28 — port Linux 0.5.3
+
+Versión **0.5.3-sendoa.1**, preparada desde el setup limpio `4f36aa41048764ecadc12515669990a80429607f`. El tag oficial `linux-v0.5.3` apunta directamente al commit `47d1c2da12bf1dce8fb28b825757d497c1e1d88d`; el tarball canónico fijado tiene SHA-256 `d0514ed726279085492f7361aa1e4d7e554984d982182b8ccdda78b8ebe38781`.
+
+- Reaplicadas las 62 personalizaciones de la base 0.5.1 mediante fusión de tres vías con el upstream limpio. Nueve archivos requirieron resolución: cinco versiones, imports/sondeos de integraciones Rust, imports de vistas, panel GitHub y traducciones. Las traducciones se fusionaron por clave, sin valores cambiados en conflicto.
+- GitHub conserva su dashboard personalizado y comparte las nuevas opciones de forja de upstream con GitLab/Gitea; sus selecciones siguen independientes. Se conservan los nuevos sondeos de GitLab/Gitea y el bucle adaptativo personalizado de GitHub sin añadir un segundo sondeo periódico de GitHub.
+- Conservados EVA-01, sala/monitor, Codex IPC, filtro Guardian, permisos, Spotifast/MPRIS, reloj compacto y actualizaciones del fork. La pantalla de novedades añade la versión Sendoa y el enlace de release propio; la regresión falló antes del ajuste y sus 13 pruebas pasan después.
+- Suite Node local (`npm test`, Node 24.18.0): **34 archivos correctos, cero fallos/cancelados/omitidos**, incluidos los nuevos tests upstream; duración 66,5 s. El test de WhatsApp mantiene un temporizador de aproximadamente 60 s. DOM y puentes Tauri simulados; no controla servicios reales.
+- TypeScript (`tsc --noEmit`) y Vite build pasan con dependencias locales reutilizadas; Vite avisa del tamaño de chunks. Esta comprobación no compila Rust ni verifica ventanas nativas.
+- Parche regenerado: **65 archivos**, incluyendo los 62 originales. Aplicación limpia mediante `git apply --check` y `git apply`, seguida de comparación: **1181 archivos de fuente idénticos**, excluyendo metadatos Git, node_modules y salida dist. SHA-256 del parche: `03a1b46ec09649844b7c77f4b3cc72f9a1bf27ac509ee128fa068dc5959eb0c8`.
+- Instalador: **10 pruebas Python correctas**; sintaxis Bash de build.sh e install.sh y `git diff --check` correctos. Son pruebas aisladas del instalador con directorios temporales; no equivalen a una instalación real.
+- La receta Docker copia `docs` para que la nueva prueba upstream de novedades encuentre `docs/index.html`.
+
+Compilación Docker terminada: 489 pruebas Node, 26 Rust de GitHub, 565 Rust de la aplicación y 34 del relé correctas; once ignoradas en la suite general. Las cinco MPRIS se ejecutaron aparte en bus privado y pasan. TypeScript, Vite y Tauri release correctos. Se reutilizan las imágenes/cachés locales; no se ha repetido una compilación sin cachés.
+
+Una revisión independiente del port no detectó pérdidas de integración. Encontró un caso de recuperación incompleta en el script local de actualización si faltaba un archivo de ajustes; corregido con una prueba del bloque real primero fallida y después correcta, y comprobado por el revisor.
+
+Instalación real terminada: servicio activo/running, versión 0.5.3-sendoa.1 y overlay layer-shell confirmados. Hashes de los tres binarios comprobados tras arrancar; ldd sin bibliotecas ausentes. Ajustes, hooks y menú idénticos byte a byte; autostart conservado. Backup previo con restore.py preparado. No se ha ejecutado una reversión real ni publicado esta actualización. Las verificaciones históricas siguientes corresponden a versiones anteriores.
+
 # Verificación — 2026-10-23 — botones de permisos
 
 Versión **0.5.1-sendoa.5**. La vista interna del proveedor de chat conservaba la clase `on` al ocultar el panel padre. Su `pointer-events: auto` interceptaba clics destinados a la tarjeta de permisos. La visibilidad del chat ahora desactiva esa vista interna y la reactiva al abrirlo; las notificaciones repetidas de visibilidad no vuelven a renderizarla.
