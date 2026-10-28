@@ -17,6 +17,11 @@ Una revisión independiente del port no detectó pérdidas de integración. Enco
 
 Instalación real terminada: servicio activo/running, versión 0.5.3-sendoa.1 y overlay layer-shell confirmados. Hashes de los tres binarios comprobados tras arrancar; ldd sin bibliotecas ausentes. Ajustes, hooks y menú idénticos byte a byte; autostart conservado. Backup previo con restore.py preparado. No se ha ejecutado una reversión real ni publicado esta actualización. Las verificaciones históricas siguientes corresponden a versiones anteriores.
 
+## Comprobación real de lectura
+
+El ejecutable instalado consulta por IPC este chat: identificador correcto, 20 mensajes, turno activo, sin decisión pendiente y sin truncación. El informe guarda solo recuentos/estados, sin títulos ni mensajes. El monitor encuentra raíz y tres agentes; indica historial acotado/truncado (un aviso), por lo que no se presenta como inventario completo. Spotifast no estaba abierto en el bus MPRIS de la sesión y no se abrió ni se enviaron controles; su selección y controles se verifican mediante las cinco pruebas aisladas. Se observaron eventos de hooks posteriores al arranque, sin probar una nueva decisión humana.
+
+
 # Verificación — 2026-10-23 — botones de permisos
 
 Versión **0.5.1-sendoa.5**. La vista interna del proveedor de chat conservaba la clase `on` al ocultar el panel padre. Su `pointer-events: auto` interceptaba clics destinados a la tarjeta de permisos. La visibilidad del chat ahora desactiva esa vista interna y la reactiva al abrirlo; las notificaciones repetidas de visibilidad no vuelven a renderizarla.
