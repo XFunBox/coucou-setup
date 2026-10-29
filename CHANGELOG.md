@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.5.3-sendoa.3 — 2026-10-29
+
+- Corrige el mini reloj: los estados de agentes terminados, avisos y texto de subagentes ya no sustituyen la hora en la isla cerrada. Los miniagentes mantienen sus indicadores.
+
 ## 0.5.3-sendoa.2 — 2026-10-29
 
 - Música en compacto con carátula cacheada, título, artista y onda animada. Ancho adaptable y apertura de controles mediante la animación existente.

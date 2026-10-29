@@ -1,3 +1,15 @@
+# Verificación — 2026-10-29 — reloj al terminar los agentes
+
+Versión **0.5.3-sendoa.3**. El estado `finished` activaba el texto compacto de subagentes y ocultaba el reloj; volver a `working` lo mostraba otra vez. Con showClock activado, hora y fecha conservan el centro del compacto también en estados terminado, error y aprobación. Los miniagentes mantienen sus indicadores; música y tarjetas expandidas conservan su comportamiento.
+
+- Regresión reproducida antes del cambio y correcta después; seis pruebas compactas y suite completa de **498 pruebas Node** correctas. TypeScript y Vite correctos; diez pruebas Python del instalador y sintaxis Bash correctas.
+- Parche de 69 archivos aplicado a upstream limpio; 1182 archivos indexados más el certificado fixture heredado cotejados. SHA-256: `527321f32692fad2d61297689066d75644d80bef89cc102f4b1aef31bde99b7a`.
+- El backend no cambia; SHA-256 cotejado con la versión .2. No se repiten las suites Rust/MPRIS documentadas abajo. El validador Python upstream de novedades rechaza las versiones Sendoa heredadas por su formato; las pruebas Node de novedades y doce idiomas pasan.
+
+- Instalación .3: Tauri release compilado; servicio activo, PID 136216, versión y layer-shell confirmados. SHA-256 y ldd correctos. showClock=true; resto de ajustes, hooks y menú conservados. Copia y reversión preparadas. La regresión de estados se verifica en pruebas; la instalación nativa confirma arranque e integridad.
+
+---
+
 # Verificación — 2026-10-29 — música y reloj compactos
 
 Versión local **0.5.3-sendoa.2** sobre Linux 0.5.3. Música compacta con carátula cacheada, metadatos y onda animada; pausa con un segundo de gracia y click para abrir controles. Con el reloj activado, la isla cerrada permanece visible; las tarjetas expandidas conservan el autocierre y la pausa explícita sigue ocultando.  Reloj en dos líneas y miniagentes 2×2. Alertas y solicitudes conservan prioridad. MPRIS amplía la selección a reproductores genéricos registrados manteniendo preferencia Spotifast/Spotify.

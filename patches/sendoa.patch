@@ -1,10 +1,14 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 4a9b2ea..bf362b2 100644
+index 4a9b2ea..7e7c699 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -1,5 +1,12 @@
+@@ -1,5 +1,16 @@
  # Changelog
  
++## Linux 0.5.3-sendoa.3 — October 29, 2026
++
++- Keep the compact clock visible after agents finish and during alerts; agent status remains in the miniature grid.
++
 +## Linux 0.5.3-sendoa.2 — October 29, 2026
 +
 +- Compact now-playing view with cached artwork, track metadata and an animated waveform. Pausing restores the normal compact view after one second; clicking opens the music card with the existing spring transition.
@@ -16,19 +20,20 @@ index 4a9b2ea..bf362b2 100644
  
  - **Mac: WhatsApp statuses aren't chats** — a contact's WhatsApp Status and channel posts no longer show up as a conversation in the WhatsApp pill (#901, same fix as #910)
 diff --git a/README.md b/README.md
-index 8bedf06..92c164c 100644
+index 8bedf06..c37bf92 100644
 --- a/README.md
 +++ b/README.md
-@@ -173,6 +173,7 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
+@@ -173,6 +173,8 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
  
  | Windows & Linux | Date | Highlights |
  |---------|------|------------|
++| 0.5.3-sendoa.3 (Linux fork) | Oct 29, 2026 | Keep the compact clock visible after agents finish |
 +| 0.5.3-sendoa.2 (Linux fork) | Oct 29, 2026 | Compact music with artwork and waveform, persistent two-line clock and MPRIS fallback |
  | 0.5.3 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.3) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.3) | Oct 22, 2026 | WhatsApp in the island (experimental): one-click gateway install, your chats and replies |
  | 0.5.2 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.2) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.2) | Oct 22, 2026 | Mochi turns blue when a new version waits, What's new after each update; GitLab and Gitea pills; the weekly recap on Android |
  | 0.5.1 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.1) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.1) | Oct 20, 2026 | New version in the island, one click to install it on Windows; German and Turkish; an optional clock; Linux idle CPU fixed |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 79ad9b1..ab4f557 100644
+index 79ad9b1..fce5a4c 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -36,7 +41,7 @@ index 79ad9b1..ab4f557 100644
  [[package]]
  name = "coucou"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.2"
++version = "0.5.3-sendoa.3"
  dependencies = [
   "arboard",
   "cpal",
@@ -45,12 +50,12 @@ index 79ad9b1..ab4f557 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.2"
++version = "0.5.3-sendoa.3"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 9c8410e..5de1662 100644
+index 9c8410e..fd374f0 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -58,31 +63,31 @@ index 9c8410e..5de1662 100644
  
  [workspace.package]
 -version = "0.5.3"
-+version = "0.5.3-sendoa.2"
++version = "0.5.3-sendoa.3"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index d5977dc..269707e 100644
+index d5977dc..888f0ce 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.2",
++  "version": "0.5.3-sendoa.3",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.3",
-+      "version": "0.5.3-sendoa.2",
++      "version": "0.5.3-sendoa.3",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 9113b8f..fddcb8c 100644
+index 9113b8f..ddbb525 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -90,7 +95,7 @@ index 9113b8f..fddcb8c 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.2",
++  "version": "0.5.3-sendoa.3",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -2695,7 +2700,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 0be3d46..73389c6 100644
+index 0be3d46..f3d689d 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -2703,7 +2708,7 @@ index 0be3d46..73389c6 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.2",
++  "version": "0.5.3-sendoa.3",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -3959,7 +3964,7 @@ index b39ecc2..e3a93f0 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index 9248cce..2411634 100644
+index 9248cce..d598d7f 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -12,7 +12,7 @@ import {
@@ -4133,7 +4138,7 @@ index 9248cce..2411634 100644
 +    const focusAgent = flowTasks.find(task => task.id === State.focusId);
 +    const children = flowTasks.filter(task => task.flow?.parentId);
 +    const showStatus = showGrid && Boolean(focusAgent || children.length) &&
-+      (!State.settings.showClock || compactAlert(State.effectiveState, State.pendingApproval != null));
++      !State.settings.showClock;
 +    this.compactStatus.style.display = showStatus ? "block" : "none";
 +    this.compactStatus.textContent = children.length ? `Codex · ${children.filter(task => task.state === "working").length}/${children.length} subagentes activos` : focusAgent ? `${focusAgent.name} · ${agentStatus(focusAgent.state)}` : "";
      if (showGrid) {
@@ -4168,7 +4173,7 @@ index 9248cce..2411634 100644
    private updateClock() {
 -    const on = State.mode === "compact" && State.settings.showClock;
 +    const on = State.mode === "compact" && State.settings.showClock && !this.compactMusic.visible &&
-+      !compactAlert(State.effectiveState, State.pendingApproval != null) && this.compactStatus.style.display === "none";
++      this.compactStatus.style.display === "none";
      this.clockEl.style.opacity = on ? "1" : "0";
 +    this.clockEl.style.visibility = on ? "visible" : "hidden";
      if (!on) return;
@@ -6262,14 +6267,50 @@ index 491bc9b..b1a5e07 100644
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index 0c338b4..cdc99cf 100644
+index 0c338b4..0d7414a 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -2,7 +2,74 @@
+@@ -2,7 +2,110 @@
    "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 12 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
      {
 -      "version": "0.5.3",
++      "version": "0.5.3-sendoa.3",
++      "items": [
++        {
++          "icon": "clock",
++          "title": {
++            "en": "Time and date at a glance",
++            "zh-Hans": "一眼查看时间和日期",
++            "hi": "समय और तारीख एक नज़र में",
++            "es": "Hora y fecha de un vistazo",
++            "ar": "الوقت والتاريخ بلمحة",
++            "fr": "L’heure et la date en un regard",
++            "bn": "এক নজরে সময় ও তারিখ",
++            "pt-BR": "Hora e data de relance",
++            "ru": "Время и дата одним взглядом",
++            "id": "Waktu dan tanggal sekilas",
++            "de": "Uhrzeit und Datum auf einen Blick",
++            "tr": "Bir bakışta saat ve tarih"
++          },
++          "detail": {
++            "en": "The closed island keeps its clock when agents finish. Agent status stays in the miniatures.",
++            "zh-Hans": "智能体完成后，折叠岛仍显示时钟。状态显示在迷你图标中。",
++            "hi": "एजेंट समाप्त होने पर भी बंद आइलैंड में घड़ी दिखती है। स्थिति छोटे आइकन में रहती है।",
++            "es": "La isla cerrada mantiene la hora al terminar los agentes. Su estado sigue en los muñequitos.",
++            "ar": "تبقى الساعة في الشريط المغلق عند انتهاء الوكلاء. تظهر حالتهم في الرموز المصغرة.",
++            "fr": "L’île fermée garde l’heure quand les agents terminent. Leur état reste dans les miniatures.",
++            "bn": "এজেন্ট শেষ করলেও বন্ধ আইল্যান্ডে ঘড়ি থাকে। অবস্থা ছোট আইকনে দেখা যায়।",
++            "pt-BR": "A ilha fechada mantém a hora quando os agentes terminam. O estado fica nas miniaturas.",
++            "ru": "Часы остаются в закрытом острове после завершения агентов. Состояние видно в миниатюрах.",
++            "id": "Pulau tertutup tetap menampilkan jam saat agen selesai. Status ada pada miniatur.",
++            "de": "Die geschlossene Insel zeigt die Uhr auch nach Abschluss der Agenten. Ihr Status bleibt in den Miniaturen.",
++            "tr": "Ajanlar bitirdiğinde kapalı ada saati göstermeye devam eder. Durum minyatürlerde kalır."
++          }
++        }
++      ]
++    },
++    {
 +      "version": "0.5.3-sendoa.2",
 +      "items": [
 +        {
@@ -6557,10 +6598,10 @@ index 0000000..51f0631
 +});
 diff --git a/windows/tests/compact-clock.test.mjs b/windows/tests/compact-clock.test.mjs
 new file mode 100644
-index 0000000..cb1dfcc
+index 0000000..4945c23
 --- /dev/null
 +++ b/windows/tests/compact-clock.test.mjs
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,32 @@
 +import { test } from 'node:test';
 +import assert from 'node:assert/strict';
 +import { State } from '../src/core/state.ts';
@@ -6568,24 +6609,29 @@ index 0000000..cb1dfcc
 +import { buildCompactClock } from '../src/island/compact.ts';
 +import { Island } from '../src/island/island.ts';
 +
-+test('compact agent status takes priority over the optional clock, and the clock returns when free', () => {
++test('compact clock stays visible through agent completion and permission alerts', () => {
 +  const mode = State.mode;
 +  const showClock = State.settings.showClock;
++  const override = State.stateOverride;
++  const pending = State.pendingApproval;
 +  installFakeDom();
 +  const clock = buildCompactClock();
-+  const host = { compactMusic: { visible: false }, compactClock: clock, compactStatus: { style: { display: 'block' } }, clockEl: clock.el };
++  const host = { compactMusic: { visible: false }, compactClock: clock, compactStatus: { style: { display: 'none' } }, clockEl: clock.el };
 +  const draw = () => Island.prototype.updateClock.call(host);
 +  try {
 +    State.mode = 'compact'; State.settings.showClock = true;
-+    draw(); assert.equal(host.clockEl.style.opacity, '0');
-+    host.compactStatus.style.display = 'none';
++    State.stateOverride = 'finished';
++    draw(); assert.equal(host.clockEl.style.opacity, '1');
++    State.stateOverride = 'approval'; State.pendingApproval = {};
++    draw(); assert.equal(host.clockEl.style.opacity, '1');
++    State.stateOverride = 'error'; State.pendingApproval = null;
 +    draw(); assert.equal(host.clockEl.style.opacity, '1'); assert.ok(host.clockEl.textContent.length);
 +    State.settings.showClock = false;
 +    draw(); assert.equal(host.clockEl.style.opacity, '0');
 +    State.settings.showClock = true; State.mode = 'expanded';
 +    draw(); assert.equal(host.clockEl.style.opacity, '0');
 +  } finally {
-+    State.mode = mode; State.settings.showClock = showClock;
++    State.mode = mode; State.settings.showClock = showClock; State.stateOverride = override; State.pendingApproval = pending;
 +  }
 +});
 diff --git a/windows/tests/compact-music.test.mjs b/windows/tests/compact-music.test.mjs
