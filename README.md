@@ -6,7 +6,7 @@ Setup de **Coucou 0.5.3-sendoa.2** para Ubuntu/Debian amd64. Descarga el código
 
 Incluye:
 
-- Base Linux 0.5.3: conserva las novedades oficiales de 0.5.2 y 0.5.3, incluidos GitLab/Gitea, WhatsApp experimental y la pantalla de novedades. Añade música compacta con carátula, título, artista y onda animada; al pausar vuelve al compacto tras un segundo. El reloj optativo muestra hora y fecha en dos líneas, con Mochi y miniagentes 2×2. Las solicitudes y alertas conservan la prioridad.
+- Base Linux 0.5.3: conserva las novedades oficiales de 0.5.2 y 0.5.3, incluidos GitLab/Gitea, WhatsApp experimental y la pantalla de novedades. Añade música compacta con carátula, título, artista y onda animada; al pausar vuelve al compacto tras un segundo. Con el reloj activado, la isla cerrada permanece visible. El reloj optativo muestra hora y fecha en dos líneas, con Mochi y miniagentes 2×2. Las solicitudes y alertas conservan la prioridad.
 - Avisos optativos de nuevas versiones del fork `XFunBox/coucou-setup`; el enlace abre su release para actualizar conservando las personalizaciones.
 
 - Sala EVA-01 ampliada (880 × 480): el agente principal y sus subagentes reales de Codex, con rol, modelo, esfuerzo, última herramienta y relación padre/hijo. La isla abre su vista habitual; la oficina se abre desde la pestaña «Sala de agentes». Pulsar un puesto muestra su ficha. Al salir el cursor se recoge al notch en 0,6 s; mantiene las solicitudes pendientes. En compacto muestra cuántos subagentes siguen activos.

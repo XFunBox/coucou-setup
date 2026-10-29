@@ -1,13 +1,14 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 4a9b2ea..73c1d2e 100644
+index 4a9b2ea..bf362b2 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -1,5 +1,11 @@
+@@ -1,5 +1,12 @@
  # Changelog
  
 +## Linux 0.5.3-sendoa.2 — October 29, 2026
 +
 +- Compact now-playing view with cached artwork, track metadata and an animated waveform. Pausing restores the normal compact view after one second; clicking opens the music card with the existing spring transition.
++- Enabling the clock keeps the closed island visible without disabling expanded-card auto-close.
 +- Two-line optional clock beside Mochi and the mini-agent grid. Requests and important alerts retain priority.
 +- Linux MPRIS fallback for other players when Spotifast and Spotify are absent.
 +
@@ -15,14 +16,14 @@ index 4a9b2ea..73c1d2e 100644
  
  - **Mac: WhatsApp statuses aren't chats** — a contact's WhatsApp Status and channel posts no longer show up as a conversation in the WhatsApp pill (#901, same fix as #910)
 diff --git a/README.md b/README.md
-index 8bedf06..817e6d5 100644
+index 8bedf06..92c164c 100644
 --- a/README.md
 +++ b/README.md
 @@ -173,6 +173,7 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
  
  | Windows & Linux | Date | Highlights |
  |---------|------|------------|
-+| 0.5.3-sendoa.2 (Linux fork) | Oct 29, 2026 | Compact music with artwork and waveform, two-line clock and MPRIS fallback |
++| 0.5.3-sendoa.2 (Linux fork) | Oct 29, 2026 | Compact music with artwork and waveform, persistent two-line clock and MPRIS fallback |
  | 0.5.3 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.3) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.3) | Oct 22, 2026 | WhatsApp in the island (experimental): one-click gateway install, your chats and replies |
  | 0.5.2 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.2) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.2) | Oct 22, 2026 | Mochi turns blue when a new version waits, What's new after each update; GitLab and Gitea pills; the weekly recap on Android |
  | 0.5.1 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.1) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.1) | Oct 20, 2026 | New version in the island, one click to install it on Windows; German and Turkish; an optional clock; Linux idle CPU fixed |
@@ -3895,15 +3896,17 @@ index 0000000..fc6efcb
 +  return view;
 +}
 diff --git a/windows/src/island/fsm.ts b/windows/src/island/fsm.ts
-index 23b65ee..da23fb8 100644
+index 23b65ee..04b5145 100644
 --- a/windows/src/island/fsm.ts
 +++ b/windows/src/island/fsm.ts
-@@ -29,6 +29,12 @@ export class IslandStateMachine {
+@@ -29,6 +29,14 @@ export class IslandStateMachine {
    greetHoverCollapseDelay = 10;
    /** An alert waiting for an answer stays open, even when the mouse leaves. */
    pinned = false;
 +  /** Music keeps the compact island visible, without pinning an expanded card. */
 +  musicVisible = false;
++  /** The optional clock stays visible when the island is closed. */
++  clockVisible = false;
 +  /** The large flow room folds promptly even after a click. */
 +  roomOpen = false;
 +  /** Keep an explicitly opened chat available while typing. */
@@ -3911,16 +3914,16 @@ index 23b65ee..da23fb8 100644
    /**
     * Hovering opens the island all the way instead of peeking (Settings →
     * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
-@@ -160,23 +166,23 @@ export class IslandStateMachine {
+@@ -160,23 +168,23 @@ export class IslandStateMachine {
      this.clear("petitHide");
      // A card folded away while it waits for an answer keeps the compact island
      // on screen, so it can be reopened (isHeldOpen on macOS).
 -    if (this.pinned) return;
-+    if (this.pinned || this.musicVisible) return;
++    if (this.pinned || this.musicVisible || this.clockVisible) return;
      this.petitHide = window.setTimeout(() => {
        this.petitHide = null;
 -      if (this.state === "petit" && !this.pinned) this.transition("hidden");
-+      if (this.state === "petit" && !this.pinned && !this.musicVisible) this.transition("hidden");
++      if (this.state === "petit" && !this.pinned && !this.musicVisible && !this.clockVisible) this.transition("hidden");
      }, this.petitToHiddenDelay * 1000);
    }
  
@@ -3956,7 +3959,7 @@ index b39ecc2..e3a93f0 100644
  
  /**
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index 9248cce..cd3bf17 100644
+index 9248cce..2411634 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -12,7 +12,7 @@ import {
@@ -4025,7 +4028,15 @@ index 9248cce..cd3bf17 100644
        this.countdown,
      );
  
-@@ -422,6 +437,7 @@ export class Island {
+@@ -340,6 +355,7 @@ export class Island {
+   private wireFsm() {
+     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
+     this.fsm.openOnHover = State.settings.openOnHover;
++    this.fsm.clockVisible = State.settings.showClock;
+     this.fsm.onTransition = (from, to) => {
+       // The greeting is over, however it ended: back to his desktop spot.
+       if (from === "coucou" && to !== "coucou") this.desktop.launch();
+@@ -422,6 +438,7 @@ export class Island {
    }
  
    setView(view: IslandViewName) {
@@ -4033,7 +4044,7 @@ index 9248cce..cd3bf17 100644
      this.stopSequenceIfLeaving(view);
      if (view !== "overview") closePlanCard();
      if (State.mode !== "expanded") {
-@@ -457,6 +473,9 @@ export class Island {
+@@ -457,6 +474,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -4043,7 +4054,7 @@ index 9248cce..cd3bf17 100644
    }
  
    /** A new Coucou waits and Mochi has nothing else to say (he is blue). */
-@@ -687,8 +706,26 @@ export class Island {
+@@ -687,8 +707,26 @@ export class Island {
  
    // ── Geometry ────────────────────────────────────────────────────────────────
  
@@ -4070,7 +4081,7 @@ index 9248cce..cd3bf17 100644
      if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
        h = QUESTION_PICKER_H;
      }
-@@ -791,6 +828,7 @@ export class Island {
+@@ -791,6 +829,7 @@ export class Island {
          return;
        }
        if (State.mode !== "expanded") {
@@ -4078,7 +4089,7 @@ index 9248cce..cd3bf17 100644
          this.fsm.click();
          return;
        }
-@@ -902,6 +940,7 @@ export class Island {
+@@ -902,6 +941,7 @@ export class Island {
        this.fsm.mouseEntered();
      }
      if (!inIsland && wasIn) {
@@ -4086,7 +4097,7 @@ index 9248cce..cd3bf17 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1073,7 +1112,7 @@ export class Island {
+@@ -1073,7 +1113,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -4095,7 +4106,7 @@ index 9248cce..cd3bf17 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1195,6 +1234,7 @@ export class Island {
+@@ -1195,6 +1235,7 @@ export class Island {
  
    private syncDom() {
      const expanded = State.mode === "expanded";
@@ -4103,7 +4114,7 @@ index 9248cce..cd3bf17 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1215,6 +1255,7 @@ export class Island {
+@@ -1215,6 +1256,7 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -4111,7 +4122,7 @@ index 9248cce..cd3bf17 100644
        if (on) view.sync();
      }
  
-@@ -1232,16 +1273,25 @@ export class Island {
+@@ -1232,16 +1274,25 @@ export class Island {
      }
  
      // Compact mini grid
@@ -4140,7 +4151,7 @@ index 9248cce..cd3bf17 100644
          }
          pruneMiniBots();
        }
-@@ -1249,20 +1299,22 @@ export class Island {
+@@ -1249,20 +1300,22 @@ export class Island {
  
      this.updateClock();
  
@@ -4170,7 +4181,17 @@ index 9248cce..cd3bf17 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1281,6 +1333,6 @@ export class Island {
+@@ -1271,6 +1324,9 @@ export class Island {
+     Sound.setVolume(State.settings.soundVolume);
+     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
+     this.fsm.openOnHover = State.settings.openOnHover;
++    this.fsm.clockVisible = State.settings.showClock;
++    if (!State.paused && this.fsm.clockVisible) this.fsm.reveal();
++    if (this.fsm.state === "petit" && !this.wasInIsland) this.fsm.mouseLeft();
+     State.notify();
+     // ponytail: one timer for the life of the window; a minute is the clock's finest tick.
+     this.clockTimer ??= window.setInterval(() => this.updateClock(), 10_000);
+@@ -1281,6 +1337,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -6241,7 +6262,7 @@ index 491bc9b..b1a5e07 100644
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index 0c338b4..63acdac 100644
+index 0c338b4..cdc99cf 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
 @@ -2,7 +2,74 @@
@@ -6299,18 +6320,18 @@ index 0c338b4..63acdac 100644
 +            "tr": "Bir bakışta saat ve tarih"
 +          },
 +          "detail": {
-+            "en": "A two-line clock beside Mochi and the mini agents. Requests and important alerts keep priority.",
-+            "zh-Hans": "Mochi 和迷你智能体旁的双行时钟。请求和重要提醒优先显示。",
-+            "hi": "मोची और छोटे एजेंटों के साथ दो पंक्तियों वाली घड़ी। अनुरोध और ज़रूरी सूचनाएँ पहले दिखती हैं।",
-+            "es": "Reloj en dos líneas junto a Mochi y los miniagentes. Las solicitudes y los avisos importantes mantienen la prioridad.",
-+            "ar": "ساعة بسطرين بجانب موتشي والوكلاء الصغار. تبقى الطلبات والتنبيهات المهمة ذات أولوية.",
-+            "fr": "Une horloge sur deux lignes près de Mochi et des mini-agents. Les demandes et alertes importantes restent prioritaires.",
-+            "bn": "মোচি ও ছোট এজেন্টদের পাশে দুই লাইনের ঘড়ি। অনুরোধ ও জরুরি সতর্কতা অগ্রাধিকার পায়।",
-+            "pt-BR": "Relógio em duas linhas ao lado do Mochi e dos miniagentes. Pedidos e alertas importantes mantêm a prioridade.",
-+            "ru": "Двухстрочные часы рядом с Моти и мини-агентами. Запросы и важные уведомления сохраняют приоритет.",
-+            "id": "Jam dua baris di samping Mochi dan agen mini. Permintaan dan peringatan penting tetap diprioritaskan.",
-+            "de": "Eine zweizeilige Uhr neben Mochi und den Mini-Agenten. Anfragen und wichtige Hinweise behalten Vorrang.",
-+            "tr": "Mochi ve mini ajanların yanında iki satırlı saat. İstekler ve önemli uyarılar önceliğini korur."
++            "en": "Keeps the closed island visible. A two-line clock beside Mochi and the mini agents. Requests and important alerts keep priority.",
++            "zh-Hans": "收起后仍保持显示。Mochi 和迷你智能体旁的双行时钟。请求和重要提醒优先显示。",
++            "hi": "बंद आइलैंड दिखाई देता रहता है। मोची और छोटे एजेंटों के साथ दो पंक्तियों वाली घड़ी। अनुरोध और ज़रूरी सूचनाएँ पहले दिखती हैं।",
++            "es": "La isla cerrada permanece visible. Reloj en dos líneas junto a Mochi y los miniagentes. Las solicitudes y los avisos importantes mantienen la prioridad.",
++            "ar": "تبقى الجزيرة المطوية ظاهرة. ساعة بسطرين بجانب موتشي والوكلاء الصغار. تبقى الطلبات والتنبيهات المهمة ذات أولوية.",
++            "fr": "L’île fermée reste visible. Une horloge sur deux lignes près de Mochi et des mini-agents. Les demandes et alertes importantes restent prioritaires.",
++            "bn": "বন্ধ আইল্যান্ড দৃশ্যমান থাকে। মোচি ও ছোট এজেন্টদের পাশে দুই লাইনের ঘড়ি। অনুরোধ ও জরুরি সতর্কতা অগ্রাধিকার পায়।",
++            "pt-BR": "A ilha fechada permanece visível. Relógio em duas linhas ao lado do Mochi e dos miniagentes. Pedidos e alertas importantes mantêm a prioridade.",
++            "ru": "Свёрнутый остров остаётся видимым. Двухстрочные часы рядом с Моти и мини-агентами. Запросы и важные уведомления сохраняют приоритет.",
++            "id": "Pulau tertutup tetap terlihat. Jam dua baris di samping Mochi dan agen mini. Permintaan dan peringatan penting tetap diprioritaskan.",
++            "de": "Die geschlossene Insel bleibt sichtbar. Eine zweizeilige Uhr neben Mochi und den Mini-Agenten. Anfragen und wichtige Hinweise behalten Vorrang.",
++            "tr": "Kapalı ada görünür kalır. Mochi ve mini ajanların yanında iki satırlı saat. İstekler ve önemli uyarılar önceliğini korur."
 +          }
 +        }
 +      ]
@@ -6671,10 +6692,10 @@ index 0000000..3504be3
 +  }
 +});
 diff --git a/windows/tests/fsm.test.mjs b/windows/tests/fsm.test.mjs
-index f1685dd..8ec16b4 100644
+index f1685dd..6e44175 100644
 --- a/windows/tests/fsm.test.mjs
 +++ b/windows/tests/fsm.test.mjs
-@@ -377,3 +377,37 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
+@@ -377,3 +377,71 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
    seconds(2);
    assert.equal(fsm.state, "petit");
  });
@@ -6710,6 +6731,40 @@ index f1685dd..8ec16b4 100644
 +  fsm.musicVisible = false;
 +  fsm.mouseLeft();
 +  seconds(60);
++  assert.equal(fsm.state, 'hidden');
++});
++
++test('the clock keeps a closed island visible after the pointer leaves', () => {
++  fsm.clockVisible = true;
++  fsm.reveal();
++  fsm.mouseLeft();
++  seconds(600);
++  assert.equal(fsm.state, 'petit');
++  fsm.click();
++  fsm.mouseLeft();
++  seconds(15);
++  assert.equal(fsm.state, 'petit');
++  seconds(600);
++  assert.equal(fsm.state, 'petit');
++});
++
++test('enabling the clock defeats a pending hide and disabling restores auto-hide', () => {
++  fsm.reveal();
++  seconds(59);
++  fsm.clockVisible = true;
++  seconds(600);
++  assert.equal(fsm.state, 'petit');
++  fsm.clockVisible = false;
++  fsm.mouseLeft();
++  seconds(60);
++  assert.equal(fsm.state, 'hidden');
++});
++
++test('an explicit pause can still hide the island with the clock enabled', () => {
++  fsm.clockVisible = true;
++  fsm.reveal();
++  fsm.forceHidden();
++  seconds(600);
 +  assert.equal(fsm.state, 'hidden');
 +});
 diff --git a/windows/tests/github-dashboard.test.mjs b/windows/tests/github-dashboard.test.mjs

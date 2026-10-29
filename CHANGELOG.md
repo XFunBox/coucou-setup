@@ -4,6 +4,7 @@
 
 - Música en compacto con carátula cacheada, título, artista y onda animada. Ancho adaptable y apertura de controles mediante la animación existente.
 - Pausar o detener restaura la vista compacta tras un segundo. La música evita la ocultación automática mientras se muestra.
+- Con el reloj activado, la isla cerrada permanece visible sin ocultarse tras 60 segundos. Las tarjetas abiertas conservan su autocierre.
 - Reloj opcional en dos líneas con Mochi y miniagentes 2×2. Permisos y avisos importantes conservan la prioridad.
 - MPRIS genérico como alternativa cuando no están Spotifast ni Spotify; conserva los controles dirigidos a su propietario D-Bus. Las portadas mantienen la lista de orígenes permitidos.
 
