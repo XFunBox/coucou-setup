@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.5.3-sendoa.2 — 2026-10-29
+
+- Música en compacto con carátula cacheada, título, artista y onda animada. Ancho adaptable y apertura de controles mediante la animación existente.
+- Pausar o detener restaura la vista compacta tras un segundo. La música evita la ocultación automática mientras se muestra.
+- Reloj opcional en dos líneas con Mochi y miniagentes 2×2. Permisos y avisos importantes conservan la prioridad.
+- MPRIS genérico como alternativa cuando no están Spotifast ni Spotify; conserva los controles dirigidos a su propietario D-Bus. Las portadas mantienen la lista de orígenes permitidos.
+
 ## 0.5.3-sendoa.1 — 2026-10-28
 
 - Actualiza la base oficial a Linux 0.5.3, conservando EVA-01, Codex IPC, monitor y sala de agentes, filtro Guardian, permisos, GitHub y Spotifast/MPRIS.

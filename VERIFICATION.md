@@ -1,3 +1,17 @@
+# Verificación — 2026-10-29 — música y reloj compactos
+
+Versión local **0.5.3-sendoa.2** sobre Linux 0.5.3. Música compacta con carátula cacheada, metadatos y onda animada; pausa con un segundo de gracia y click para abrir controles. Reloj en dos líneas y miniagentes 2×2. Alertas y solicitudes conservan prioridad. MPRIS amplía la selección a reproductores genéricos registrados manteniendo preferencia Spotifast/Spotify.
+
+- 495 pruebas Node, TypeScript y Vite correctos. Rust: 566 aplicación y 34 relé correctas; 12 ignoradas en la suite general. Seis pruebas MPRIS adicionales correctas en bus privado, incluidos cambio de reproductor al pausar, propietario y señales ajenas. Tauri release compilado.
+- Diez pruebas Python del instalador, sintaxis Bash y revisión independiente correctas. Corregido el hallazgo de selección MPRIS y revisada la corrección.
+- Parche completo de 69 archivos aplicado a upstream limpio; 1182 archivos indexados y el certificado fixture heredado cotejados byte a byte. Hash del parche en source-lock.json.
+- QA navegador con componentes reales y datos simulados: reloj 288 px, música 400 px, pausa, click y tarjeta; cero errores de consola. No equivale a captura nativa KDE.
+- Instalación local real con copia y reversión preparadas: servicio active/running, versión y layer-shell confirmados, hashes de binarios idénticos al release y ldd sin bibliotecas ausentes. Activado showClock; otros ajustes, hooks y acceso del menú conservados. Integración musical activada; ningún reproductor MPRIS publicado en la consulta final de solo lectura.
+- Controles musicales probados con reproductores simulados, sin enviar controles a la música del usuario. La reversión real no se ejercitó. Las portadas mantienen los orígenes permitidos previos. No se probaron aquí voz/modelos, Android ni instalación limpia.
+- Compilación reutiliza dependencias y cachés de la imagen local anterior. Receta pública completa conservada. Sin push, tag ni publicación remota.
+
+---
+
 # Verificación — 2026-10-28 — port Linux 0.5.3
 
 Versión **0.5.3-sendoa.1**, preparada desde el setup limpio `4f36aa41048764ecadc12515669990a80429607f`. El tag oficial `linux-v0.5.3` apunta directamente al commit `47d1c2da12bf1dce8fb28b825757d497c1e1d88d`; el tarball canónico fijado tiene SHA-256 `d0514ed726279085492f7361aa1e4d7e554984d982182b8ccdda78b8ebe38781`.
