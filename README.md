@@ -4,6 +4,21 @@ Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuro
 
 Setup de **Coucou 0.5.3-sendoa.3** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.3, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
+
+## Así se ve
+
+**Reloj y miniagentes** — captura real en KDE Plasma. La isla cerrada mantiene la hora y la fecha visibles.
+
+![Coucou cerrado con la hora, la fecha y los miniagentes](docs/images/reloj-compacto.png)
+
+**Música compacta** — vista de prueba de la interfaz con datos de demostración. Muestra carátula, título, artista y onda animada; al pulsar abre los controles.
+
+![Vista de prueba de la música compacta con carátula y datos de la canción](docs/images/musica-compacta.png)
+
+Capturas de la personalización EVA-01. Coucou y el personaje Mochi son de Louis Raillé; uso de capturas según [las condiciones del autor](LICENSE-ASSETS.md).
+
+## Funciones
+
 Incluye:
 
 - Base Linux 0.5.3: conserva las novedades oficiales de 0.5.2 y 0.5.3, incluidos GitLab/Gitea, WhatsApp experimental y la pantalla de novedades. Añade música compacta con carátula, título, artista y onda animada; al pausar vuelve al compacto tras un segundo. Con el reloj activado, la isla cerrada permanece visible. El reloj optativo muestra hora y fecha en dos líneas, con Mochi y miniagentes 2×2. Las solicitudes y alertas conservan la prioridad.
