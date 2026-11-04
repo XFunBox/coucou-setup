@@ -38,7 +38,7 @@ index 8bedf06..887d372 100644
  | 0.5.2 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.2) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.2) | Oct 22, 2026 | Mochi turns blue when a new version waits, What's new after each update; GitLab and Gitea pills; the weekly recap on Android |
  | 0.5.1 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.1) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.1) | Oct 20, 2026 | New version in the island, one click to install it on Windows; German and Turkish; an optional clock; Linux idle CPU fixed |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 79ad9b1..e51112c 100644
+index 79ad9b1..d3982d9 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -46,7 +46,7 @@ index 79ad9b1..e51112c 100644
  [[package]]
  name = "coucou"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.6"
++version = "0.5.3-sendoa.7"
  dependencies = [
   "arboard",
   "cpal",
@@ -55,12 +55,12 @@ index 79ad9b1..e51112c 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.6"
++version = "0.5.3-sendoa.7"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 9c8410e..34c8c46 100644
+index 9c8410e..9d540fa 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -68,31 +68,31 @@ index 9c8410e..34c8c46 100644
  
  [workspace.package]
 -version = "0.5.3"
-+version = "0.5.3-sendoa.6"
++version = "0.5.3-sendoa.7"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index d5977dc..e50d126 100644
+index d5977dc..9c5d76c 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.6",
++  "version": "0.5.3-sendoa.7",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.3",
-+      "version": "0.5.3-sendoa.6",
++      "version": "0.5.3-sendoa.7",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 9113b8f..55fa423 100644
+index 9113b8f..8498c37 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -100,7 +100,7 @@ index 9113b8f..55fa423 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.6",
++  "version": "0.5.3-sendoa.7",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -3067,7 +3067,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 0be3d46..7d939bb 100644
+index 0be3d46..a8cd66f 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -3075,7 +3075,7 @@ index 0be3d46..7d939bb 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.6",
++  "version": "0.5.3-sendoa.7",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -5720,7 +5720,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index ebc4093..aeee3a2 100644
+index ebc4093..2b60112 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -6591,7 +6591,7 @@ index ebc4093..aeee3a2 100644
  }
  
  .np-bar.active .np-track,
-@@ -3026,3 +3120,109 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -3026,3 +3120,111 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    unicode-bidi: plaintext;
    text-align: start;
  }
@@ -6650,9 +6650,11 @@ index ebc4093..aeee3a2 100644
 +.quota-ring { --quota: 0%; --quota-color: var(--eva-secondary); display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%; background: radial-gradient(closest-side, var(--eva-panel) 69%, transparent 72%), conic-gradient(var(--quota-color) var(--quota), var(--eva-border) 0); color: var(--eva-text); font: 600 7px var(--font); }
 +.quota-rings.stale { outline: 1px dashed var(--eva-secondary); outline-offset: 2px; border-radius: 12px; }
 +.quota-group { color: var(--eva-secondary); font: 600 10px var(--font); }
-+.quota-row { flex-wrap: wrap; }
++.quota-row { display: grid; grid-template-columns: 40px minmax(40px, 1fr) auto; }
 +.quota-row .plan-label { flex-basis: auto; min-width: 40px; }
-+.quota-value { color: var(--eva-text); }
++.quota-row .plan-bar { width: 100%; }
++.quota-row .plan-reset { grid-column: 1 / -1; white-space: normal; }
++.quota-value { grid-column: 3; color: var(--eva-text); }
 +.plan-card { max-height: 100%; overflow-y: auto; }
 +#compact-quota { position: absolute; right: 65px; top: 5px; padding: 2px; border: 0; background: transparent; cursor: pointer; }
 +#compact-quota:focus-visible, .plan-pill:focus-visible { outline: 2px solid var(--eva-accent); outline-offset: 2px; }
@@ -7587,7 +7589,7 @@ index e851100..3bcc407 100644
            btn(t("Yes, tell me"), "primary", () => Updates.answer(true)),
            btn(t("No thanks"), "secondary", () => Updates.answer(false)),
 diff --git a/windows/src/views/usage.ts b/windows/src/views/usage.ts
-index 9abc2e0..39656e8 100644
+index 9abc2e0..5f3dc77 100644
 --- a/windows/src/views/usage.ts
 +++ b/windows/src/views/usage.ts
 @@ -12,13 +12,13 @@
@@ -7671,7 +7673,7 @@ index 9abc2e0..39656e8 100644
          : pillLabel("Claude", State.planUsage);
      },
    };
-@@ -200,15 +232,25 @@ export class PlanCard {
+@@ -200,15 +232,35 @@ export class PlanCard {
  
    private drawCodex(u: CodexPlanUsage | null, now: number) {
      const rows = h("div", { class: "plan-rows" });
@@ -7690,8 +7692,18 @@ index 9abc2e0..39656e8 100644
 +        const pct = quotaAvailable(w, now);
 +        const row = h("div", { class: "plan-row quota-row" },
 +          h("span", { class: "plan-label", text: quotaWindowLabel(w) }),
-+          h("span", { class: "quota-value", text: pct == null ? t("No data") : t("{n}% available", { n: Math.round(pct) }) }),
 +        );
++        if (pct != null) {
++          const fill = h("i", { class: "plan-fill" });
++          fill.style.width = `${pct}%`;
++          fill.style.background = planColor(100 - pct);
++          row.append(h("span", {
++            class: "plan-bar", role: "progressbar",
++            "aria-label": `${group.label} · ${quotaWindowLabel(w)} · ${t("{n}% available", { n: Math.round(pct) })}`,
++            "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct),
++          }, fill));
++        }
++        row.append(h("span", { class: "quota-value", text: pct == null ? t("No data") : t("{n}% available", { n: Math.round(pct) }) }));
 +        row.append(h("span", { class: "plan-reset", text: pct == null ? t("Update pending") :
 +          `${t("Resets")}: ${new Date(w.resetsAt).toLocaleString(language(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` }));
 +        rows.append(row);
@@ -7809,14 +7821,50 @@ index 491bc9b..d29f8ae 100644
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index 0c338b4..9c5e59a 100644
+index 0c338b4..e406e41 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -2,7 +2,249 @@
+@@ -2,7 +2,285 @@
    "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 12 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
      {
 -      "version": "0.5.3",
++      "version": "0.5.3-sendoa.7",
++      "items": [
++        {
++          "icon": "sparkles",
++          "title": {
++            "en": "Quota bars restored",
++            "zh-Hans": "配额进度条已恢复",
++            "hi": "कोटा बार बहाल",
++            "es": "Barras de cuota recuperadas",
++            "ar": "استعادة أشرطة الحصص",
++            "fr": "Barres de quota rétablies",
++            "bn": "কোটার বার ফিরে এসেছে",
++            "pt-BR": "Barras de cota restauradas",
++            "ru": "Полосы квоты восстановлены",
++            "id": "Bilah kuota dipulihkan",
++            "de": "Kontingentbalken wiederhergestellt",
++            "tr": "Kota çubukları geri geldi"
++          },
++          "detail": {
++            "en": "The Codex detail shows an availability bar for each quota window.",
++            "zh-Hans": "Codex 详情为每个配额周期显示可用量进度条。",
++            "hi": "Codex विवरण में हर कोटा अवधि की उपलब्धता का बार दिखता है।",
++            "es": "El detalle de Codex vuelve a mostrar una barra de disponibilidad por cada ventana de cuota.",
++            "ar": "تعرض تفاصيل Codex شريط الحصة المتاحة لكل فترة.",
++            "fr": "Le détail Codex affiche une barre de disponibilité pour chaque période de quota.",
++            "bn": "Codex বিবরণে প্রতিটি কোটা সময়সীমার উপলব্ধতার বার দেখা যায়।",
++            "pt-BR": "O detalhe do Codex mostra uma barra de disponibilidade por período de cota.",
++            "ru": "В деталях Codex снова видна полоса доступной квоты для каждого периода.",
++            "id": "Detail Codex menampilkan bilah ketersediaan untuk setiap periode kuota.",
++            "de": "Die Codex-Details zeigen wieder einen Verfügbarkeitsbalken für jedes Kontingentfenster.",
++            "tr": "Codex ayrıntıları her kota dönemi için kullanılabilirlik çubuğu gösterir."
++          }
++        }
++      ]
++    },
++    {
 +      "version": "0.5.3-sendoa.6",
 +      "items": [
 +        {
@@ -8948,10 +8996,10 @@ index c228887..838df38 100644
  
 diff --git a/windows/tests/quota-rings.test.mjs b/windows/tests/quota-rings.test.mjs
 new file mode 100644
-index 0000000..0c8ebf4
+index 0000000..d71a879
 --- /dev/null
 +++ b/windows/tests/quota-rings.test.mjs
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,105 @@
 +import { test } from 'node:test';
 +import assert from 'node:assert/strict';
 +import * as plan from '../src/core/plan.ts';
@@ -9020,6 +9068,15 @@ index 0000000..0c8ebf4
 +  card.sync(now);
 +  assert.match(card.el.textContent, /review/);
 +  assert.match(card.el.textContent, /95% available/);
++  const descendants = el => el.children.flatMap(child => [child, ...descendants(child)]);
++  const bars = () => descendants(card.el).filter(el => el.classList.contains('plan-bar'));
++  assert.equal(bars().length, 3, 'every quota window keeps its visual bar');
++  assert.deepEqual(bars().map(bar => bar.children[0].style.width), ['75%', '0%', '95%']);
++  assert.deepEqual(bars().map(bar => bar.getAttribute('aria-valuenow')), ['75', '0', '95']);
++  assert.ok(bars().every(bar => bar.getAttribute('aria-label').includes('available')));
++  card.sync(now + 3600_000);
++  assert.equal(bars().length, 0, 'expired windows must not imply available quota');
++
 +  State.codexPlanUsage = null;
 +  rings.sync(now);
 +  assert.match(rings.el.getAttribute('aria-label'), /No data/);

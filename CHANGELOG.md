@@ -1,5 +1,10 @@
 # Cambios
 
+## 0.5.3-sendoa.7 — 2026-11-04
+
+- Recupera las barras de disponibilidad en el detalle de Codex al pulsar los anillos de cuota. Mantiene todos los grupos, ventanas y fechas de reinicio reales.
+- No representa como disponible una cuota caducada o desconocida. Conserva las mejoras .6 y el hotfix de escalado.
+
 ## 0.5.3-sendoa.6 — 2026-11-04
 
 - Entrega conjunta: borde vivo, cuotas disponibles, música según capacidades, reloj orbital, avisos compactos, historial de sesión y constelación de agentes reales.

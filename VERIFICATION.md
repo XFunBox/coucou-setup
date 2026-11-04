@@ -1,3 +1,12 @@
+# Verificación — 2026-11-04 — barras de cuota
+
+Versión **0.5.3-sendoa.7**. Corrección de interfaz: .6 había sustituido las barras del detalle de Codex por texto al añadir varios grupos de cuota. Recupera una barra por ventana válida; el porcentaje representa disponibilidad y el color avisa al agotarse. Mantiene las lecturas caducadas como pendientes.
+
+- Regresión de barras reproducida antes de corregir. Tres archivos Node dirigidos (cuotas, plan y novedades), TypeScript y Vite correctos. Los cambios Rust son únicamente metadatos de versión; se conserva la validación de .6.
+- Tauri release compilado e instalado en KDE Wayland/layer-shell; proceso único y hash del ejecutable comprobados. Ajustes, hooks y accesos conservados byte a byte; copia anterior y restauración preparadas. No se realizó una inspección visual nativa completa.
+- Parche aplicado a upstream limpio y 1190 archivos cotejados; diez pruebas Python del instalador y sintaxis Bash correctas.
+- Navegador con el componente real y datos ficticios en tarjetas de 322 × 160: barras de 75 % y 0 %, sin desbordamiento horizontal; las ventanas caducadas no dibujan barras. No equivale a inspección nativa en KDE.
+
 # Verificación — 2026-11-04 — mejoras visuales integradas
 
 Versión **0.5.3-sendoa.6**. Integra borde vivo, anillos de cuota disponible, música según capacidades, reloj orbital, avisos compactos, historial de sesión y constelación de agentes reales. Conserva exactamente la corrección de escalado d4ead41 publicada en .5. Sin cambios de Mochi ni temporizador de enfoque.
