@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.3-sendoa.5 — 2026-11-04
+
+- Hotfix de escala y posición de la isla y la sala en Wayland al cambiar entre monitores con distinta escala. Conserva el tamaño lógico y consulta la escala actual de GTK.
+- Basado en la revisión pública .3. Las mejoras visuales en preparación se reservan para la siguiente entrega (.6).
+
+
 ## 0.5.3-sendoa.3 — 2026-10-29
 
 - Corrige el mini reloj: los estados de agentes terminados, avisos y texto de subagentes ya no sustituyen la hora en la isla cerrada. Los miniagentes mantienen sus indicadores.

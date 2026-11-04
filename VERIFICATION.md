@@ -1,3 +1,16 @@
+# Verificación — 2026-11-04 — hotfix de escalado
+
+Versión pública **0.5.3-sendoa.5**, basada en la .3 publicada. Corrige el tamaño lógico de la isla/sala en Linux y obtiene la escala actual de GTK para el zoom. Las mejoras visuales pendientes no están incluidas; próxima entrega prevista .6.
+
+- Dos regresiones Rust reprodujeron ambos sentidos del fallo antes del cambio. Después: ocho pruebas de island correctas.
+- El backend modificado es byte idéntico al compilado en release y probado nativamente en KDE Wayland sobre la instalación local .4. DELL al 100 % y portátil al 140 %; captura de isla completa y centrada, y confirmación del usuario «Así perfecto». No se automatizó un recorrido entre pantallas.
+- Fuente upstream fijada y SHA verificado. Parche aplicado en una segunda fuente limpia; 69 archivos modificados cotejados byte a byte. Hash fijado en source-lock.json.
+- Suite Node: 35 archivos de pruebas aprobados, cero fallos. TypeScript y Vite correctos; aviso heredado de bundle grande. Diez pruebas Python del instalador y sintaxis Bash correctas.
+- Release de código y setup reproducible, sin binarios adjuntos. No se ha recompilado un binario con la etiqueta .5: la instalación local conserva .4 con este hotfix y su borde vivo existente. Copia del ejecutable previo conservada.
+- El código de las mejoras pendientes incorpora también el hotfix para conservarlo en la siguiente entrega.
+
+---
+
 # Verificación — 2026-10-29 — reloj al terminar los agentes
 
 Versión **0.5.3-sendoa.3**. El estado `finished` activaba el texto compacto de subagentes y ocultaba el reloj; volver a `working` lo mostraba otra vez. Con showClock activado, hora y fecha conservan el centro del compacto también en estados terminado, error y aprobación. Los miniagentes mantienen sus indicadores; música y tarjetas expandidas conservan su comportamiento.

@@ -1,10 +1,15 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 4a9b2ea..7e7c699 100644
+index 4a9b2ea..00591b2 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -1,5 +1,16 @@
+@@ -1,5 +1,21 @@
  # Changelog
  
++## Linux 0.5.3-sendoa.5 — November 4, 2026
++
++- Fix island and agent room sizing on Wayland displays with different scales. Linux geometry uses logical dimensions and the webview reads the current GTK scale.
++
++
 +## Linux 0.5.3-sendoa.3 — October 29, 2026
 +
 +- Keep the compact clock visible after agents finish and during alerts; agent status remains in the miniature grid.
@@ -33,7 +38,7 @@ index 8bedf06..c37bf92 100644
  | 0.5.2 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.2) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.2) | Oct 22, 2026 | Mochi turns blue when a new version waits, What's new after each update; GitLab and Gitea pills; the weekly recap on Android |
  | 0.5.1 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.1) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.1) | Oct 20, 2026 | New version in the island, one click to install it on Windows; German and Turkish; an optional clock; Linux idle CPU fixed |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 79ad9b1..fce5a4c 100644
+index 79ad9b1..c6659ac 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -41,7 +46,7 @@ index 79ad9b1..fce5a4c 100644
  [[package]]
  name = "coucou"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.3"
++version = "0.5.3-sendoa.5"
  dependencies = [
   "arboard",
   "cpal",
@@ -50,12 +55,12 @@ index 79ad9b1..fce5a4c 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.3"
++version = "0.5.3-sendoa.5"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 9c8410e..fd374f0 100644
+index 9c8410e..1793ea8 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -63,31 +68,31 @@ index 9c8410e..fd374f0 100644
  
  [workspace.package]
 -version = "0.5.3"
-+version = "0.5.3-sendoa.3"
++version = "0.5.3-sendoa.5"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index d5977dc..888f0ce 100644
+index d5977dc..a6aef07 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.3",
++  "version": "0.5.3-sendoa.5",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.3",
-+      "version": "0.5.3-sendoa.3",
++      "version": "0.5.3-sendoa.5",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 9113b8f..ddbb525 100644
+index 9113b8f..6023670 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -95,7 +100,7 @@ index 9113b8f..ddbb525 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.3",
++  "version": "0.5.3-sendoa.5",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1525,10 +1530,18 @@ index e41e226..b794ab7 100644
      };
      if had_data {
 diff --git a/windows/src-tauri/src/island.rs b/windows/src-tauri/src/island.rs
-index b7cf921..d200ffb 100644
+index b7cf921..077503b 100644
 --- a/windows/src-tauri/src/island.rs
 +++ b/windows/src-tauri/src/island.rs
-@@ -15,8 +15,8 @@ use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize
+@@ -10,13 +10,15 @@ use std::sync::{Arc, Condvar, Mutex};
+ use std::time::Duration;
+ 
+ use serde::Serialize;
+-use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
++use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, WebviewWindow};
++#[cfg(not(target_os = "linux"))]
++use tauri::PhysicalSize;
+ 
  use crate::platform::{self, cursor_physical, left_button_down};
  
  /// Logical size of the full window — the largest island view, like the macOS panel.
@@ -1539,7 +1552,38 @@ index b7cf921..d200ffb 100644
  /// Logical size of the invisible strip that wakes the island when it is hidden.
  pub const STRIP_W: f64 = 240.0;
  pub const STRIP_H: f64 = 6.0;
-@@ -360,8 +360,8 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+@@ -350,6 +352,30 @@ pub fn screen_info(app: &AppHandle, pref: &str) -> ScreenInfo {
+     }
+ }
+ 
++// Tao can retain the previous output scale for a GTK layer surface. Sending
++// logical dimensions avoids converting through that stale cached scale.
++fn requested_window_size(pw: u32, ph: u32, monitor_scale: f64) -> tauri::Size {
++    #[cfg(target_os = "linux")]
++    { tauri::LogicalSize::new(pw as f64 / monitor_scale, ph as f64 / monitor_scale).into() }
++    #[cfg(not(target_os = "linux"))]
++    { let _ = monitor_scale; PhysicalSize::new(pw, ph).into() }
++}
++
++#[cfg(all(test, target_os = "linux"))]
++mod mixed_display_tests {
++    use super::*;
++    #[test]
++    fn moving_from_double_scale_keeps_dell_panel_logical_size() {
++        let size = requested_window_size(960, 540, 1.0).to_logical::<f64>(2.0);
++        assert_eq!((size.width, size.height), (960.0, 540.0));
++    }
++    #[test]
++    fn double_scale_panel_keeps_its_logical_size_with_stale_single_scale() {
++        let size = requested_window_size(1920, 1080, 2.0).to_logical::<f64>(1.0);
++        assert_eq!((size.width, size.height), (960.0, 540.0));
++    }
++}
++
+ /// Places and sizes the window. `collapsed` picks the wake strip instead of the panel.
+ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+     let Some(win) = window(app) else { return };
+@@ -360,8 +386,8 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
      let ms = *m.size();
  
      let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
@@ -1550,8 +1594,33 @@ index b7cf921..d200ffb 100644
      let x = mp.x + (ms.width as i32 - pw as i32) / 2;
      let y = mp.y;
  
+@@ -372,12 +398,12 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+     // still offers the user nothing to resize it by. (Found by @YossiYad, #44.)
+     #[cfg(target_os = "linux")]
+     let _ = win.set_resizable(true);
+-    let _ = win.set_size(PhysicalSize::new(pw, ph));
++    let _ = win.set_size(requested_window_size(pw, ph, scale));
+     let _ = win.set_position(PhysicalPosition::new(x, y));
+     let (lx, ly) = logical_origin(&m);
+     platform::pin_to_monitor(&win, lx, ly);
+-    // Moving across displays can rescale the window: re-assert the physical size.
+-    let _ = win.set_size(PhysicalSize::new(pw, ph));
++    // Moving across displays can rescale the window: re-assert its dimensions.
++    let _ = win.set_size(requested_window_size(pw, ph, scale));
+     let _ = win.set_always_on_top(true);
+ 
+     // On Windows, moving across displays or waking from the strip can clamp or lag
+@@ -388,7 +414,7 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+                 "window size mismatch: wanted {pw}x{ph}, got {}x{} (scale {scale}, monitor {}x{})",
+                 got.width, got.height, ms.width, ms.height
+             ));
+-            let _ = win.set_size(PhysicalSize::new(pw, ph));
++            let _ = win.set_size(requested_window_size(pw, ph, scale));
+             let _ = win.set_position(PhysicalPosition::new(x, y));
+         }
+     }
 diff --git a/windows/src-tauri/src/lib.rs b/windows/src-tauri/src/lib.rs
-index 5e544f8..4d5828f 100644
+index 5e544f8..3eca98b 100644
 --- a/windows/src-tauri/src/lib.rs
 +++ b/windows/src-tauri/src/lib.rs
 @@ -4,6 +4,8 @@ mod agent_hooks;
@@ -1563,7 +1632,20 @@ index 5e544f8..4d5828f 100644
  mod codex_plan;
  mod config_file;
  mod desktop;
-@@ -489,6 +491,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
+@@ -206,6 +208,12 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
+ fn fit_zoom(app: AppHandle, dpr: f64) -> bool {
+     let Some(win) = island::window(&app) else { return false };
+     let scale = win.scale_factor().unwrap_or(1.0);
++    #[cfg(target_os = "linux")]
++    let scale = {
++        use gtk::prelude::WidgetExt;
++        // Layer-shell may move outputs without updating Tao's cached scale.
++        win.gtk_window().map(|w| w.scale_factor() as f64).unwrap_or(scale)
++    };
+     static ZOOM: std::sync::Mutex<f64> = std::sync::Mutex::new(1.0);
+     let mut zoom = ZOOM.lock().unwrap();
+     if let Some(new_zoom) = island::calculate_zoom_correction(*zoom, scale, dpr) {
+@@ -489,6 +497,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
      tauri::async_runtime::spawn_blocking(codex_plan::read).await.ok().flatten()
  }
  
@@ -1627,7 +1709,7 @@ index 5e544f8..4d5828f 100644
  #[tauri::command]
  fn approval_decision(app: AppHandle, request_id: String, decision: String) {
      recap::record_decision(&app, &request_id, &decision);
-@@ -836,6 +895,12 @@ pub fn run() {
+@@ -836,6 +901,12 @@ pub fn run() {
              status_line_preview,
              status_line_apply,
              codex_plan_usage,
@@ -2700,7 +2782,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 0be3d46..f3d689d 100644
+index 0be3d46..032fbae 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -2708,7 +2790,7 @@ index 0be3d46..f3d689d 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.3",
++  "version": "0.5.3-sendoa.5",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -6267,14 +6349,50 @@ index 491bc9b..b1a5e07 100644
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index 0c338b4..0d7414a 100644
+index 0c338b4..6921c8d 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -2,7 +2,110 @@
+@@ -2,7 +2,146 @@
    "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 12 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
      {
 -      "version": "0.5.3",
++      "version": "0.5.3-sendoa.5",
++      "items": [
++        {
++          "icon": "clock",
++          "title": {
++            "en": "Correct size on every screen",
++            "es": "Tamaño correcto en cada pantalla",
++            "fr": "La bonne taille sur chaque écran",
++            "de": "Passende Größe auf jedem Bildschirm",
++            "pt-BR": "Tamanho certo em cada tela",
++            "ru": "Верный размер на каждом экране",
++            "tr": "Her ekranda doğru boyut",
++            "id": "Ukuran tepat di setiap layar",
++            "zh-Hans": "每个屏幕上的正确大小",
++            "hi": "हर स्क्रीन पर सही आकार",
++            "bn": "প্রতি পর্দায় সঠিক আকার",
++            "ar": "الحجم الصحيح على كل شاشة"
++          },
++          "detail": {
++            "en": "The island and agent room keep their size when switching between displays with different scales.",
++            "es": "La isla y la sala mantienen su tamaño al cambiar entre pantallas con distinta escala.",
++            "fr": "L’île et la salle des agents gardent leur taille entre des écrans aux échelles différentes.",
++            "de": "Insel und Agentenraum behalten ihre Größe beim Wechsel zwischen unterschiedlich skalierten Bildschirmen.",
++            "pt-BR": "A ilha e a sala mantêm o tamanho ao alternar entre telas com escalas diferentes.",
++            "ru": "Остров и комната агентов сохраняют размер при переходе между экранами с разным масштабом.",
++            "tr": "Ada ve ajan odası, farklı ölçekli ekranlar arasında geçiş yaparken boyutunu korur.",
++            "id": "Pulau dan ruang agen mempertahankan ukuran saat berpindah antara layar dengan skala berbeda.",
++            "zh-Hans": "在不同缩放比例的屏幕之间切换时，岛和智能体房间保持正确大小。",
++            "hi": "अलग-अलग स्केल वाली स्क्रीन के बीच जाने पर आइलैंड और एजेंट रूम अपना आकार बनाए रखते हैं।",
++            "bn": "ভিন্ন স্কেলের পর্দার মধ্যে বদলালে আইল্যান্ড ও এজেন্ট রুম তাদের আকার ধরে রাখে।",
++            "ar": "تحافظ الجزيرة وغرفة الوكلاء على حجمهما عند الانتقال بين شاشات بمقاييس مختلفة."
++          }
++        }
++      ]
++    },
++    {
 +      "version": "0.5.3-sendoa.3",
 +      "items": [
 +        {
