@@ -1,3 +1,17 @@
+# Verificación — 2026-11-04 — Linux 0.5.9 custom
+
+Versión **0.5.9-sendoa.1**, portada desde .7 sobre el commit oficial `74363634b037108393e450428e5f207515c2c29b`. Conserva EVA-01, chat Codex IPC, cuotas por grupo y barras, reloj permanente, MPRIS/Spotifast, historial y sala de agentes. Adapta el cierre configurable, cola de permisos y paginación GitHub.
+
+- **605 pruebas Node** pasan en la suite completa con Node 22 del contenedor. TypeScript y Vite correctos; se conserva el aviso de bundle grande. El runner activa transform-types para la sintaxis TypeScript incorporada por upstream.
+- **Rust release:** 622 pruebas de la aplicación y 34 del relé pasan; 14 ignoradas en la ejecución general. Las **24 de Spotify/MPRIS**, incluidas las fixtures con bus D-Bus privado, pasan aparte. **26 regresiones Rust de GitHub** también pasan.
+- Revisión independiente de permisos/prioridades, reloj/cuotas, geometría y dashboard/IPC sin hallazgos accionables. Regresiones nuevas verifican que una respuesta AskUserQuestion de otra sesión no retire la solicitud activa y que se depuren las respuestas en cola de la misma sesión.
+- Fuente canónica y parche fijados por SHA-256. Parche aplicado a una segunda fuente limpia y **1275 archivos** cotejados byte a byte. Diez pruebas Python del instalador y sintaxis Bash correctas.
+- Tauri release compilado e instalado en KDE Wayland: versión nueva y layer-shell confirmados en registro, una sola instancia y hash del ejecutable en memoria cotejado. Ajustes, hooks, menú e inicio automático byte idénticos; copia previa y script de restauración preparados. La reversión queda preparada, sin ejercitarse sobre la instalación correcta.
+
+La compilación local reutiliza dependencias e imágenes/cachés previas; no equivale a reconstruir desde imágenes base limpias. No se reparó el registro dañado del catálogo de imágenes Docker. No se hizo un recorrido visual nativo entre monitores con escalas distintas, ni se enviaron mensajes al chat o controles a un reproductor real. Las pruebas de micrófono, servicios externos y móviles que necesitan dispositivos/credenciales quedan fuera de esta validación. El validador Python upstream de novedades sigue sin admitir las versiones históricas Sendoa; las pruebas Node de novedades y traducciones pasan.
+
+---
+
 # Verificación — 2026-11-04 — barras de cuota
 
 Versión **0.5.3-sendoa.7**. Corrección de interfaz: .6 había sustituido las barras del detalle de Codex por texto al añadir varios grupos de cuota. Recupera una barra por ventana válida; el porcentaje representa disponibilidad y el color avisa al agotarse. Mantiene las lecturas caducadas como pendientes.

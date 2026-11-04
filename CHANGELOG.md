@@ -1,5 +1,12 @@
 # Cambios
 
+## 0.5.9-sendoa.1 — 2026-11-04
+
+- Actualiza a Linux 0.5.9 conservando EVA-01, chat Codex compartido, cuotas por grupo, música MPRIS/Spotifast, historial y constelación de agentes.
+- Adapta el cierre configurable y mantiene el reloj compacto y la corrección de tamaño lógico en KDE.
+- Integra el recuento completo de estrellas GitHub y conserva el dashboard acotado con caché y cancelación.
+- Conserva la cola de solicitudes con caducidad; las respuestas de otra sesión no retiran preguntas activas.
+
 ## 0.5.3-sendoa.7 — 2026-11-04
 
 - Recupera las barras de disponibilidad en el detalle de Codex al pulsar los anillos de cuota. Mantiene todos los grupos, ventanas y fechas de reinicio reales.

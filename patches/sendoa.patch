@@ -1,10 +1,16 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 4a9b2ea..eabb6e9 100644
+index 3e425bf..8d6601a 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -1,5 +1,20 @@
+@@ -1,5 +1,26 @@
  # Changelog
  
++## Linux 0.5.9-sendoa.1 — November 4, 2026
++
++- Rebase the Sendoa fork on Linux 0.5.9, retaining EVA-01, Codex desktop IPC, grouped quotas, compact clock/music, activity history and agent room.
++- Integrate queued permissions and configurable closed-island geometry while preserving Linux logical sizing.
++- Combine complete GitHub star pagination with the bounded, cached repository dashboard.
++
 +## Linux 0.5.3-sendoa.4 — October 29, 2026
 +
 +- Add an inset live border aggregated across agents: requests take priority over errors, work and completion. Respect reduced motion without changing focus, dimensions, permissions or clock.
@@ -22,85 +28,86 @@ index 4a9b2ea..eabb6e9 100644
 +
  ## Unreleased
  
- - **Mac: WhatsApp statuses aren't chats** — a contact's WhatsApp Status and channel posts no longer show up as a conversation in the WhatsApp pill (#901, same fix as #910)
+ - **Android phone link (Mac)** — Coucou for Android can now pair with your Mac, the way it already does with Windows and Linux (Settings → Android phone, off by default). Scan the QR code on the same Wi-Fi, see your agent sessions, and allow or deny a permission request from the phone; Allow still needs the phone's fingerprint or screen lock. Optional switches show session details, let the phone answer Claude Code's questions and show your plan usage. Coucou listens on your local network only while the switch is on, the certificate and the pairing code stay in the Keychain, and nothing runs while it is off (GitHub build; not in the App Store build)
 diff --git a/README.md b/README.md
-index 8bedf06..887d372 100644
+index ab75aa7..7863ba5 100644
 --- a/README.md
 +++ b/README.md
-@@ -173,6 +173,9 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
+@@ -181,6 +181,10 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
  
  | Windows & Linux | Date | Highlights |
  |---------|------|------------|
++| 0.5.9-sendoa.1 (Linux fork) | Nov 4, 2026 | Linux 0.5.9 with EVA-01, Codex IPC, grouped quotas, compact clock/music and logical sizing retained |
 +| 0.5.3-sendoa.4 (Linux fork) | Oct 29, 2026 | Live agent border with reduced-motion support |
 +| 0.5.3-sendoa.3 (Linux fork) | Oct 29, 2026 | Keep the compact clock visible after agents finish |
 +| 0.5.3-sendoa.2 (Linux fork) | Oct 29, 2026 | Compact music with artwork and waveform, persistent two-line clock and MPRIS fallback |
- | 0.5.3 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.3) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.3) | Oct 22, 2026 | WhatsApp in the island (experimental): one-click gateway install, your chats and replies |
- | 0.5.2 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.2) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.2) | Oct 22, 2026 | Mochi turns blue when a new version waits, What's new after each update; GitLab and Gitea pills; the weekly recap on Android |
- | 0.5.1 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.1) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.1) | Oct 20, 2026 | New version in the island, one click to install it on Windows; German and Turkish; an optional clock; Linux idle CPU fixed |
+ | 0.5.9 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.9) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.9) | Nov 3, 2026 | The island never disappears (Mochi or the time when closed), ✕ to fold it, dictation keeps your language, your own dictation key, silence while you speak |
+ | 0.5.8 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.8) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.8) | Oct 31, 2026 | 14 fixes and features by @Ohualtex: permission requests queue, Claude Desktop cards and pill, plan usage in the compact island, Flow pill in a corner |
+ | 0.5.7 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.7) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.7) | Oct 31, 2026 | Mail with classic Outlook on Windows: search, filters, automatic sorting, mail plans from the chat; search the settings |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 79ad9b1..d3982d9 100644
+index e1436a2..60b3903 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
-@@ -719,7 +719,7 @@ dependencies = [
+@@ -804,7 +804,7 @@ dependencies = [
  
  [[package]]
  name = "coucou"
--version = "0.5.3"
-+version = "0.5.3-sendoa.7"
+-version = "0.5.9"
++version = "0.5.9-sendoa.1"
  dependencies = [
   "arboard",
   "cpal",
-@@ -755,7 +755,7 @@ dependencies = [
+@@ -841,7 +841,7 @@ dependencies = [
  
  [[package]]
  name = "coucou-hook"
--version = "0.5.3"
-+version = "0.5.3-sendoa.7"
+-version = "0.5.9"
++version = "0.5.9-sendoa.1"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 9c8410e..9d540fa 100644
+index 6233219..56eba74 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
  resolver = "2"
  
  [workspace.package]
--version = "0.5.3"
-+version = "0.5.3-sendoa.7"
+-version = "0.5.9"
++version = "0.5.9-sendoa.1"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index d5977dc..9c5d76c 100644
+index c248d64..7a57aa4 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
--  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.7",
+-  "version": "0.5.9",
++  "version": "0.5.9-sendoa.1",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
--      "version": "0.5.3",
-+      "version": "0.5.3-sendoa.7",
+-      "version": "0.5.9",
++      "version": "0.5.9-sendoa.1",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 9113b8f..8498c37 100644
+index ad4baa4..9606496 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
  {
    "name": "coucou-windows",
    "private": true,
--  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.7",
+-  "version": "0.5.9",
++  "version": "0.5.9-sendoa.1",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1133,7 +1140,7 @@ index 0000000..362df62
 +    }
 +}
 diff --git a/windows/src-tauri/src/codex_plan.rs b/windows/src-tauri/src/codex_plan.rs
-index d3993ae..d0db7f6 100644
+index 9a8ab12..411d490 100644
 --- a/windows/src-tauri/src/codex_plan.rs
 +++ b/windows/src-tauri/src/codex_plan.rs
 @@ -128,6 +128,7 @@ pub fn first_answer(reader: impl BufRead) -> Option<Value> {
@@ -1297,10 +1304,10 @@ index f1b2907..a59485e 100644
          json!({
            "data": {
 diff --git a/windows/src-tauri/src/hooks.rs b/windows/src-tauri/src/hooks.rs
-index 36aa761..49603b5 100644
+index f49a7a9..db1dab2 100644
 --- a/windows/src-tauri/src/hooks.rs
 +++ b/windows/src-tauri/src/hooks.rs
-@@ -365,6 +365,11 @@ pub fn ensure_hook_exe(app: &AppHandle) {
+@@ -393,6 +393,11 @@ pub fn ensure_hook_exe(app: &AppHandle) {
          if let Some(parent) = exe.parent() {
              // Installed build, then `tauri dev` (target/debug) next to the
              // release hook the pre-build step produces.
@@ -1313,7 +1320,7 @@ index 36aa761..49603b5 100644
              candidates.push(parent.join("../release").join(platform::HOOK_EXE));
              // Belt and braces: where the old glob form used to land it.
 diff --git a/windows/src-tauri/src/integrations.rs b/windows/src-tauri/src/integrations.rs
-index e41e226..b794ab7 100644
+index 8681ffd..aa848c6 100644
 --- a/windows/src-tauri/src/integrations.rs
 +++ b/windows/src-tauri/src/integrations.rs
 @@ -17,7 +17,7 @@ use serde_json::{json, Value};
@@ -1342,7 +1349,7 @@ index e41e226..b794ab7 100644
          }
          "integration_gitlab" => poll_gitlab(app).await,
          "integration_gitea" => poll_gitea(app).await,
-@@ -522,6 +521,7 @@ async fn poll_stripe(app: AppHandle) {
+@@ -613,6 +612,7 @@ async fn poll_stripe(app: AppHandle) {
  
  async fn poll_github(app: AppHandle) {
      let Some(token) = secrets::get("github-token") else { return };
@@ -1350,46 +1357,48 @@ index e41e226..b794ab7 100644
      let http = client();
  
      let user = http
-@@ -549,32 +549,78 @@ async fn poll_github(app: AppHandle) {
+@@ -640,38 +640,83 @@ async fn poll_github(app: AppHandle) {
          .and_then(Value::as_i64)
          .unwrap_or(0);
  
--    let repos = http
--        .get("https://api.github.com/user/repos?per_page=100&affiliation=owner&sort=pushed")
--        .header("Authorization", format!("Bearer {token}"))
--        .header("Accept", "application/vnd.github+json")
--        .header("User-Agent", "Coucou")
--        .send()
--        .await;
--    let stars: i64 = match repos {
--        Ok(r) if r.status().is_success() => r
--            .json::<Value>()
--            .await
--            .ok()
--            .and_then(|v| v.as_array().cloned())
--            .map(|list| {
--                list.iter()
--                    .filter_map(|r| r.get("stargazers_count").and_then(Value::as_i64))
--                    .sum()
--            })
--            .unwrap_or(0),
--        _ => 0,
--    };
--
--    GITHUB.cache.lock().unwrap().stats = Some((public + private, stars));
 +    let mut dashboard = GitHubDashboard { login: json["login"].as_str().unwrap_or_default().into(), ..Default::default() };
+     let total_repos = public + private;
+     let max_pages = calculate_repo_pages(total_repos);
+-    let mut stars: i64 = 0;
+-
 +    let mut stars = 0;
-+    // A bounded paginated list keeps large accounts manageable; the UI says when capped.
-+    for page in 1..=5 {
++    // Share the paginated requests for complete star totals and the bounded dashboard.
+     for page in 1..=max_pages {
+-        let url = format!(
+-            "https://api.github.com/user/repos?per_page=100&affiliation=owner&sort=pushed&page={page}"
+-        );
+-        let resp = http
+-            .get(&url)
+-            .header("Authorization", format!("Bearer {token}"))
+-            .header("Accept", "application/vnd.github+json")
+-            .header("User-Agent", "Coucou")
+-            .send()
+-            .await;
+-        match resp {
+-            Ok(r) if r.status().is_success() => {
+-                let Ok(list) = r.json::<Vec<Value>>().await else { break };
+-                let count = list.len();
+-                stars += sum_repo_stars(&list);
+-                if count < 100 {
+-                    break;
+-                }
 +        if PAUSED.load(Ordering::Relaxed) || !enabled(&app, GITHUB_ID)
 +            || GITHUB.generation.load(Ordering::SeqCst) != generation { return; }
 +        let path = format!("/user/repos?per_page=100&affiliation=owner&sort=pushed&page={page}");
 +        let Ok(list) = github_rest(&http, &token, &path).await else { return };
 +        let Some(list) = list.as_array() else { return };
-+        stars += list.iter().filter_map(|r| r["stargazers_count"].as_i64()).sum::<i64>();
-+        dashboard.repositories.extend(list.iter().filter_map(GitHubRepository::parse));
++        stars += sum_repo_stars(list);
++        // Keep Actions/commit fan-out bounded to the 500 most recently pushed repos.
++        if page <= 5 {
++            dashboard.repositories.extend(list.iter().filter_map(GitHubRepository::parse));
++        }
 +        if list.len() < 100 { break; }
-+        if page == 5 { dashboard.truncated = true; }
++        if page == 5 && total_repos > 500 { dashboard.truncated = true; }
 +    }
 +    // Batches of four limit traffic and latency. Only the 10 most recently pushed
 +    // repositories need a commit history; running Actions are checked across the list.
@@ -1424,9 +1433,12 @@ index e41e226..b794ab7 100644
 +            match runs {
 +                Ok(v) => if let Some(list) = v["workflow_runs"].as_array() { dashboard.pipelines.extend(list.iter().filter_map(|r| GitHubPipeline::parse(&repo, r))); },
 +                Err(_) => dashboard.pipelines_unavailable += 1,
-+            }
-+        }
-+    }
+             }
+-            _ => break,
+         }
+     }
+-
+-    GITHUB.cache.lock().unwrap().stats = Some((total_repos, stars));
 +    dashboard.commits.sort_by(|a,b| b.date.cmp(&a.date));
 +    dashboard.commits.truncate(20);
 +    dashboard.pipelines.sort_by(|a,b| b.started_at.cmp(&a.started_at));
@@ -1434,7 +1446,7 @@ index e41e226..b794ab7 100644
 +    {
 +        let mut cache = GITHUB.cache.lock().unwrap();
 +        if GITHUB.generation.load(Ordering::SeqCst) != generation { return; }
-+        cache.stats = Some((public + private, stars));
++        cache.stats = Some((total_repos, stars));
 +        cache.dashboard = Some(dashboard);
 +    }
      emit_github(&app);
@@ -1449,10 +1461,10 @@ index e41e226..b794ab7 100644
 +    response.json().await.map_err(|_| 0u16)
 +}
 +
- // ── GitHub pulse and activity (GithubPoller.swift) ────────────────────────────
- //
- // Two more loops next to the stats above, with the Mac cadence: the pulse (my
-@@ -595,6 +641,7 @@ struct GitHubCache {
+ pub(crate) fn calculate_repo_pages(total_repos: i64) -> usize {
+     if total_repos <= 0 {
+         1
+@@ -707,6 +752,7 @@ struct GitHubCache {
      stats: Option<(i64, i64)>,
      pulse: Option<GitHubPulse>,
      activity: Option<GitHubActivity>,
@@ -1460,7 +1472,7 @@ index e41e226..b794ab7 100644
  }
  
  struct GitHubLoops {
-@@ -605,6 +652,8 @@ struct GitHubLoops {
+@@ -717,6 +763,8 @@ struct GitHubLoops {
      activity_wake: Notify,
      pulse_busy: AtomicBool,
      activity_busy: AtomicBool,
@@ -1469,7 +1481,7 @@ index e41e226..b794ab7 100644
  }
  
  static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| GitHubLoops {
-@@ -614,6 +663,8 @@ static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| Gi
+@@ -726,6 +774,8 @@ static GITHUB: std::sync::LazyLock<GitHubLoops> = std::sync::LazyLock::new(|| Gi
      activity_wake: Notify::new(),
      pulse_busy: AtomicBool::new(false),
      activity_busy: AtomicBool::new(false),
@@ -1478,7 +1490,7 @@ index e41e226..b794ab7 100644
  });
  
  fn now_ms() -> u64 {
-@@ -636,6 +687,9 @@ fn github_card_data(cache: &GitHubCache) -> Value {
+@@ -748,6 +798,9 @@ fn github_card_data(cache: &GitHubCache) -> Value {
      if let Some(activity) = &cache.activity {
          data.insert("activity".into(), serde_json::to_value(activity).unwrap_or(Value::Null));
      }
@@ -1488,7 +1500,7 @@ index e41e226..b794ab7 100644
      Value::Object(data)
  }
  
-@@ -645,6 +699,23 @@ fn emit_github(app: &AppHandle) {
+@@ -757,6 +810,23 @@ fn emit_github(app: &AppHandle) {
  }
  
  fn spawn_github_loops(app: AppHandle) {
@@ -1512,7 +1524,7 @@ index e41e226..b794ab7 100644
      let pulse_app = app.clone();
      tauri::async_runtime::spawn(async move {
          let mut wait = Duration::from_secs(10);
-@@ -757,6 +828,10 @@ pub fn github_refresh_if_stale(section: &str) {
+@@ -869,6 +939,10 @@ pub fn github_refresh_if_stale(section: &str) {
      let cache = GITHUB.cache.lock().unwrap();
      match section {
          "pulse" => {
@@ -1523,7 +1535,7 @@ index e41e226..b794ab7 100644
              let fetched = cache.pulse.as_ref().map(|p| p.fetched_at);
              if !GITHUB.pulse_busy.load(Ordering::SeqCst) && github::is_stale(fetched, now, 60) {
                  GITHUB.pulse_wake.notify_one();
-@@ -781,6 +856,7 @@ pub fn github_token_changed(app: &AppHandle) {
+@@ -893,6 +967,7 @@ pub fn github_token_changed(app: &AppHandle) {
          let mut cache = GITHUB.cache.lock().unwrap();
          cache.pulse = None;
          cache.activity = None;
@@ -1531,7 +1543,7 @@ index e41e226..b794ab7 100644
          if !has_token {
              cache.stats = None;
          }
-@@ -789,7 +865,7 @@ pub fn github_token_changed(app: &AppHandle) {
+@@ -901,7 +976,7 @@ pub fn github_token_changed(app: &AppHandle) {
      GITHUB.pulse_wake.notify_one();
      GITHUB.activity_wake.notify_one();
      if has_token && !PAUSED.load(Ordering::Relaxed) && enabled(app, GITHUB_ID) {
@@ -1540,7 +1552,7 @@ index e41e226..b794ab7 100644
      }
  }
  
-@@ -799,11 +875,13 @@ pub fn settings_saved(app: &AppHandle, active_integrations: &[String]) {
+@@ -911,11 +986,13 @@ pub fn settings_saved(app: &AppHandle, active_integrations: &[String]) {
      if active_integrations.iter().any(|id| id == GITHUB_ID) {
          return;
      }
@@ -1556,10 +1568,10 @@ index e41e226..b794ab7 100644
      };
      if had_data {
 diff --git a/windows/src-tauri/src/island.rs b/windows/src-tauri/src/island.rs
-index b7cf921..077503b 100644
+index fff8bd8..1260c73 100644
 --- a/windows/src-tauri/src/island.rs
 +++ b/windows/src-tauri/src/island.rs
-@@ -10,13 +10,15 @@ use std::sync::{Arc, Condvar, Mutex};
+@@ -10,15 +10,16 @@ use std::sync::{Arc, Condvar, Mutex};
  use std::time::Duration;
  
  use serde::Serialize;
@@ -1573,12 +1585,15 @@ index b7cf921..077503b 100644
  /// Logical size of the full window — the largest island view, like the macOS panel.
 -pub const PANEL_W: f64 = 720.0;
 -pub const PANEL_H: f64 = 320.0;
+-/// Logical size of the invisible strip that wakes the island when it is hidden
+-/// and the closed island is set to show nothing.
 +pub const PANEL_W: f64 = 960.0;
 +pub const PANEL_H: f64 = 540.0;
- /// Logical size of the invisible strip that wakes the island when it is hidden.
++/// Logical size of the invisible strip when the closed island shows nothing.
  pub const STRIP_W: f64 = 240.0;
  pub const STRIP_H: f64 = 6.0;
-@@ -350,6 +352,30 @@ pub fn screen_info(app: &AppHandle, pref: &str) -> ScreenInfo {
+ 
+@@ -406,6 +407,30 @@ pub fn screen_info(app: &AppHandle, pref: &str) -> ScreenInfo {
      }
  }
  
@@ -1606,21 +1621,21 @@ index b7cf921..077503b 100644
 +    }
 +}
 +
- /// Places and sizes the window. `collapsed` picks the wake strip instead of the panel.
- pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
-     let Some(win) = window(app) else { return };
-@@ -360,8 +386,8 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+ /// Places and sizes the window: the full panel, or `collapsed` to the size the
+ /// closed island needs (the wake strip when it shows nothing).
+ /// Windows: how far a taskbar docked at the top of this display (or another
+@@ -434,8 +459,8 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>
      let ms = *m.size();
  
-     let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
+     let (lw, lh) = collapsed.map(clamp_collapsed).unwrap_or((PANEL_W, PANEL_H));
 -    let pw = (lw * scale).round().max(1.0) as u32;
 -    let ph = (lh * scale).round().max(1.0) as u32;
 +    let pw = ((lw * scale).round().max(1.0) as u32).min(ms.width);
 +    let ph = ((lh * scale).round().max(1.0) as u32).min(ms.height);
      let x = mp.x + (ms.width as i32 - pw as i32) / 2;
-     let y = mp.y;
+     let y = mp.y + top_inset(&m);
  
-@@ -372,12 +398,12 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+@@ -446,12 +471,12 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>
      // still offers the user nothing to resize it by. (Found by @YossiYad, #44.)
      #[cfg(target_os = "linux")]
      let _ = win.set_resizable(true);
@@ -1636,7 +1651,7 @@ index b7cf921..077503b 100644
      let _ = win.set_always_on_top(true);
  
      // On Windows, moving across displays or waking from the strip can clamp or lag
-@@ -388,7 +414,7 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+@@ -462,7 +487,7 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>
                  "window size mismatch: wanted {pw}x{ph}, got {}x{} (scale {scale}, monitor {}x{})",
                  got.width, got.height, ms.width, ms.height
              ));
@@ -1646,19 +1661,19 @@ index b7cf921..077503b 100644
          }
      }
 diff --git a/windows/src-tauri/src/lib.rs b/windows/src-tauri/src/lib.rs
-index 5e544f8..3eca98b 100644
+index 2acb29c..0082905 100644
 --- a/windows/src-tauri/src/lib.rs
 +++ b/windows/src-tauri/src/lib.rs
-@@ -4,6 +4,8 @@ mod agent_hooks;
- mod agents;
- mod chat;
+@@ -6,6 +6,8 @@ mod chat;
  mod claude;
+ mod claude_code;
+ mod cli_relay;
 +mod codex_agents;
 +mod codex_chat;
  mod codex_plan;
  mod config_file;
  mod desktop;
-@@ -206,6 +208,12 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
+@@ -218,6 +220,12 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
  fn fit_zoom(app: AppHandle, dpr: f64) -> bool {
      let Some(win) = island::window(&app) else { return false };
      let scale = win.scale_factor().unwrap_or(1.0);
@@ -1671,7 +1686,7 @@ index 5e544f8..3eca98b 100644
      static ZOOM: std::sync::Mutex<f64> = std::sync::Mutex::new(1.0);
      let mut zoom = ZOOM.lock().unwrap();
      if let Some(new_zoom) = island::calculate_zoom_correction(*zoom, scale, dpr) {
-@@ -489,6 +497,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
+@@ -502,6 +510,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
      tauri::async_runtime::spawn_blocking(codex_plan::read).await.ok().flatten()
  }
  
@@ -1735,7 +1750,7 @@ index 5e544f8..3eca98b 100644
  #[tauri::command]
  fn approval_decision(app: AppHandle, request_id: String, decision: String) {
      recap::record_decision(&app, &request_id, &decision);
-@@ -836,6 +901,12 @@ pub fn run() {
+@@ -926,6 +991,12 @@ pub fn run() {
              status_line_preview,
              status_line_apply,
              codex_plan_usage,
@@ -3067,15 +3082,15 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 0be3d46..a8cd66f 100644
+index 8002726..f7b35d7 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
  {
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
--  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.7",
+-  "version": "0.5.9",
++  "version": "0.5.9-sendoa.1",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -3119,7 +3134,7 @@ index 0000000..40c5d1f
 +  return `${symbol} ${t(label)}`;
 +}
 diff --git a/windows/src/core/bridge.ts b/windows/src/core/bridge.ts
-index ce2f2c4..62f8bef 100644
+index 18250cf..8ffa13b 100644
 --- a/windows/src/core/bridge.ts
 +++ b/windows/src/core/bridge.ts
 @@ -24,6 +24,15 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
@@ -3146,7 +3161,7 @@ index ce2f2c4..62f8bef 100644
    /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
    setSystemLanguages: (languages: string[]) => call<void>("set_system_languages", { languages }),
  
-@@ -362,6 +372,12 @@ export const Bridge = {
+@@ -364,6 +374,12 @@ export const Bridge = {
  
    // ── Chat, files, secrets ──────────────────────────────────────────────────
    /** One chat turn. The API key and any file bytes never leave Rust. */
@@ -3156,8 +3171,8 @@ index ce2f2c4..62f8bef 100644
 +  codexChatInterrupt: (threadId: string, expectedTurnId: string) => callOrThrow<void>("codex_chat_interrupt", { threadId, expectedTurnId }),
 +  codexChatOpen: (threadId: string) => callOrThrow<void>("codex_chat_open", { threadId }),
 +
-   chatSend: (query: string, context: ChatContext | null) =>
-     callOrThrow<{ text: string }>("chat_send", { query, context }),
+   chatSend: (query: string, context: ChatContext | null, mail = false) =>
+     callOrThrow<{ text: string }>("chat_send", { query, context, mail }),
    chatReset: () => call<void>("chat_reset"),
 diff --git a/windows/src/core/codex-flow.ts b/windows/src/core/codex-flow.ts
 new file mode 100644
@@ -3517,7 +3532,7 @@ index 47d7c20..26e8d1c 100644
  export const Spotify = {
    state: { ...IDLE_SPOTIFY } as SpotifyState,
 diff --git a/windows/src/core/state.ts b/windows/src/core/state.ts
-index a99718d..52c06a8 100644
+index f0d6a6f..422e482 100644
 --- a/windows/src/core/state.ts
 +++ b/windows/src/core/state.ts
 @@ -1,6 +1,7 @@
@@ -3536,7 +3551,7 @@ index a99718d..52c06a8 100644
    id: string;
    name: string;
    color: string;
-@@ -284,7 +286,7 @@ class AppState {
+@@ -298,7 +300,7 @@ class AppState {
    }
  
    get effectiveState(): BotStateName {
@@ -3545,7 +3560,7 @@ index a99718d..52c06a8 100644
    }
  
    /** Spotify plays on a declared pill: Mochi dances (Linux; never on Windows yet). */
-@@ -510,7 +512,8 @@ class AppState {
+@@ -534,7 +536,8 @@ class AppState {
     */
    defaultView(): IslandViewName {
      if (this.pendingApproval) return this.pendingApproval.questions ? "question" : "approval";
@@ -3620,10 +3635,10 @@ index 0000000..2205388
 +
 +export const taskHistory = new TaskHistory();
 diff --git a/windows/src/hub/hero.ts b/windows/src/hub/hero.ts
-index b0dce33..8193c8e 100644
+index 5f25663..0164416 100644
 --- a/windows/src/hub/hero.ts
 +++ b/windows/src/hub/hero.ts
-@@ -151,7 +151,7 @@ export function backdrop(canvas: HTMLCanvasElement, color: string, pointerFrom:
+@@ -208,7 +208,7 @@ export function backdrop(canvas: HTMLCanvasElement, color: string, pointerFrom:
        ctx.beginPath();
        ctx.roundRect(0, 0, w, h, radius);
        ctx.clip();
@@ -3632,7 +3647,7 @@ index b0dce33..8193c8e 100644
        ctx.fillRect(0, 0, w, h);
        const lin = ctx.createLinearGradient(w, 0, w * 0.35, h);
        lin.addColorStop(0, rgba(color, 0.1));
-@@ -341,7 +341,7 @@ export function troupe(canvas: HTMLCanvasElement, cast: MochiSpec[], width: numb
+@@ -400,7 +400,7 @@ export function troupe(canvas: HTMLCanvasElement, cast: MochiSpec[], width: numb
  }
  
  /** One Mochi alone (the sidebar's logo, an empty page). */
@@ -3641,7 +3656,7 @@ index b0dce33..8193c8e 100644
    const engine = new BotEngine();
    engine.bodyColor = hexToRGB(color);
    engine.setState(state, true);
-@@ -450,7 +450,7 @@ export function glowCard(color: string, ...content: (HTMLElement | string)[]): H
+@@ -517,7 +517,7 @@ export function glowCard(color: string, ...content: (HTMLElement | string)[]): H
  }
  
  /** An empty page: a Mochi asleep, and a line. */
@@ -3651,7 +3666,7 @@ index b0dce33..8193c8e 100644
    el.className = "hub-empty";
    const canvas = document.createElement("canvas");
 diff --git a/windows/src/hub/hub.css b/windows/src/hub/hub.css
-index a4327c0..6c610da 100644
+index 4bdd4df..4682818 100644
 --- a/windows/src/hub/hub.css
 +++ b/windows/src/hub/hub.css
 @@ -1,24 +1,26 @@
@@ -3694,7 +3709,7 @@ index a4327c0..6c610da 100644
    color: var(--hub-text);
    font: 400 13px/1.45 var(--font);
    -webkit-font-smoothing: antialiased;
-@@ -73,7 +75,7 @@ body.hub-window {
+@@ -246,7 +248,7 @@ body.hub-window {
    height: 32px;
    border-radius: 9px;
    background: transparent;
@@ -3703,7 +3718,7 @@ index a4327c0..6c610da 100644
    font: 500 13.5px var(--font);
    text-align: start;
  }
-@@ -91,7 +93,7 @@ body.hub-window {
+@@ -264,7 +266,7 @@ body.hub-window {
  }
  
  .hub-item:hover:not(:disabled) {
@@ -3712,7 +3727,7 @@ index a4327c0..6c610da 100644
    transform: none;
  }
  
-@@ -100,8 +102,8 @@ body.hub-window {
+@@ -273,8 +275,8 @@ body.hub-window {
  }
  
  .hub-item.on {
@@ -3723,7 +3738,7 @@ index a4327c0..6c610da 100644
    font-weight: 600;
  }
  
-@@ -116,7 +118,7 @@ body.hub-window {
+@@ -289,7 +291,7 @@ body.hub-window {
    gap: 8px;
    padding: 10px 12px;
    border-radius: 11px;
@@ -3732,7 +3747,7 @@ index a4327c0..6c610da 100644
    color: var(--hub-secondary);
    font-size: 12px;
    line-height: 1.3;
-@@ -175,7 +177,7 @@ body.hub-window {
+@@ -358,7 +360,7 @@ body.hub-window {
    border-radius: 18px;
    overflow: hidden;
    flex: 0 0 auto;
@@ -3741,7 +3756,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-hero.compact {
-@@ -221,7 +223,7 @@ body.hub-window {
+@@ -404,7 +406,7 @@ body.hub-window {
  
  .hub-hero p {
    font-size: 14px;
@@ -3750,7 +3765,7 @@ index a4327c0..6c610da 100644
    max-width: 420px;
  }
  
-@@ -290,7 +292,7 @@ body.hub-window {
+@@ -473,7 +475,7 @@ body.hub-window {
    display: inline-flex;
    align-items: center;
    border-radius: 7px;
@@ -3759,7 +3774,7 @@ index a4327c0..6c610da 100644
    white-space: nowrap;
  }
  
-@@ -298,7 +300,7 @@ button.hub-btn {
+@@ -481,7 +483,7 @@ button.hub-btn {
    border-radius: 10px;
    padding: 8px 14px;
    font: 600 12.5px var(--font);
@@ -3768,7 +3783,7 @@ index a4327c0..6c610da 100644
    color: var(--hub-text);
  }
  
-@@ -308,12 +310,13 @@ button.hub-btn.primary {
+@@ -491,12 +493,13 @@ button.hub-btn.primary {
  }
  
  button.hub-btn.primary:hover:not(:disabled) {
@@ -3785,7 +3800,7 @@ index a4327c0..6c610da 100644
  }
  
  button.hub-btn.small {
-@@ -329,8 +332,8 @@ button.hub-icon {
+@@ -512,8 +515,8 @@ button.hub-icon {
    display: inline-flex;
    align-items: center;
    justify-content: center;
@@ -3796,7 +3811,7 @@ index a4327c0..6c610da 100644
  }
  
  button.hub-icon svg {
-@@ -349,7 +352,7 @@ button.hub-icon svg {
+@@ -532,7 +535,7 @@ button.hub-icon svg {
    font: 400 13px var(--font);
    color: var(--hub-text);
    background: var(--hub-field);
@@ -3805,7 +3820,7 @@ index a4327c0..6c610da 100644
    border-radius: 9px;
    padding: 7px 10px;
    outline: none;
-@@ -358,7 +361,7 @@ button.hub-icon svg {
+@@ -541,7 +544,7 @@ button.hub-icon svg {
  .hub-input:focus,
  .hub-textarea:focus,
  .hub-select:focus {
@@ -3814,7 +3829,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-textarea {
-@@ -371,7 +374,7 @@ button.hub-icon svg {
+@@ -554,7 +557,7 @@ button.hub-icon svg {
    display: inline-flex;
    padding: 2px;
    border-radius: 9px;
@@ -3823,7 +3838,7 @@ index a4327c0..6c610da 100644
    gap: 2px;
  }
  
-@@ -379,12 +382,12 @@ button.hub-icon svg {
+@@ -562,12 +565,12 @@ button.hub-icon svg {
    border-radius: 7px;
    padding: 5px 14px;
    background: transparent;
@@ -3838,7 +3853,7 @@ index a4327c0..6c610da 100644
    color: var(--hub-text);
  }
  
-@@ -393,7 +396,7 @@ button.hub-icon svg {
+@@ -576,7 +579,7 @@ button.hub-icon svg {
    height: 17px;
    flex: 0 0 17px;
    border-radius: 50%;
@@ -3847,7 +3862,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-radio.on {
-@@ -404,7 +407,7 @@ button.hub-icon svg {
+@@ -587,7 +590,7 @@ button.hub-icon svg {
    width: 120px;
    height: 6px;
    border-radius: 3px;
@@ -3856,7 +3871,7 @@ index a4327c0..6c610da 100644
    overflow: hidden;
  }
  
-@@ -426,9 +429,9 @@ button.hub-icon svg {
+@@ -609,9 +612,9 @@ button.hub-icon svg {
  .hub-warn {
    border-radius: 12px;
    padding: 12px 14px;
@@ -3869,7 +3884,7 @@ index a4327c0..6c610da 100644
    font-size: 12.5px;
  }
  
-@@ -491,7 +494,7 @@ button.hub-icon svg {
+@@ -674,7 +677,7 @@ button.hub-icon svg {
    font-size: 11px;
    padding: 1px 7px;
    border-radius: 5px;
@@ -3878,7 +3893,7 @@ index a4327c0..6c610da 100644
    color: var(--hub-secondary);
    max-width: 100%;
    overflow: hidden;
-@@ -542,7 +545,7 @@ button.hub-icon svg {
+@@ -725,7 +728,7 @@ button.hub-icon svg {
    position: relative;
    border-radius: 14px;
    overflow: hidden;
@@ -3887,7 +3902,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-glow canvas {
-@@ -634,7 +637,7 @@ button.hub-icon svg {
+@@ -817,7 +820,7 @@ button.hub-icon svg {
    align-items: flex-end;
    gap: 4px;
    height: 180px;
@@ -3896,7 +3911,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-bars i {
-@@ -674,7 +677,7 @@ button.hub-icon svg {
+@@ -857,7 +860,7 @@ button.hub-icon svg {
  .hub-app-bar .track {
    height: 5px;
    border-radius: 3px;
@@ -3905,7 +3920,7 @@ index a4327c0..6c610da 100644
    overflow: hidden;
  }
  
-@@ -699,7 +702,7 @@ button.hub-icon svg {
+@@ -882,7 +885,7 @@ button.hub-icon svg {
    gap: 6px;
    padding: 5px 6px 5px 12px;
    border-radius: 999px;
@@ -3914,7 +3929,7 @@ index a4327c0..6c610da 100644
    font-size: 13px;
  }
  
-@@ -775,7 +778,7 @@ button.hub-icon svg {
+@@ -958,7 +961,7 @@ button.hub-icon svg {
    border-radius: 14px;
    overflow: hidden;
    border: 1px solid var(--hub-line);
@@ -3923,7 +3938,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-notes-list {
-@@ -798,7 +801,7 @@ button.hub-icon svg {
+@@ -981,7 +984,7 @@ button.hub-icon svg {
  }
  
  .hub-note-item.on {
@@ -3932,7 +3947,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-note-item .t {
-@@ -838,7 +841,7 @@ button.hub-icon svg {
+@@ -1021,7 +1024,7 @@ button.hub-icon svg {
    gap: 7px;
    padding: 4px 10px 4px 4px;
    border-radius: 999px;
@@ -3941,7 +3956,7 @@ index a4327c0..6c610da 100644
    font-size: 13px;
    color: var(--hub-text);
  }
-@@ -851,7 +854,7 @@ button.hub-icon svg {
+@@ -1034,7 +1037,7 @@ button.hub-icon svg {
    align-items: center;
    justify-content: center;
    font: 700 11px var(--font);
@@ -3950,7 +3965,7 @@ index a4327c0..6c610da 100644
  }
  
  .hub-line {
-@@ -900,7 +903,7 @@ button.hub-icon svg {
+@@ -1083,7 +1086,7 @@ button.hub-icon svg {
    height: 8px;
    border-radius: 50%;
    background: var(--hub-red);
@@ -3960,10 +3975,10 @@ index a4327c0..6c610da 100644
  
  @media (max-width: 1000px) {
 diff --git a/windows/src/hub/pages/dictation.ts b/windows/src/hub/pages/dictation.ts
-index 43932d1..8d6393f 100644
+index 7c81177..673966a 100644
 --- a/windows/src/hub/pages/dictation.ts
 +++ b/windows/src/hub/pages/dictation.ts
-@@ -36,7 +36,7 @@ export async function dictationPage(page: HTMLElement, ctx: HubContext) {
+@@ -37,7 +37,7 @@ export async function dictationPage(page: HTMLElement, ctx: HubContext) {
    const record = button(t("Record a call"), () => {
      void FlowBridge.startNote().then(() => ctx.navigate("notes"), (err) => alertLine.replaceChildren(String(err)));
    }, "primary");
@@ -3972,7 +3987,7 @@ index 43932d1..8d6393f 100644
    const alertLine = h("div", { class: "hub-note" });
    const hello = status.userName ? t("Hello {0}", { 0: status.userName }) : t("Hello");
    page.append(ctx.hero("dictation", hello, t("Hold {0} anywhere, speak, let go: it's pasted.", { 0: key }), [record]));
-@@ -126,7 +126,7 @@ function promo(ctx: HubContext): HTMLElement {
+@@ -131,7 +131,7 @@ function promo(ctx: HubContext): HTMLElement {
    return glowCard(
      "#FB923C",
      h("div", { style: "font:700 15px var(--font)", text: t("The Notetaker") }),
@@ -3981,7 +3996,7 @@ index 43932d1..8d6393f 100644
      h("button", { class: "hub-link", text: t("Open the Notetaker →"), onclick: () => ctx.navigate("notes") }),
    );
  }
-@@ -138,7 +138,7 @@ function setup(ctx: HubContext): HTMLElement {
+@@ -143,7 +143,7 @@ function setup(ctx: HubContext): HTMLElement {
    const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
    body.append(
      h("div", { style: "font:700 17px var(--font)", text: t("Dictate anywhere on your computer") }),
@@ -3991,7 +4006,7 @@ index 43932d1..8d6393f 100644
    body.append(row(t("Turn on dictation"), null, toggle(status.prefs.enabled, (on) => {
      void ctx.setPrefs((p) => (p.enabled = on)).then(() => ctx.navigate("dictation"));
 diff --git a/windows/src/hub/pages/notes.ts b/windows/src/hub/pages/notes.ts
-index 099556c..f030627 100644
+index 1585a9c..9ed7504 100644
 --- a/windows/src/hub/pages/notes.ts
 +++ b/windows/src/hub/pages/notes.ts
 @@ -28,7 +28,7 @@ export async function notesPage(page: HTMLElement, ctx: HubContext) {
@@ -4003,7 +4018,7 @@ index 099556c..f030627 100644
        modelsControl(ctx, () => ctx.navigate("notes")),
      ));
    }
-@@ -61,7 +61,7 @@ export async function notesPage(page: HTMLElement, ctx: HubContext) {
+@@ -63,7 +63,7 @@ export async function notesPage(page: HTMLElement, ctx: HubContext) {
          drawList();
        });
      }, "primary");
@@ -4013,10 +4028,10 @@ index 099556c..f030627 100644
    }
  
 diff --git a/windows/src/hub/shell.ts b/windows/src/hub/shell.ts
-index 252a0f1..ff2a971 100644
+index 2f7fca2..e5e1f8f 100644
 --- a/windows/src/hub/shell.ts
 +++ b/windows/src/hub/shell.ts
-@@ -119,18 +119,18 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
+@@ -135,18 +135,18 @@ export async function startHub(root: HTMLElement, opts: HubOptions) {
    function drawStatus() {
      clear(statusLine);
      const models = status.models.parakeet.state;
@@ -4036,14 +4051,14 @@ index 252a0f1..ff2a971 100644
      } else {
 -      color = "#34d399";
 +      color = "var(--eva-accent)";
-       text = t("Ready · hold {0}", { 0: keyLabel(status.keys === "wayland" ? "wayland" : status.prefs.key, status.platform) });
+       text = t("Ready · hold {0}", { 0: keyLabel(status.keys === "wayland" ? "wayland" : flowKeyId(status.prefs), status.platform) });
      }
      statusLine.append(h("i", { class: "dot", style: `background:${color}` }), h("span", { text }));
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 06e3c49..a773fce 100644
+index 9243272..1e88b4c 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
-@@ -1824,7 +1824,7 @@
+@@ -2194,7 +2194,7 @@
      "Ready": {
        "zh-Hans": "就绪",
        "hi": "तैयार",
@@ -4052,10 +4067,10 @@ index 06e3c49..a773fce 100644
        "ar": "جاهز",
        "fr": "Prêt",
        "bn": "প্রস্তুত",
-@@ -6091,6 +6091,539 @@
-       "id": "Matikan pil lain untuk memberi tempat bagi WhatsApp (maksimal {max}).",
-       "de": "Schalte eine andere Pill aus, um Platz für WhatsApp zu schaffen (höchstens {max}).",
-       "tr": "WhatsApp’a yer açmak için başka bir hapı kapat (en fazla {max})."
+@@ -7533,6 +7533,621 @@
+       "tr": "Coucou sizi dinlerken videolar, müzik ve aramalar susar, sonra geri gelir. Coucou'nun kendi sesleri çalmaya devam eder.",
+       "ko": "Coucou가 듣는 동안 동영상, 음악, 통화 소리가 꺼졌다가 다시 돌아옵니다. Coucou 자체의 소리는 계속 납니다.",
+       "ja": "Coucou が聞いている間は動画・音楽・通話の音が消え、終わると戻ります。Coucou 自身の音はそのまま鳴ります。"
 +    },
 +    "Latest commits": {
 +      "es": "Últimos commits",
@@ -4068,7 +4083,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Последние коммиты",
 +      "id": "Commit terbaru",
 +      "de": "Letzte Commits",
-+      "tr": "Son commitler"
++      "tr": "Son commitler",
++      "ko": "최근 커밋",
++      "ja": "最新のコミット"
 +    },
 +    "Running pipelines": {
 +      "es": "Pipelines activos",
@@ -4081,7 +4098,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Выполняющиеся пайплайны",
 +      "id": "Pipeline yang berjalan",
 +      "de": "Laufende Pipelines",
-+      "tr": "Çalışan işlem hatları"
++      "tr": "Çalışan işlem hatları",
++      "ko": "실행 중인 파이프라인",
++      "ja": "実行中のパイプライン"
 +    },
 +    "No repositories visible. Check token access.": {
 +      "es": "Sin repositorios visibles. Revisa el acceso del token.",
@@ -4094,7 +4113,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Нет доступных репозиториев. Проверьте доступ токена.",
 +      "id": "Tidak ada repositori yang terlihat. Periksa akses token.",
 +      "de": "Keine Repositorys sichtbar. Token-Zugriff prüfen.",
-+      "tr": "Görünür depo yok. Token erişimini kontrol edin."
++      "tr": "Görünür depo yok. Token erişimini kontrol edin.",
++      "ko": "표시할 저장소가 없어요. 토큰 접근 권한을 확인하세요.",
++      "ja": "表示できるリポジトリがありません。トークンのアクセス権を確認してください。"
 +    },
 +    "No commits available.": {
 +      "es": "Sin commits disponibles.",
@@ -4107,7 +4128,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Нет доступных коммитов.",
 +      "id": "Tidak ada commit yang tersedia.",
 +      "de": "Keine Commits verfügbar.",
-+      "tr": "Kullanılabilir commit yok."
++      "tr": "Kullanılabilir commit yok.",
++      "ko": "표시할 커밋이 없어요.",
++      "ja": "表示できるコミットがありません。"
 +    },
 +    "No pipelines running.": {
 +      "es": "No hay pipelines en ejecución.",
@@ -4120,7 +4143,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Нет выполняющихся пайплайнов.",
 +      "id": "Tidak ada pipeline yang berjalan.",
 +      "de": "Keine Pipelines aktiv.",
-+      "tr": "Çalışan işlem hattı yok."
++      "tr": "Çalışan işlem hattı yok.",
++      "ko": "실행 중인 파이프라인이 없어요.",
++      "ja": "実行中のパイプラインはありません。"
 +    },
 +    "Check token permissions to load this section.": {
 +      "es": "Revisa los permisos del token para ver este apartado.",
@@ -4133,7 +4158,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Проверьте разрешения токена для загрузки этого раздела.",
 +      "id": "Periksa izin token untuk memuat bagian ini.",
 +      "de": "Token-Berechtigungen prüfen, um diesen Bereich zu laden.",
-+      "tr": "Bu bölümü yüklemek için token izinlerini kontrol edin."
++      "tr": "Bu bölümü yüklemek için token izinlerini kontrol edin.",
++      "ko": "이 섹션을 불러오려면 토큰 권한을 확인하세요.",
++      "ja": "この項目を読み込むにはトークンの権限を確認してください。"
 +    },
 +    "Partial": {
 +      "es": "Parcial",
@@ -4146,7 +4173,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Частично",
 +      "id": "Sebagian",
 +      "de": "Teilweise",
-+      "tr": "Kısmi"
++      "tr": "Kısmi",
++      "ko": "일부",
++      "ja": "一部"
 +    },
 +    "Private": {
 +      "es": "Privado",
@@ -4159,7 +4188,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Приватный",
 +      "id": "Pribadi",
 +      "de": "Privat",
-+      "tr": "Özel"
++      "tr": "Özel",
++      "ko": "비공개",
++      "ja": "非公開"
 +    },
 +    "Last updated": {
 +      "es": "Última actualización",
@@ -4172,7 +4203,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Последнее обновление",
 +      "id": "Terakhir diperbarui",
 +      "de": "Zuletzt aktualisiert",
-+      "tr": "Son güncelleme"
++      "tr": "Son güncelleme",
++      "ko": "마지막 업데이트",
++      "ja": "最終更新"
 +    },
 +    "Reviews": {
 +      "es": "Revisiones",
@@ -4185,7 +4218,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Проверки",
 +      "id": "Ulasan",
 +      "de": "Reviews",
-+      "tr": "İncelemeler"
++      "tr": "İncelemeler",
++      "ko": "리뷰",
++      "ja": "レビュー"
 +    },
 +    "Open {player}": {
 +      "zh-Hans": "打开 {player}",
@@ -4198,7 +4233,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Открыть {player}",
 +      "id": "Buka {player}",
 +      "de": "{player} öffnen",
-+      "tr": "{player} aç"
++      "tr": "{player} aç",
++      "ko": "{player} 열기",
++      "ja": "{player} を開く"
 +    },
 +    "{0} — open {player}": {
 +      "zh-Hans": "{0} — 打开 {player}",
@@ -4211,7 +4248,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "{0} — открыть {player}",
 +      "id": "{0} — buka {player}",
 +      "de": "{0} — {player} öffnen",
-+      "tr": "{0} — {player} aç"
++      "tr": "{0} — {player} aç",
++      "ko": "{0} — {player} 열기",
++      "ja": "{0} — {player} を開く"
 +    },
 +    "Agent room": {
 +      "es": "Sala de agentes",
@@ -4224,7 +4263,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Комната агентов",
 +      "id": "Ruang agen",
 +      "de": "Agentenraum",
-+      "tr": "Ajan odası"
++      "tr": "Ajan odası",
++      "ko": "에이전트 방",
++      "ja": "エージェントルーム"
 +    },
 +    "Connect an agent in Settings to see its activity here.": {
 +      "es": "Conecta un agente en Ajustes para ver su actividad aquí.",
@@ -4237,7 +4278,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Подключите агента в настройках, чтобы видеть его действия здесь.",
 +      "id": "Hubungkan agen di Pengaturan untuk melihat aktivitasnya di sini.",
 +      "de": "Verbinde einen Agenten in den Einstellungen, um hier seine Aktivität zu sehen.",
-+      "tr": "Etkinliğini burada görmek için Ayarlar bölümünde bir ajan bağlayın."
++      "tr": "Etkinliğini burada görmek için Ayarlar bölümünde bir ajan bağlayın.",
++      "ko": "설정에서 에이전트를 연결하면 활동이 여기에 표시돼요.",
++      "ja": "設定でエージェントを接続すると、ここに活動が表示されます。"
 +    },
 +    "Waiting for activity": {
 +      "es": "Esperando actividad",
@@ -4250,7 +4293,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Ожидание активности",
 +      "id": "Menunggu aktivitas",
 +      "de": "Warten auf Aktivität",
-+      "tr": "Etkinlik bekleniyor"
++      "tr": "Etkinlik bekleniyor",
++      "ko": "활동 대기 중",
++      "ja": "活動を待機中"
 +    },
 +    "Working": {
 +      "es": "Trabajando",
@@ -4263,7 +4308,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Работает",
 +      "id": "Bekerja",
 +      "de": "Arbeitet",
-+      "tr": "Çalışıyor"
++      "tr": "Çalışıyor",
++      "ko": "작업 중",
++      "ja": "作業中"
 +    },
 +    "Thinking": {
 +      "es": "Pensando",
@@ -4276,7 +4323,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Думает",
 +      "id": "Berpikir",
 +      "de": "Denkt nach",
-+      "tr": "Düşünüyor"
++      "tr": "Düşünüyor",
++      "ko": "생각 중",
++      "ja": "思考中"
 +    },
 +    "Searching": {
 +      "es": "Buscando",
@@ -4289,7 +4338,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Ищет",
 +      "id": "Mencari",
 +      "de": "Sucht",
-+      "tr": "Arıyor"
++      "tr": "Arıyor",
++      "ko": "검색 중",
++      "ja": "検索中"
 +    },
 +    "Needs permission": {
 +      "es": "Necesita permiso",
@@ -4302,7 +4353,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Нужно разрешение",
 +      "id": "Perlu izin",
 +      "de": "Benötigt Erlaubnis",
-+      "tr": "İzin gerekiyor"
++      "tr": "İzin gerekiyor",
++      "ko": "권한 승인 필요",
++      "ja": "許可が必要"
 +    },
 +    "Needs an answer": {
 +      "es": "Espera una respuesta",
@@ -4315,7 +4368,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Ждёт ответа",
 +      "id": "Menunggu jawaban",
 +      "de": "Benötigt eine Antwort",
-+      "tr": "Yanıt gerekiyor"
++      "tr": "Yanıt gerekiyor",
++      "ko": "답변 필요",
++      "ja": "回答が必要"
 +    },
 +    "Finished": {
 +      "es": "Terminado",
@@ -4328,7 +4383,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Завершено",
 +      "id": "Selesai",
 +      "de": "Fertig",
-+      "tr": "Tamamlandı"
++      "tr": "Tamamlandı",
++      "ko": "완료",
++      "ja": "完了"
 +    },
 +    "Rate limited": {
 +      "es": "Límite alcanzado",
@@ -4341,7 +4398,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Достигнут лимит",
 +      "id": "Batas tercapai",
 +      "de": "Ratenlimit erreicht",
-+      "tr": "Hız sınırına ulaşıldı"
++      "tr": "Hız sınırına ulaşıldı",
++      "ko": "사용 한도 도달",
++      "ja": "使用上限に到達"
 +    },
 +    "Sleeping": {
 +      "es": "Descansando",
@@ -4354,7 +4413,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Отдыхает",
 +      "id": "Beristirahat",
 +      "de": "Schläft",
-+      "tr": "Uyuyor"
++      "tr": "Uyuyor",
++      "ko": "대기 중",
++      "ja": "待機中"
 +    },
 +    "Recovering": {
 +      "es": "Recuperándose",
@@ -4367,7 +4428,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Восстанавливается",
 +      "id": "Memulihkan",
 +      "de": "Erholt sich",
-+      "tr": "Toparlanıyor"
++      "tr": "Toparlanıyor",
++      "ko": "복구 중",
++      "ja": "復旧中"
 +    },
 +    "Unknown window": {
 +      "zh-Hans": "未知时间窗口",
@@ -4380,7 +4443,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Неизвестный период",
 +      "id": "Periode tidak diketahui",
 +      "de": "Unbekanntes Zeitfenster",
-+      "tr": "Bilinmeyen dönem"
++      "tr": "Bilinmeyen dönem",
++      "ko": "알 수 없는 기간",
++      "ja": "不明な期間"
 +    },
 +    "No data": {
 +      "zh-Hans": "无数据",
@@ -4393,7 +4458,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Нет данных",
 +      "id": "Tidak ada data",
 +      "de": "Keine Daten",
-+      "tr": "Veri yok"
++      "tr": "Veri yok",
++      "ko": "데이터 없음",
++      "ja": "データなし"
 +    },
 +    "{n}% available": {
 +      "zh-Hans": "剩余 {n}%",
@@ -4406,7 +4473,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Доступно {n}%",
 +      "id": "{n}% tersedia",
 +      "de": "{n}% verfügbar",
-+      "tr": "%{n} kullanılabilir"
++      "tr": "%{n} kullanılabilir",
++      "ko": "{n}% 사용 가능",
++      "ja": "{n}% 利用可能"
 +    },
 +    "Update pending": {
 +      "zh-Hans": "等待更新",
@@ -4419,7 +4488,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Ожидается обновление",
 +      "id": "Pembaruan tertunda",
 +      "de": "Aktualisierung ausstehend",
-+      "tr": "Güncelleme bekleniyor"
++      "tr": "Güncelleme bekleniyor",
++      "ko": "업데이트 대기 중",
++      "ja": "更新待ち"
 +    },
 +    "{n} d": {
 +      "zh-Hans": "{n} 天",
@@ -4432,7 +4503,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "{n} д",
 +      "id": "{n} hr",
 +      "de": "{n} T",
-+      "tr": "{n} gün"
++      "tr": "{n} gün",
++      "ko": "{n}일",
++      "ja": "{n}日"
 +    },
 +    "{n} h": {
 +      "zh-Hans": "{n} 小时",
@@ -4445,7 +4518,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "{n} ч",
 +      "id": "{n} jam",
 +      "de": "{n} Std",
-+      "tr": "{n} sa"
++      "tr": "{n} sa",
++      "ko": "{n}시간",
++      "ja": "{n}時間"
 +    },
 +    "{n} min": {
 +      "zh-Hans": "{n} 分钟",
@@ -4458,7 +4533,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "{n} мин",
 +      "id": "{n} mnt",
 +      "de": "{n} Min",
-+      "tr": "{n} dk"
++      "tr": "{n} dk",
++      "ko": "{n}분",
++      "ja": "{n}分"
 +    },
 +    "Orbit: minutes within the hour": {
 +      "zh-Hans": "轨道：当前小时内的分钟数",
@@ -4471,7 +4548,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Орбита: минуты текущего часа",
 +      "id": "Orbit: menit dalam jam saat ini",
 +      "de": "Umlauf: Minuten der aktuellen Stunde",
-+      "tr": "Yörünge: geçerli saatin dakikaları"
++      "tr": "Yörünge: geçerli saatin dakikaları",
++      "ko": "궤도: 현재 시간의 경과 분",
++      "ja": "軌道：現在の時刻の経過分"
 +    },
 +    "Tool started": {
 +      "es": "Herramienta iniciada",
@@ -4484,7 +4563,9 @@ index 06e3c49..a773fce 100644
 +      "bn": "টুল শুরু হয়েছে",
 +      "ru": "Инструмент запущен",
 +      "id": "Alat dimulai",
-+      "tr": "Araç başlatıldı"
++      "tr": "Araç başlatıldı",
++      "ko": "도구 시작",
++      "ja": "ツール開始"
 +    },
 +    "Tool finished": {
 +      "es": "Herramienta finalizada",
@@ -4497,7 +4578,9 @@ index 06e3c49..a773fce 100644
 +      "bn": "টুল শেষ হয়েছে",
 +      "ru": "Инструмент завершён",
 +      "id": "Alat selesai",
-+      "tr": "Araç tamamlandı"
++      "tr": "Araç tamamlandı",
++      "ko": "도구 완료",
++      "ja": "ツール完了"
 +    },
 +    "Permission requested": {
 +      "es": "Permiso solicitado",
@@ -4510,7 +4593,9 @@ index 06e3c49..a773fce 100644
 +      "bn": "অনুমতি চাওয়া হয়েছে",
 +      "ru": "Запрошено разрешение",
 +      "id": "Izin diminta",
-+      "tr": "İzin istendi"
++      "tr": "İzin istendi",
++      "ko": "권한 요청됨",
++      "ja": "許可を要求"
 +    },
 +    "Turn finished": {
 +      "es": "Turno finalizado",
@@ -4523,7 +4608,9 @@ index 06e3c49..a773fce 100644
 +      "bn": "পর্ব শেষ হয়েছে",
 +      "ru": "Ход завершён",
 +      "id": "Giliran selesai",
-+      "tr": "Tur tamamlandı"
++      "tr": "Tur tamamlandı",
++      "ko": "턴 완료",
++      "ja": "ターン完了"
 +    },
 +    "Turn failed": {
 +      "es": "Turno fallido",
@@ -4536,7 +4623,9 @@ index 06e3c49..a773fce 100644
 +      "bn": "পর্ব ব্যর্থ হয়েছে",
 +      "ru": "Ошибка хода",
 +      "id": "Giliran gagal",
-+      "tr": "Tur başarısız oldu"
++      "tr": "Tur başarısız oldu",
++      "ko": "턴 실패",
++      "ja": "ターン失敗"
 +    },
 +    "Turn cancelled": {
 +      "es": "Turno cancelado",
@@ -4549,7 +4638,9 @@ index 06e3c49..a773fce 100644
 +      "bn": "পর্ব বাতিল হয়েছে",
 +      "ru": "Ход отменён",
 +      "id": "Giliran dibatalkan",
-+      "tr": "Tur iptal edildi"
++      "tr": "Tur iptal edildi",
++      "ko": "턴 취소됨",
++      "ja": "ターンをキャンセル"
 +    },
 +    "More agents": {
 +      "zh-Hans": "更多代理",
@@ -4562,7 +4653,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Другие агенты",
 +      "id": "Agen lainnya",
 +      "de": "Weitere Agenten",
-+      "tr": "Diğer ajanlar"
++      "tr": "Diğer ajanlar",
++      "ko": "에이전트 더 보기",
++      "ja": "他のエージェント"
 +    },
 +    "Show {count} more agents": {
 +      "zh-Hans": "显示另外 {count} 个代理",
@@ -4575,7 +4668,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Показать ещё {count} агентов",
 +      "id": "Tampilkan {count} agen lainnya",
 +      "de": "{count} weitere Agenten anzeigen",
-+      "tr": "{count} ajan daha göster"
++      "tr": "{count} ajan daha göster",
++      "ko": "에이전트 {count}개 더 보기",
++      "ja": "他の {count} 件のエージェントを表示"
 +    },
 +    "Live hook activity · Select an agent to see details": {
 +      "zh-Hans": "实时钩子活动 · 选择代理查看详情",
@@ -4588,7 +4683,9 @@ index 06e3c49..a773fce 100644
 +      "ru": "Активность хуков · Выберите агента для просмотра подробностей",
 +      "id": "Aktivitas hook langsung · Pilih agen untuk melihat detail",
 +      "de": "Live-Hook-Aktivität · Agenten auswählen, um Details anzuzeigen",
-+      "tr": "Canlı hook etkinliği · Ayrıntılar için bir ajan seçin"
++      "tr": "Canlı hook etkinliği · Ayrıntılar için bir ajan seçin",
++      "ko": "실시간 훅 활동 · 에이전트를 선택하면 세부 정보를 볼 수 있어요",
++      "ja": "リアルタイムのフック活動 · エージェントを選択して詳細を表示"
      }
    }
  }
@@ -4705,7 +4802,7 @@ index 0000000..fece898
 +  return view;
 +}
 diff --git a/windows/src/island/fsm.ts b/windows/src/island/fsm.ts
-index 23b65ee..04b5145 100644
+index f811666..51c3c15 100644
 --- a/windows/src/island/fsm.ts
 +++ b/windows/src/island/fsm.ts
 @@ -29,6 +29,14 @@ export class IslandStateMachine {
@@ -4723,7 +4820,7 @@ index 23b65ee..04b5145 100644
    /**
     * Hovering opens the island all the way instead of peeking (Settings →
     * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
-@@ -160,23 +168,23 @@ export class IslandStateMachine {
+@@ -163,23 +171,23 @@ export class IslandStateMachine {
      this.clear("petitHide");
      // A card folded away while it waits for an answer keeps the compact island
      // on screen, so it can be reopened (isHeldOpen on macOS).
@@ -4753,7 +4850,7 @@ index 23b65ee..04b5145 100644
          this.transition("petit");
        }
 diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
-index b39ecc2..ccc6a39 100644
+index c539648..d273ec2 100644
 --- a/windows/src/island/hooks.ts
 +++ b/windows/src/island/hooks.ts
 @@ -1,3 +1,4 @@
@@ -4761,7 +4858,7 @@ index b39ecc2..ccc6a39 100644
  // Hook events from Claude Code and every other agent → island state.
  // Port of HookServer.processEvent / processPermissionRequest from the macOS app.
  // Difference from macOS: no terminal filter. On Windows the hook fires from any
-@@ -45,6 +46,11 @@ function cancelStopTimer(id: string): boolean {
+@@ -110,6 +111,11 @@ export function restoreAlertFocus(): void {
  }
  
  /** Events after which a pending permission request of the same session is moot. */
@@ -4773,7 +4870,7 @@ index b39ecc2..ccc6a39 100644
  const TURN_OVER = new Set(["Stop", "StopFailure", "UserPromptSubmit", "SessionEnd", "Interrupt"]);
  
  interface HookPayload {
-@@ -167,7 +173,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
+@@ -234,7 +240,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
        return `${tool} · ${value.trim()}`;
      }
    }
@@ -4784,7 +4881,7 @@ index b39ecc2..ccc6a39 100644
  }
  
  /**
-@@ -278,6 +286,9 @@ function handleHook(island: Island, payload: HookPayload) {
+@@ -352,6 +360,9 @@ function handleHook(island: Island, payload: HookPayload) {
    const surface = (view: Parameters<Island["alert"]>[0], isAlert: boolean) => {
      if (State.mode === "expanded") {
        if (isAlert) island.setView(view);
@@ -4794,7 +4891,27 @@ index b39ecc2..ccc6a39 100644
      } else if (isAlert) {
        island.alert(view);
      } else if (State.mode === "hidden") {
-@@ -532,5 +543,21 @@ function handleHook(island: Island, payload: HookPayload) {
+@@ -450,13 +461,12 @@ function handleHook(island: Island, payload: HookPayload) {
+ 
+     case "PostToolUse":
+       supersedeStop();
+-      // The question was answered in the terminal: the card would be lying.
+-      if (
+-        payload.tool_name === "AskUserQuestion" &&
+-        State.pendingApproval?.questions &&
+-        State.pendingApproval.sessionId === (payload.session_id ?? "")
+-      ) {
+-        dropPendingCard(island);
++      // A terminal answer withdraws only this pill/session's questions, including
++      // ones still in line. Another agent can use the same session id.
++      if (payload.tool_name === "AskUserQuestion") {
++        dropQueued((x) => Boolean(x.questions) && x.pillId === agentId && x.sessionId === sessionId);
++        if (State.pendingApproval?.questions && State.pendingApproval.pillId === agentId &&
++            State.pendingApproval.sessionId === sessionId) dropPendingCard(island);
+       }
+       State.updateTask(agentId, "working");
+       recordDiff(agentId, payload);
+@@ -632,5 +642,21 @@ function handleHook(island: Island, payload: HookPayload) {
      default:
        break;
    }
@@ -4817,7 +4934,7 @@ index b39ecc2..ccc6a39 100644
    State.notify();
  }
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index 9248cce..7c1317e 100644
+index e237b0b..5dd8658 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -1,3 +1,4 @@
@@ -4825,30 +4942,24 @@ index 9248cce..7c1317e 100644
  // The island: DOM shell, sizing animation, Mochi placement, mouse handling.
  // Mirrors IslandRootView.swift + IslandWindowController.swift.
  
-@@ -12,17 +13,20 @@ import {
- } from "../core/layout";
- import { Sound } from "../core/sound";
- import { State } from "../core/state";
--import { SPOTIFY_ID, islandDances } from "../core/spotify";
-+import { SPOTIFY_ID, Spotify, islandDances } from "../core/spotify";
- import { BotEngine, hexToRGB } from "../mochi/engine";
- import { Greeting } from "../mochi/greeting";
- import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
+@@ -22,12 +23,15 @@ import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from ".
  import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
  import { UploadCanvas } from "../upload/canvas";
  import { USC, UploadSeq } from "../upload/sequence";
--import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
-+import { buildQuotaRings, refreshCodexPlanUsage, closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
++import { buildQuotaRings, refreshCodexPlanUsage, claudeCompactPillVisible, closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 +import { roomAgents, agentStatus } from "../core/agent-room";
+ import { dominantPct, planColor } from "../core/plan";
+ import { language, tl } from "../i18n/i18n";
+-import { claudeCompactPillVisible, closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
  import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
  import { h } from "../views/dom";
  import { IslandStateMachine } from "./fsm";
 +import { buildCompactNotice, selectCompactNotice, type CompactNotice } from "./notice";
 +import { buildCompactClock, buildCompactMusic, compactAlert } from "./compact";
  import { refreshHookPills } from "./integrations";
+ import { restoreAlertFocus } from "./hooks";
  import { DesktopLink } from "./desktop";
- import type { ViewCommand } from "./shortcuts";
-@@ -60,8 +64,15 @@ export class Island {
+@@ -66,8 +70,15 @@ export class Island {
    private botGlow!: HTMLElement;
    private greetingCanvas!: HTMLCanvasElement;
    private miniGrid!: HTMLElement;
@@ -4861,10 +4972,10 @@ index 9248cce..7c1317e 100644
 +  private quotaRings!: ReturnType<typeof buildQuotaRings>;
 +  private quotaButton!: HTMLButtonElement;
 +  private quotaShown = false;
-   private countdown!: HTMLElement;
-   private wakeStrip!: HTMLElement;
- 
-@@ -138,6 +149,7 @@ export class Island {
+   /** The closed island's one line (core/closed.ts), and what it last showed. */
+   private closedEl!: HTMLElement;
+   private closedDot!: HTMLElement;
+@@ -161,6 +172,7 @@ export class Island {
        this.onGreetingDone?.();
      };
      State.subscribe(() => {
@@ -4872,7 +4983,7 @@ index 9248cce..7c1317e 100644
        this.dirty = true;
        this.ensureRunning();
      });
-@@ -286,7 +298,26 @@ export class Island {
+@@ -318,7 +330,26 @@ export class Island {
      this.botCanvas = h("canvas", { id: "bot-canvas" });
      this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
      this.miniGrid = h("div", { id: "mini-grid" });
@@ -4898,21 +5009,22 @@ index 9248cce..7c1317e 100644
 +      },
 +    }, this.quotaRings.el);
      this.countdown = h("div", { id: "countdown" });
- 
-     this.header = buildHeader(actions);
-@@ -321,7 +352,11 @@ export class Island {
+     this.compactPlanDot = h("i", { class: "compact-plan-dot" });
+     this.compactPlanLabel = h("span", { class: "compact-plan-label" });
+@@ -372,8 +403,12 @@ export class Island {
        this.botGlow,
        this.botCanvas,
        this.miniGrid,
 +      this.compactStatus,
 +      this.compactNotice.el,
+       this.compactPlan,
        this.clockEl,
 +      this.compactMusic.el,
 +      this.quotaButton,
+       this.closedEl,
        this.countdown,
      );
- 
-@@ -340,6 +375,7 @@ export class Island {
+@@ -393,6 +428,7 @@ export class Island {
    private wireFsm() {
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -4920,7 +5032,7 @@ index 9248cce..7c1317e 100644
      this.fsm.onTransition = (from, to) => {
        // The greeting is over, however it ended: back to his desktop spot.
        if (from === "coucou" && to !== "coucou") this.desktop.launch();
-@@ -422,6 +458,7 @@ export class Island {
+@@ -493,6 +529,7 @@ export class Island {
    }
  
    setView(view: IslandViewName) {
@@ -4928,7 +5040,7 @@ index 9248cce..7c1317e 100644
      this.stopSequenceIfLeaving(view);
      if (view !== "overview") closePlanCard();
      if (State.mode !== "expanded") {
-@@ -457,6 +494,9 @@ export class Island {
+@@ -528,6 +565,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -4938,7 +5050,7 @@ index 9248cce..7c1317e 100644
    }
  
    /** A new Coucou waits and Mochi has nothing else to say (he is blue). */
-@@ -687,8 +727,27 @@ export class Island {
+@@ -758,6 +798,19 @@ export class Island {
  
    // ── Geometry ────────────────────────────────────────────────────────────────
  
@@ -4955,7 +5067,12 @@ index 9248cce..7c1317e 100644
 +    if (held && !visible && this.fsm.state === "petit" && !this.wasInIsland) this.fsm.mouseLeft();
 +  }
 +
-   private targetSize(): { w: number; h: number; r: number } {
+   /** The closed island stays on screen (anything but "hidden"). */
+   private get closedShows(): boolean {
+     return closedIsland(State.settings.closedIsland) !== "hidden";
+@@ -768,6 +821,12 @@ export class Island {
+       return { w: this.closedW, h: CLOSED_H, r: 10 };
+     }
      let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
 +    if (State.mode === "compact" && this.compactMusic.visible) w = 400;
 +    if (State.mode === "expanded" && State.view === "prompt") h = this.chatHeight;
@@ -4966,7 +5083,7 @@ index 9248cce..7c1317e 100644
      if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
        h = QUESTION_PICKER_H;
      }
-@@ -791,6 +850,7 @@ export class Island {
+@@ -956,6 +1015,7 @@ export class Island {
          return;
        }
        if (State.mode !== "expanded") {
@@ -4974,7 +5091,7 @@ index 9248cce..7c1317e 100644
          this.fsm.click();
          return;
        }
-@@ -902,6 +962,7 @@ export class Island {
+@@ -1067,6 +1127,7 @@ export class Island {
        this.fsm.mouseEntered();
      }
      if (!inIsland && wasIn) {
@@ -4982,7 +5099,7 @@ index 9248cce..7c1317e 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1073,7 +1134,7 @@ export class Island {
+@@ -1245,7 +1306,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -4991,7 +5108,7 @@ index 9248cce..7c1317e 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1193,8 +1254,22 @@ export class Island {
+@@ -1373,8 +1434,22 @@ export class Island {
  
    // ── DOM sync ────────────────────────────────────────────────────────────────
  
@@ -5014,7 +5131,7 @@ index 9248cce..7c1317e 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1215,6 +1290,7 @@ export class Island {
+@@ -1395,6 +1470,7 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -5022,7 +5139,7 @@ index 9248cce..7c1317e 100644
        if (on) view.sync();
      }
  
-@@ -1231,38 +1307,91 @@ export class Island {
+@@ -1411,24 +1487,39 @@ export class Island {
        }
      }
  
@@ -5059,6 +5176,18 @@ index 9248cce..7c1317e 100644
        }
      }
  
+     // Compact Claude plan indicator
+-    const showPlan = claudeCompactPillVisible();
++    const showPlan = claudeCompactPillVisible() && !State.paused && !this.compactMusic.visible && !notice &&
++      !State.settings.showCodexPlanInNotch && !(State.stateOverride != null && compactAlert(State.stateOverride, false));
+     this.compactPlan.style.opacity = showPlan ? "1" : "0";
+     this.compactPlan.style.pointerEvents = showPlan ? "auto" : "none";
+     if (showPlan) {
+@@ -1440,23 +1531,62 @@ export class Island {
+       this.compactPlanLabel.textContent = pct != null ? `${Math.round(pct)}%` : "—";
+     }
+ 
++    this.updateClosed();
      this.updateClock();
 +    this.updateQuota();
  
@@ -5109,6 +5238,7 @@ index 9248cce..7c1317e 100644
 +
 +  /** Keep time readable beside music and let explicit status text take priority. */
    private updateClock() {
+-    this.updateClosed();
 -    const on = State.mode === "compact" && State.settings.showClock;
 +    const on = State.mode === "compact" && State.settings.showClock &&
 +      this.compactStatus.style.display === "none";
@@ -5125,7 +5255,7 @@ index 9248cce..7c1317e 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1271,9 +1400,12 @@ export class Island {
+@@ -1473,9 +1603,12 @@ export class Island {
      Sound.setVolume(State.settings.soundVolume);
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -5135,11 +5265,11 @@ index 9248cce..7c1317e 100644
      State.notify();
      // ponytail: one timer for the life of the window; a minute is the clock's finest tick.
 -    this.clockTimer ??= window.setInterval(() => this.updateClock(), 10_000);
-+    this.clockTimer ??= window.setInterval(() => { this.updateClock(); this.updateQuota(); }, 10_000);
++    this.clockTimer ??= window.setInterval(() => { this.updateClosed(); this.updateClock(); this.updateQuota(); }, 10_000);
    }
  
    get panelSize() {
-@@ -1281,6 +1413,6 @@ export class Island {
+@@ -1483,6 +1616,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -5210,7 +5340,7 @@ index 0000000..e1a9d4a
 +  }};
 +}
 diff --git a/windows/src/main.ts b/windows/src/main.ts
-index 0a4f48e..7c35ae9 100644
+index a84d3dc..1c768cc 100644
 --- a/windows/src/main.ts
 +++ b/windows/src/main.ts
 @@ -5,6 +5,7 @@ import { Bridge, IS_TAURI, onEvent } from "./core/bridge";
@@ -5221,7 +5351,7 @@ index 0a4f48e..7c35ae9 100644
  import { registerHookHandlers } from "./island/hooks";
  import { registerPhoneLink } from "./island/phone-link";
  import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
-@@ -156,6 +157,7 @@ async function main() {
+@@ -159,6 +160,7 @@ async function main() {
    });
  
    registerHookHandlers(island);
@@ -5262,7 +5392,7 @@ index a33d03d..a606206 100644
    dizzy: [0.957, 0.447, 0.714] as RGB,
  };
 diff --git a/windows/src/pill/main.ts b/windows/src/pill/main.ts
-index 7d81770..653a80c 100644
+index 07dc64c..89af3be 100644
 --- a/windows/src/pill/main.ts
 +++ b/windows/src/pill/main.ts
 @@ -49,7 +49,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""):
@@ -5274,7 +5404,7 @@ index 7d81770..653a80c 100644
  mochi.setState("idle", true);
  const mochiCanvas = el("canvas");
  
-@@ -177,7 +177,7 @@ function content(l: Look): HTMLElement {
+@@ -178,7 +178,7 @@ function content(l: Look): HTMLElement {
        if (vertical()) {
          const icon = el("span");
          icon.append(svgIcon(state.phase === "failed" ? "mic" : "copy"));
@@ -5284,7 +5414,7 @@ index 7d81770..653a80c 100644
        } else {
          c.append(mochiSlot(), el("span", "message", messageText() ?? ""));
 diff --git a/windows/src/pill/pill.css b/windows/src/pill/pill.css
-index 9602991..7f0a48c 100644
+index 33459c1..f953964 100644
 --- a/windows/src/pill/pill.css
 +++ b/windows/src/pill/pill.css
 @@ -1,3 +1,5 @@
@@ -5302,7 +5432,7 @@ index 9602991..7f0a48c 100644
  }
  
  #pill {
-@@ -53,8 +55,8 @@ body {
+@@ -78,8 +80,8 @@ body {
    flex: 0 0 auto;
    border-radius: 999px;
    overflow: hidden;
@@ -5313,7 +5443,7 @@ index 9602991..7f0a48c 100644
    transition:
      width 0.36s cubic-bezier(0.34, 1.36, 0.64, 1),
      height 0.36s cubic-bezier(0.34, 1.36, 0.64, 1),
-@@ -63,15 +65,15 @@ body {
+@@ -88,15 +90,15 @@ body {
  }
  
  .capsule.open {
@@ -5332,7 +5462,7 @@ index 9602991..7f0a48c 100644
      0 4px 10px rgba(0, 0, 0, 0.35);
  }
  
-@@ -123,7 +125,7 @@ body {
+@@ -148,7 +150,7 @@ body {
    border: 0;
    border-radius: 50%;
    background: transparent;
@@ -5341,7 +5471,7 @@ index 9602991..7f0a48c 100644
    display: inline-flex;
    align-items: center;
    justify-content: center;
-@@ -132,19 +134,19 @@ body {
+@@ -157,19 +159,19 @@ body {
  }
  
  .pbtn:hover {
@@ -5365,7 +5495,7 @@ index 9602991..7f0a48c 100644
  }
  
  .pbtn svg {
-@@ -174,7 +176,7 @@ body {
+@@ -199,7 +201,7 @@ body {
    width: 3.4px;
    height: 3.4px;
    border-radius: 2px;
@@ -5374,7 +5504,7 @@ index 9602991..7f0a48c 100644
  }
  
  .vertical .bars {
-@@ -189,7 +191,7 @@ body {
+@@ -214,7 +216,7 @@ body {
  
  .message {
    font: 500 12px system-ui, "Segoe UI", sans-serif;
@@ -5383,7 +5513,7 @@ index 9602991..7f0a48c 100644
    white-space: nowrap;
  }
  
-@@ -197,15 +199,15 @@ body {
+@@ -222,15 +224,15 @@ body {
    width: 8px;
    height: 8px;
    border-radius: 50%;
@@ -5402,7 +5532,7 @@ index 9602991..7f0a48c 100644
  }
  
  .vertical .clock {
-@@ -217,7 +219,7 @@ body {
+@@ -242,7 +244,7 @@ body {
    height: 22px;
    border-radius: 50%;
    border: 0;
@@ -5411,7 +5541,7 @@ index 9602991..7f0a48c 100644
    display: inline-flex;
    align-items: center;
    justify-content: center;
-@@ -228,14 +230,14 @@ body {
+@@ -253,14 +255,14 @@ body {
    width: 8px;
    height: 8px;
    border-radius: 2px;
@@ -5429,7 +5559,7 @@ index 9602991..7f0a48c 100644
    border-radius: 999px;
    padding: 0 14px;
    height: 30px;
-@@ -268,7 +270,7 @@ body {
+@@ -293,7 +295,7 @@ body {
  }
  
  .bubble.voice .heard {
@@ -5438,7 +5568,7 @@ index 9602991..7f0a48c 100644
    font-weight: 500;
    line-height: 1.3;
    display: -webkit-box;
-@@ -278,7 +280,7 @@ body {
+@@ -303,7 +305,7 @@ body {
  }
  
  .bubble.voice .answer {
@@ -5447,7 +5577,7 @@ index 9602991..7f0a48c 100644
    font-weight: 500;
    line-height: 1.35;
    display: -webkit-box;
-@@ -313,8 +315,8 @@ body {
+@@ -338,8 +340,8 @@ body {
    border: 0;
    border-radius: 999px;
    padding: 6px 12px;
@@ -5458,7 +5588,7 @@ index 9602991..7f0a48c 100644
    font: 600 12px system-ui, "Segoe UI", sans-serif;
    cursor: pointer;
    white-space: nowrap;
-@@ -325,8 +327,8 @@ body {
+@@ -350,8 +352,8 @@ body {
    width: 22px;
    height: 22px;
    border-radius: 50%;
@@ -5720,7 +5850,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index ebc4093..2b60112 100644
+index b7877d3..1f29a7b 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -5819,7 +5949,7 @@ index ebc4093..2b60112 100644
  #island-clip {
    position: absolute;
    inset: 0;
-@@ -185,14 +220,72 @@ body {
+@@ -225,14 +260,72 @@ body {
    display: flex;
    align-items: center;
    justify-content: center;
@@ -5891,10 +6021,10 @@ index ebc4093..2b60112 100644
 +@keyframes compact-wave { to { transform: scaleY(1); } }
 +@media (prefers-reduced-motion: reduce) { .playing.on .compact-wave i { animation: none; transform: scaleY(.6); } }
 +
- /* A mini Mochi: the slot is the body, the canvas is larger and overflows it so
-    hands, badges and particles are not cut off. */
- .mini {
-@@ -248,13 +341,13 @@ body {
+ /* The closed island's one line (core/closed.ts): the time, the plan, the song. */
+ #island-closed {
+   position: absolute;
+@@ -333,13 +426,13 @@ body {
  }
  
  .tab:hover {
@@ -5911,7 +6041,7 @@ index ebc4093..2b60112 100644
  }
  
  .header-actions {
-@@ -360,17 +453,17 @@ body {
+@@ -445,17 +538,17 @@ body {
  }
  
  .btn.primary {
@@ -5933,7 +6063,7 @@ index ebc4093..2b60112 100644
  }
  
  .btn .kbd {
-@@ -385,7 +478,7 @@ body {
+@@ -470,7 +563,7 @@ body {
  }
  
  .btn.secondary .kbd {
@@ -5942,7 +6072,7 @@ index ebc4093..2b60112 100644
  }
  
  .link-btn {
-@@ -400,7 +493,7 @@ body {
+@@ -485,7 +578,7 @@ body {
    height: 16px;
    border: 0;
    border-radius: 50%;
@@ -5951,7 +6081,7 @@ index ebc4093..2b60112 100644
    color: var(--dim-4);
    display: grid;
    place-items: center;
-@@ -620,7 +713,7 @@ body {
+@@ -705,7 +798,7 @@ body {
  
  .diff-line .sym {
    flex: 0 0 12px;
@@ -5960,7 +6090,7 @@ index ebc4093..2b60112 100644
  }
  
  .diff-line .txt {
-@@ -632,8 +725,8 @@ body {
+@@ -717,8 +810,8 @@ body {
  }
  
  .diff-line.added {
@@ -5971,7 +6101,7 @@ index ebc4093..2b60112 100644
  }
  
  .diff-line.added .sym {
-@@ -641,8 +734,8 @@ body {
+@@ -726,8 +819,8 @@ body {
  }
  
  .diff-line.removed {
@@ -5982,7 +6112,7 @@ index ebc4093..2b60112 100644
  }
  
  .diff-line.removed .sym {
-@@ -692,7 +785,7 @@ body {
+@@ -777,7 +870,7 @@ body {
    height: 28px;
    border-radius: 999px;
    background: var(--card-flat);
@@ -5991,7 +6121,7 @@ index ebc4093..2b60112 100644
    display: flex;
    align-items: center;
    cursor: default;
-@@ -730,7 +823,7 @@ body {
+@@ -815,7 +908,7 @@ body {
    width: 14px;
    height: 14px;
    border-radius: 50%;
@@ -6000,7 +6130,7 @@ index ebc4093..2b60112 100644
    display: grid;
    place-items: center;
  }
-@@ -788,9 +881,9 @@ body {
+@@ -873,9 +966,9 @@ body {
  
  .code {
    font: 400 12px var(--mono);
@@ -6013,7 +6143,7 @@ index ebc4093..2b60112 100644
    border-radius: 10px;
    padding: 5px 10px;
    max-width: 100%;
-@@ -854,7 +947,7 @@ body {
+@@ -939,7 +1032,7 @@ body {
    align-items: center;
    gap: 10px;
    font: 400 12.5px var(--font);
@@ -6022,7 +6152,7 @@ index ebc4093..2b60112 100644
  }
  
  .switch {
-@@ -862,7 +955,7 @@ body {
+@@ -947,7 +1040,7 @@ body {
    width: 32px;
    height: 18px;
    border-radius: 9px;
@@ -6031,7 +6161,7 @@ index ebc4093..2b60112 100644
    flex: 0 0 32px;
    transition: background 0.18s;
    cursor: default;
-@@ -881,11 +974,12 @@ body {
+@@ -966,11 +1059,12 @@ body {
    width: 14px;
    height: 14px;
    border-radius: 50%;
@@ -6045,7 +6175,7 @@ index ebc4093..2b60112 100644
    transform: translateX(14px);
  }
  
-@@ -894,7 +988,7 @@ input[type="range"] {
+@@ -979,7 +1073,7 @@ input[type="range"] {
    appearance: none;
    height: 3px;
    border-radius: 2px;
@@ -6054,7 +6184,7 @@ index ebc4093..2b60112 100644
    width: 72px;
  }
  
-@@ -903,7 +997,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -988,7 +1082,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 11px;
    height: 11px;
    border-radius: 50%;
@@ -6063,7 +6193,7 @@ index ebc4093..2b60112 100644
  }
  
  .seg {
-@@ -923,7 +1017,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1008,7 +1102,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .seg button.on {
@@ -6072,7 +6202,7 @@ index ebc4093..2b60112 100644
    color: var(--ink);
  }
  
-@@ -963,10 +1057,10 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1048,10 +1142,10 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 6px;
    padding: 4px 10px;
    border-radius: 999px;
@@ -6085,7 +6215,7 @@ index ebc4093..2b60112 100644
    transform: scale(1.06);
    transition: border-color 0.3s ease-out 0.45s, transform 0.3s ease-out 0.45s;
  }
-@@ -1005,7 +1099,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1088,7 +1182,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .bubble {
@@ -6094,7 +6224,7 @@ index ebc4093..2b60112 100644
    border-radius: 12px;
    padding: 6px 10px;
    font: 400 12.5px var(--font);
-@@ -1016,7 +1110,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1099,7 +1193,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .reply {
    font: 400 12.5px var(--font);
@@ -6103,7 +6233,7 @@ index ebc4093..2b60112 100644
    white-space: pre-wrap;
    padding-right: 8px;
    user-select: text;
-@@ -1031,7 +1125,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1114,7 +1208,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .md-p {
    font: 400 12.5px var(--font);
@@ -6112,7 +6242,7 @@ index ebc4093..2b60112 100644
    white-space: pre-wrap;
    overflow-wrap: anywhere;
  }
-@@ -1048,16 +1142,16 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1131,16 +1225,16 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .reply strong {
@@ -6132,7 +6262,7 @@ index ebc4093..2b60112 100644
  }
  
  .md-link {
-@@ -1071,16 +1165,16 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1154,16 +1248,16 @@ input[type="range"]::-webkit-slider-thumb {
    align-items: flex-start;
    gap: 8px;
    padding: 10px;
@@ -6152,7 +6282,7 @@ index ebc4093..2b60112 100644
    white-space: pre-wrap;
    overflow-wrap: anywhere;
  }
-@@ -1094,7 +1188,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1177,7 +1271,7 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 0;
    border: 0;
    border-radius: 4px;
@@ -6161,7 +6291,7 @@ index ebc4093..2b60112 100644
    color: var(--dim-3);
    cursor: default;
  }
-@@ -1133,13 +1227,13 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1216,13 +1310,13 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .md-quote .md-p {
@@ -6177,7 +6307,7 @@ index ebc4093..2b60112 100644
    opacity: 0.3;
  }
  
-@@ -1186,14 +1280,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1269,14 +1363,14 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 4px 8px;
    border: 0;
    border-radius: 999px;
@@ -6195,7 +6325,7 @@ index ebc4093..2b60112 100644
  }
  
  .model-btn:disabled {
-@@ -1213,7 +1307,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1296,7 +1390,7 @@ input[type="range"]::-webkit-slider-thumb {
    text-overflow: ellipsis;
    white-space: nowrap;
    font: 500 10.5px var(--font);
@@ -6204,7 +6334,7 @@ index ebc4093..2b60112 100644
  }
  
  .picker {
-@@ -1224,8 +1318,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1307,8 +1401,8 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 8px;
    padding: 10px;
    border-radius: 12px;
@@ -6215,7 +6345,7 @@ index ebc4093..2b60112 100644
  }
  
  .chat-body.picking .picker {
-@@ -1243,25 +1337,25 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1326,25 +1420,25 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 6px;
  }
  
@@ -6248,7 +6378,7 @@ index ebc4093..2b60112 100644
    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
    background: color-mix(in srgb, var(--accent) 18%, transparent);
  }
-@@ -1275,7 +1369,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1358,7 +1452,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .picker-rule {
    flex: 0 0 1px;
@@ -6257,7 +6387,7 @@ index ebc4093..2b60112 100644
    opacity: 0.4;
  }
  
-@@ -1298,19 +1392,19 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1379,19 +1473,19 @@ input[type="range"]::-webkit-slider-thumb {
    border: 0;
    border-radius: 6px;
    background: transparent;
@@ -6280,7 +6410,7 @@ index ebc4093..2b60112 100644
    background: color-mix(in srgb, var(--accent) 10%, transparent);
  }
  
-@@ -1329,7 +1423,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1410,7 +1504,7 @@ input[type="range"]::-webkit-slider-thumb {
    flex-wrap: wrap;
    padding: 4px 0;
    font: 400 11px var(--font);
@@ -6289,7 +6419,7 @@ index ebc4093..2b60112 100644
  }
  
  .picker-link {
-@@ -1346,7 +1440,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1427,7 +1521,7 @@ input[type="range"]::-webkit-slider-thumb {
    align-items: center;
    gap: 8px;
    padding: 6px 10px;
@@ -6298,7 +6428,7 @@ index ebc4093..2b60112 100644
    border-radius: 12px;
  }
  
-@@ -1371,8 +1465,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1452,8 +1546,8 @@ input[type="range"]::-webkit-slider-thumb {
    flex: 0 0 28px;
    border: 0;
    border-radius: 50%;
@@ -6309,7 +6439,7 @@ index ebc4093..2b60112 100644
    display: grid;
    place-items: center;
    cursor: default;
-@@ -1404,12 +1498,12 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1485,12 +1579,12 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .drop-card.over {
@@ -6324,7 +6454,7 @@ index ebc4093..2b60112 100644
    animation: dash-march 1.1s linear infinite;
  }
  
-@@ -1435,7 +1529,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1516,7 +1610,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .drop-title {
    font: 500 13px var(--font);
@@ -6333,7 +6463,7 @@ index ebc4093..2b60112 100644
    transition: color 0.2s;
  }
  
-@@ -1452,19 +1546,19 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1533,19 +1627,19 @@ input[type="range"]::-webkit-slider-thumb {
    font: 400 11px var(--font);
    padding: 3px 8px;
    border-radius: 999px;
@@ -6357,7 +6487,7 @@ index ebc4093..2b60112 100644
      var(--card);
  }
  
-@@ -1477,7 +1571,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1558,7 +1652,7 @@ input[type="range"]::-webkit-slider-thumb {
    justify-content: space-between;
    gap: 8px;
    font: 400 12.5px var(--font);
@@ -6366,7 +6496,7 @@ index ebc4093..2b60112 100644
  }
  
  .up-name {
-@@ -1504,13 +1598,13 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1585,13 +1679,13 @@ input[type="range"]::-webkit-slider-thumb {
    width: 526px;
    height: 6px;
    border-radius: 3px;
@@ -6382,7 +6512,7 @@ index ebc4093..2b60112 100644
  }
  
  .up-glow {
-@@ -1520,7 +1614,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1601,7 +1695,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 28px;
    height: 12px;
    border-radius: 50%;
@@ -6391,7 +6521,7 @@ index ebc4093..2b60112 100644
    filter: blur(5px);
    pointer-events: none;
  }
-@@ -1567,7 +1661,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1648,7 +1742,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-total span {
    font: 500 11px var(--font);
@@ -6400,7 +6530,7 @@ index ebc4093..2b60112 100644
    font-variant-numeric: tabular-nums;
  }
  
-@@ -1623,7 +1717,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1704,7 +1798,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-name {
    font: 500 11px var(--font);
@@ -6409,7 +6539,7 @@ index ebc4093..2b60112 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -1631,7 +1725,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1712,7 +1806,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .int-row.first .int-name {
@@ -6418,7 +6548,7 @@ index ebc4093..2b60112 100644
  }
  
  .int-ago {
-@@ -1642,7 +1736,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1723,7 +1817,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-sub {
    font: 400 10px var(--font);
@@ -6427,7 +6557,7 @@ index ebc4093..2b60112 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -1710,7 +1804,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1791,7 +1885,7 @@ input[type="range"]::-webkit-slider-thumb {
  .int-stat-value {
    margin-left: auto;
    font: 600 12px var(--font);
@@ -6436,7 +6566,7 @@ index ebc4093..2b60112 100644
    font-variant-numeric: tabular-nums;
  }
  
-@@ -1745,7 +1839,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1826,7 +1920,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .int-page:hover {
@@ -6445,7 +6575,7 @@ index ebc4093..2b60112 100644
    border-radius: 5px;
  }
  
-@@ -1811,7 +1905,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1892,7 +1986,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-commit {
    font: 400 10.5px var(--font);
@@ -6454,7 +6584,7 @@ index ebc4093..2b60112 100644
    display: -webkit-box;
    -webkit-line-clamp: 2;
    -webkit-box-orient: vertical;
-@@ -1888,7 +1982,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1969,7 +2063,7 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 4px 8px;
    border: 1px solid color-mix(in srgb, var(--plan) 14%, transparent);
    border-radius: 999px;
@@ -6463,7 +6593,7 @@ index ebc4093..2b60112 100644
    color: var(--dim-3);
    font: 600 10px var(--font);
    line-height: 12px;
-@@ -1966,7 +2060,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2047,7 +2141,7 @@ input[type="range"]::-webkit-slider-thumb {
    flex: 0 0 50px;
    height: 4px;
    border-radius: 2px;
@@ -6472,7 +6602,7 @@ index ebc4093..2b60112 100644
    overflow: hidden;
  }
  
-@@ -1981,7 +2075,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2062,7 +2156,7 @@ input[type="range"]::-webkit-slider-thumb {
    text-align: right;
    font-weight: 600;
    font-variant-numeric: tabular-nums;
@@ -6481,7 +6611,7 @@ index ebc4093..2b60112 100644
  }
  
  .plan-reset-icon {
-@@ -2000,7 +2094,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2081,7 +2175,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .plan-credits {
    font-weight: 600;
@@ -6490,7 +6620,7 @@ index ebc4093..2b60112 100644
  }
  
  /* ── GitHub pulse (GitHubPulseCardView / GitHubDetailView) ─────────────── */
-@@ -2115,12 +2209,12 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2196,12 +2290,12 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .gh-row:hover {
@@ -6505,7 +6635,7 @@ index ebc4093..2b60112 100644
  }
  
  .gh-gap {
-@@ -2130,14 +2224,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2211,14 +2305,14 @@ input[type="range"]::-webkit-slider-thumb {
  
  .gh-ref {
    font: 400 10.5px var(--font);
@@ -6522,7 +6652,7 @@ index ebc4093..2b60112 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -2326,8 +2420,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2407,8 +2501,8 @@ input[type="range"]::-webkit-slider-thumb {
    height: 30px;
    padding: 0;
    border-radius: 7px;
@@ -6533,7 +6663,7 @@ index ebc4093..2b60112 100644
    display: grid;
    place-items: center;
    cursor: default;
-@@ -2335,11 +2429,11 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2416,11 +2510,11 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .wardrobe-item:hover {
@@ -6547,7 +6677,7 @@ index ebc4093..2b60112 100644
  }
  
  .wardrobe-item canvas {
-@@ -2364,14 +2458,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2445,14 +2539,14 @@ input[type="range"]::-webkit-slider-thumb {
    max-width: 260px;
    height: 4px;
    border-radius: 999px;
@@ -6564,7 +6694,7 @@ index ebc4093..2b60112 100644
    transition: width 0.25s linear;
  }
  
-@@ -2535,7 +2629,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2616,7 +2710,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 36px;
    height: 36px;
    border-radius: 6px;
@@ -6573,7 +6703,7 @@ index ebc4093..2b60112 100644
    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
    display: grid;
    place-items: center;
-@@ -2548,7 +2642,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2629,7 +2723,7 @@ input[type="range"]::-webkit-slider-thumb {
    position: absolute;
    inset: 0;
    border-radius: 6px;
@@ -6582,7 +6712,7 @@ index ebc4093..2b60112 100644
    pointer-events: none;
  }
  
-@@ -2643,7 +2737,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2724,7 +2818,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .np-track {
    width: 100%;
@@ -6591,11 +6721,10 @@ index ebc4093..2b60112 100644
  }
  
  .np-bar.active .np-track,
-@@ -3026,3 +3120,111 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
-   unicode-bidi: plaintext;
+@@ -3108,6 +3202,114 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    text-align: start;
  }
-+
+ 
 +/* EVA agent room: hook-driven Mochis at individual desks. */
 +.agent-room { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 8px; }
 +.room-heading { display: flex; align-items: center; justify-content: space-between; color: var(--eva-accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
@@ -6703,6 +6832,10 @@ index ebc4093..2b60112 100644
 +.agent-overflow-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 112px; overflow-y: auto; flex-shrink: 0; }
 +.agent-overflow-item { width: 100%; }
 +@media (max-width: 650px) { .agent-node.agent-desk { gap: 0 4px; padding: 4px; } .agent-node-name { font-size: 10px; } .agent-node-status, .agent-node-activity { font-size: 9px; } }
++
+ /* ── Mail (classic Outlook) — MailViews.swift ─────────────────────────────── */
+ .mail-card {
+   height: 100%;
 diff --git a/windows/src/theme.css b/windows/src/theme.css
 new file mode 100644
 index 0000000..91a8088
@@ -6922,7 +7055,7 @@ index 0000000..a058592
 +  } };
 +}
 diff --git a/windows/src/views/chat.ts b/windows/src/views/chat.ts
-index f11fea1..920bc35 100644
+index 4ddde19..836b8be 100644
 --- a/windows/src/views/chat.ts
 +++ b/windows/src/views/chat.ts
 @@ -1,3 +1,4 @@
@@ -6938,7 +7071,7 @@ index f11fea1..920bc35 100644
  import { h, svg, clear } from "./dom";
  import { ICONS } from "./icons";
  import { renderMarkdown } from "./markdown";
-@@ -201,7 +203,7 @@ function buildPicker(onChange: () => void): Picker {
+@@ -219,7 +221,7 @@ function buildPicker(onChange: () => void): Picker {
  
  // ── View ──────────────────────────────────────────────────────────────────────
  
@@ -6947,7 +7080,7 @@ index f11fea1..920bc35 100644
    const chipRow = h("div", { class: "chip-row" });
    const log = h("div", { class: "chat-log" });
    const input = h("input", {
-@@ -350,3 +352,35 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
+@@ -384,3 +386,35 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
      },
    };
  }
@@ -7589,7 +7722,7 @@ index e851100..3bcc407 100644
            btn(t("Yes, tell me"), "primary", () => Updates.answer(true)),
            btn(t("No thanks"), "secondary", () => Updates.answer(false)),
 diff --git a/windows/src/views/usage.ts b/windows/src/views/usage.ts
-index 9abc2e0..5f3dc77 100644
+index d383339..513b26d 100644
 --- a/windows/src/views/usage.ts
 +++ b/windows/src/views/usage.ts
 @@ -12,13 +12,13 @@
@@ -7608,7 +7741,7 @@ index 9abc2e0..5f3dc77 100644
  
  /** The Claude pill is in the header: overview, turned on, relay in. */
  export function claudePillVisible(): boolean {
-@@ -105,6 +105,35 @@ export function refreshCodexPlanUsage(): void {
+@@ -113,6 +113,35 @@ export function refreshCodexPlanUsage(): void {
      });
  }
  
@@ -7644,7 +7777,7 @@ index 9abc2e0..5f3dc77 100644
  // ── Pill ──────────────────────────────────────────────────────────────────────
  
  export interface PlanPill {
-@@ -116,6 +145,7 @@ export interface PlanPill {
+@@ -124,6 +153,7 @@ export interface PlanPill {
  export function buildPlanPill(codex: boolean): PlanPill {
    const label = h("span", { class: "plan-pill-label" });
    const dotEl = h("i", { class: "plan-pill-dot" });
@@ -7652,7 +7785,7 @@ index 9abc2e0..5f3dc77 100644
    const isOpen = () => State.showingPlanDetail && State.planDetailIsCodex === codex;
    const el = h("button", {
      class: "plan-pill",
-@@ -127,7 +157,7 @@ export function buildPlanPill(codex: boolean): PlanPill {
+@@ -135,7 +165,7 @@ export function buildPlanPill(codex: boolean): PlanPill {
        if (codex) refreshCodexPlanUsage();
        State.notify();
      },
@@ -7661,7 +7794,7 @@ index 9abc2e0..5f3dc77 100644
    return {
      el,
      sync() {
-@@ -135,8 +165,10 @@ export function buildPlanPill(codex: boolean): PlanPill {
+@@ -143,8 +173,10 @@ export function buildPlanPill(codex: boolean): PlanPill {
        el.style.setProperty("--plan", color);
        el.classList.toggle("active", isOpen());
        dotEl.style.background = color;
@@ -7673,7 +7806,7 @@ index 9abc2e0..5f3dc77 100644
          : pillLabel("Claude", State.planUsage);
      },
    };
-@@ -200,15 +232,35 @@ export class PlanCard {
+@@ -208,15 +240,35 @@ export class PlanCard {
  
    private drawCodex(u: CodexPlanUsage | null, now: number) {
      const rows = h("div", { class: "plan-rows" });
@@ -7719,7 +7852,7 @@ index 9abc2e0..5f3dc77 100644
    }
  }
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index 491bc9b..d29f8ae 100644
+index d29f9b6..d698a4d 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
 @@ -1,3 +1,5 @@
@@ -7736,7 +7869,7 @@ index 491bc9b..d29f8ae 100644
  import { buildRecap } from "./recap";
  import { buildWardrobe } from "./wardrobe";
  import { buildUpdate } from "./update";
-@@ -66,6 +69,9 @@ export interface ViewActions {
+@@ -68,6 +71,9 @@ export interface ViewActions {
  export interface ViewHost {
    el: HTMLElement;
    sync(): void;
@@ -7746,24 +7879,24 @@ index 491bc9b..d29f8ae 100644
    /** Called when the view becomes active, for views with a text field. */
    focus?(): void;
    /** Called every frame while the view is on screen. True = needs another frame. */
-@@ -116,6 +122,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
+@@ -118,6 +124,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
  
  export function buildHeader(actions: ViewActions): ViewHost {
-   const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 13));
+   const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 17));
 +  const tabRoom = h("button", { class: "tab", title: tl("Agent room"), "aria-label": tl("Agent room"), onclick: () => go("agents") }, svg("M2 4h8v7H2zM14 4h8v7h-8zM5 11h2v4H5zM17 11h2v4h-2zM1 16h10v2H1zM13 16h10v2H13z", 14));
-   const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
-   const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 13));
+   const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubbleRound, 19));
+   const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 16));
  
-@@ -135,7 +142,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -140,7 +147,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
    const el = h(
      "div",
      { id: "header" },
 -    h("div", { class: "tabs" }, tabHome, tabChat, tabDrop),
 +    h("div", { class: "tabs" }, tabHome, tabRoom, tabChat, tabDrop),
-     h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
+     h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn, closeBtn),
    );
    const headerActions = el.lastElementChild as HTMLElement;
-@@ -145,6 +152,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -150,6 +157,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
      sync() {
        const v = State.view;
        tabHome.classList.toggle("on", v === "overview" || v === "empty");
@@ -7771,7 +7904,7 @@ index 491bc9b..d29f8ae 100644
        tabChat.classList.toggle("on", v === "prompt");
        tabDrop.classList.toggle("on", v === "upload");
        gearBtn.classList.toggle("on", v === "settings");
-@@ -189,6 +197,11 @@ function buildOverview(actions: ViewActions): ViewHost {
+@@ -195,6 +203,11 @@ function buildOverview(actions: ViewActions): ViewHost {
      activeDiffId = diffId;
      State.notify();
    });
@@ -7783,7 +7916,7 @@ index 491bc9b..d29f8ae 100644
    const who = h("div", { class: "who" });
    const tickerBody = h("div", { class: "card-body" }, who, ticker.el);
    const leftBody = h("div", { class: "left-body" });
-@@ -306,6 +319,7 @@ function buildOverview(actions: ViewActions): ViewHost {
+@@ -314,6 +327,7 @@ function buildOverview(actions: ViewActions): ViewHost {
        const task = State.focusTask;
        if (task?.id !== lastFocus) {
          lastFocus = task?.id ?? null;
@@ -7791,7 +7924,7 @@ index 491bc9b..d29f8ae 100644
          detailOpen = false;
          activeDiffId = null;
          cardKey = "";
-@@ -369,6 +383,12 @@ function buildOverview(actions: ViewActions): ViewHost {
+@@ -377,6 +391,12 @@ function buildOverview(actions: ViewActions): ViewHost {
              text: `${Math.min(task.stepIndex + 1, task.steps.length)}/${task.steps.length}`,
            }));
          }
@@ -7804,7 +7937,7 @@ index 491bc9b..d29f8ae 100644
          ticker.sync(task);
        } else if (task && task.id === SPOTIFY_ID) {
          // Its own card for every state: playing, idle, not installed.
-@@ -555,6 +575,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+@@ -571,6 +591,7 @@ function buildApproval(actions: ViewActions): ViewHost {
        // is the command, the file path or the URL being authorised, not just the
        // name of the tool asking.
        code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
@@ -7812,7 +7945,7 @@ index 491bc9b..d29f8ae 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
-@@ -830,6 +851,7 @@ export function buildViews(
+@@ -846,6 +867,7 @@ export function buildViews(
  ): Map<IslandViewName, ViewHost> {
    const map = new Map<IslandViewName, ViewHost>();
    map.set("overview", buildOverview(actions));
@@ -7821,14 +7954,159 @@ index 491bc9b..d29f8ae 100644
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index 0c338b4..e406e41 100644
+index e98f0d5..c13fc05 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -2,7 +2,285 @@
-   "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 12 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
+@@ -1,6 +1,527 @@
+ {
+   "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 14 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
-     {
--      "version": "0.5.3",
++    {
++      "version": "0.5.9-sendoa.1",
++      "items": [
++        {
++          "icon": "eye",
++          "title": {
++            "en": "The island stays on screen",
++            "zh-Hans": "灵动岛一直在屏幕上",
++            "hi": "आइलैंड स्क्रीन पर बना रहता है",
++            "es": "La isla se queda en pantalla",
++            "ar": "تبقى الجزيرة على الشاشة",
++            "fr": "L'île reste à l'écran",
++            "bn": "আইল্যান্ড স্ক্রিনে থাকে",
++            "pt-BR": "A ilha fica na tela",
++            "ru": "Остров остаётся на экране",
++            "id": "Pulau tetap di layar",
++            "de": "Die Insel bleibt auf dem Bildschirm",
++            "tr": "Ada ekranda kalır",
++            "ko": "아일랜드가 화면에 남아요",
++            "ja": "アイランドが画面に残る"
++          },
++          "detail": {
++            "en": "Closed, it keeps Mochi or the time at the top of the screen. Hover it to bring Coucou back.",
++            "zh-Hans": "关闭后，屏幕顶部仍显示 Mochi 或时间。将指针移上去即可唤回 Coucou。",
++            "hi": "बंद होने पर ऊपर Mochi या समय दिखता रहता है। Coucou लौटाने के लिए पॉइंटर रखें।",
++            "es": "Cerrada, muestra a Mochi o la hora arriba. Pasa el puntero para recuperar Coucou.",
++            "ar": "عند الإغلاق يبقى Mochi أو الوقت أعلى الشاشة. مرّر المؤشر لإعادة Coucou.",
++            "fr": "Fermée, elle garde Mochi ou l'heure en haut de l'écran. Survolez-la pour retrouver Coucou.",
++            "bn": "বন্ধ হলেও উপরে Mochi বা সময় থাকে। Coucou ফেরাতে পয়েন্টার রাখুন।",
++            "pt-BR": "Fechada, mostra o Mochi ou a hora no topo. Passe o ponteiro para trazer o Coucou.",
++            "ru": "Закрытый, он показывает Mochi или время вверху. Наведите указатель, чтобы вернуть Coucou.",
++            "id": "Saat ditutup, Mochi atau jam tetap di atas. Arahkan penunjuk untuk memunculkan Coucou.",
++            "de": "Geschlossen zeigt sie oben Mochi oder die Uhrzeit. Zeiger darüber holt Coucou zurück.",
++            "tr": "Kapalıyken üstte Mochi ya da saat kalır. Coucou'yu geri getirmek için üzerine gelin.",
++            "ko": "닫혀도 화면 위에 Mochi나 시간이 남아요. 포인터를 올리면 Coucou가 돌아와요.",
++            "ja": "閉じても上部に Mochi か時刻が残ります。ポインタを乗せると Coucou が戻ります。"
++          }
++        },
++        {
++          "icon": "mic",
++          "title": {
++            "en": "Dictation keeps your language",
++            "zh-Hans": "听写保持你的语言",
++            "hi": "डिक्टेशन आपकी भाषा में रहता है",
++            "es": "El dictado mantiene tu idioma",
++            "ar": "الإملاء يحافظ على لغتك",
++            "fr": "La dictée garde votre langue",
++            "bn": "ডিক্টেশন আপনার ভাষায় থাকে",
++            "pt-BR": "O ditado mantém seu idioma",
++            "ru": "Диктовка не меняет язык",
++            "id": "Dikte tetap dalam bahasa Anda",
++            "de": "Diktat bleibt in deiner Sprache",
++            "tr": "Dikte dilinizde kalır",
++            "ko": "받아쓰기가 언어를 유지해요",
++            "ja": "音声入力が言語を保ちます"
++          },
++          "detail": {
++            "en": "It no longer switches to English mid-sentence when you start speaking right away.",
++            "zh-Hans": "立即开口说话时，不会再在句中切换成英语。",
++            "hi": "तुरंत बोलना शुरू करने पर वाक्य के बीच अंग्रेज़ी में नहीं बदलता।",
++            "es": "Ya no cambia al inglés a mitad de frase cuando empiezas a hablar enseguida.",
++            "ar": "لم يعد يتحول إلى الإنجليزية في منتصف الجملة عندما تبدأ الكلام فورًا.",
++            "fr": "Elle ne passe plus à l'anglais en pleine phrase quand vous parlez tout de suite.",
++            "bn": "সঙ্গে সঙ্গে কথা বললে বাক্যের মাঝে আর ইংরেজিতে যায় না।",
++            "pt-BR": "Não muda mais para o inglês no meio da frase quando você fala logo de cara.",
++            "ru": "Больше не переходит на английский посреди фразы, если начать говорить сразу.",
++            "id": "Tak lagi beralih ke bahasa Inggris di tengah kalimat saat Anda langsung bicara.",
++            "de": "Sie wechselt nicht mehr mitten im Satz ins Englische, wenn du sofort sprichst.",
++            "tr": "Hemen konuşmaya başladığınızda cümle ortasında İngilizceye geçmez.",
++            "ko": "바로 말을 시작해도 문장 중간에 영어로 바뀌지 않아요.",
++            "ja": "すぐに話し始めても、文の途中で英語に切り替わりません。"
++          }
++        },
++        {
++          "icon": "keyboard",
++          "title": {
++            "en": "Your own dictation key",
++            "zh-Hans": "自定义听写按键",
++            "hi": "अपनी डिक्टेशन कुंजी",
++            "es": "Tu propia tecla de dictado",
++            "ar": "مفتاح إملاء خاص بك",
++            "fr": "Votre touche de dictée",
++            "bn": "নিজের ডিক্টেশন কী",
++            "pt-BR": "Sua própria tecla de ditado",
++            "ru": "Своя клавиша диктовки",
++            "id": "Tombol dikte sendiri",
++            "de": "Deine eigene Diktiertaste",
++            "tr": "Kendi dikte tuşunuz",
++            "ko": "나만의 받아쓰기 키",
++            "ja": "自分の音声入力キー"
++          },
++          "detail": {
++            "en": "The left keys, or record any shortcut, like Alt + Shift + F.",
++            "zh-Hans": "可用左侧按键，或录制任意快捷键，如 Alt + Shift + F。",
++            "hi": "बाईं कुंजियाँ, या कोई भी शॉर्टकट रिकॉर्ड करें, जैसे Alt + Shift + F।",
++            "es": "Las teclas izquierdas, o graba cualquier atajo, como Alt + Shift + F.",
++            "ar": "المفاتيح اليسرى، أو سجّل أي اختصار مثل Alt + Shift + F.",
++            "fr": "Les touches de gauche, ou enregistrez le raccourci de votre choix, comme Alt + Shift + F.",
++            "bn": "বাম দিকের কী, বা Alt + Shift + F-এর মতো যেকোনো শর্টকাট।",
++            "pt-BR": "As teclas da esquerda, ou grave qualquer atalho, como Alt + Shift + F.",
++            "ru": "Левые клавиши или любое сочетание, например Alt + Shift + F.",
++            "id": "Tombol kiri, atau rekam pintasan apa pun, seperti Alt + Shift + F.",
++            "de": "Die linken Tasten oder ein beliebiges Kürzel wie Alt + Shift + F.",
++            "tr": "Sol tuşlar ya da Alt + Shift + F gibi istediğiniz kısayol.",
++            "ko": "왼쪽 키나 Alt + Shift + F 같은 원하는 단축키를 쓸 수 있어요.",
++            "ja": "左側のキー、または Alt + Shift + F など好きなショートカットを記録できます。"
++          }
++        },
++        {
++          "icon": "bell",
++          "title": {
++            "en": "Silence while you speak",
++            "zh-Hans": "说话时保持安静",
++            "hi": "बोलते समय शांति",
++            "es": "Silencio mientras hablas",
++            "ar": "صمت أثناء حديثك",
++            "fr": "Le silence quand vous parlez",
++            "bn": "কথা বলার সময় নীরবতা",
++            "pt-BR": "Silêncio enquanto você fala",
++            "ru": "Тишина, пока вы говорите",
++            "id": "Hening saat Anda bicara",
++            "de": "Stille, während du sprichst",
++            "tr": "Konuşurken sessizlik",
++            "ko": "말하는 동안 조용히",
++            "ja": "話している間は静かに"
++          },
++          "detail": {
++            "en": "On Windows, videos, music and calls go quiet while Coucou listens, then come back.",
++            "zh-Hans": "在 Windows 上，Coucou 聆听时视频、音乐和通话会静音，之后恢复。",
++            "hi": "Windows पर Coucou के सुनते समय वीडियो, संगीत और कॉल शांत होकर फिर लौट आते हैं।",
++            "es": "En Windows, vídeos, música y llamadas se callan mientras Coucou escucha y luego vuelven.",
++            "ar": "على Windows تصمت الفيديوهات والموسيقى والمكالمات أثناء استماع Coucou ثم تعود.",
++            "fr": "Sur Windows, vidéos, musique et appels se taisent pendant que Coucou écoute, puis reviennent.",
++            "bn": "Windows-এ Coucou শোনার সময় ভিডিও, গান ও কল চুপ থাকে, পরে ফিরে আসে।",
++            "pt-BR": "No Windows, vídeos, música e chamadas silenciam enquanto o Coucou ouve e depois voltam.",
++            "ru": "В Windows видео, музыка и звонки затихают, пока Coucou слушает, а потом возвращаются.",
++            "id": "Di Windows, video, musik, dan panggilan senyap saat Coucou mendengar, lalu kembali.",
++            "de": "Unter Windows verstummen Videos, Musik und Anrufe, während Coucou zuhört.",
++            "tr": "Windows'ta Coucou dinlerken videolar, müzik ve aramalar susar, sonra geri gelir.",
++            "ko": "Windows에서 Coucou가 듣는 동안 영상·음악·통화가 조용해졌다가 돌아와요.",
++            "ja": "Windows では Coucou が聞く間、動画・音楽・通話が静かになり、その後戻ります。"
++          }
++        }
++      ]
++    },
++    {
 +      "version": "0.5.3-sendoa.7",
 +      "items": [
 +        {
@@ -8108,11 +8386,107 @@ index 0c338b4..e406e41 100644
 +    },
 +    {
 +      "version": "0.5.3-sendoa.1",
++      "items": [
++        {
++          "icon": "chat",
++          "title": {
++            "en": "WhatsApp in the island",
++            "zh-Hans": "岛中的 WhatsApp",
++            "hi": "आइलैंड में WhatsApp",
++            "es": "WhatsApp en la isla",
++            "ar": "واتساب في الشريط",
++            "fr": "WhatsApp dans l’île",
++            "bn": "আইল্যান্ডে WhatsApp",
++            "pt-BR": "WhatsApp na ilha",
++            "ru": "WhatsApp на острове",
++            "id": "WhatsApp di pulau",
++            "de": "WhatsApp in der Insel",
++            "tr": "Adada WhatsApp"
++          },
++          "detail": {
++            "en": "Your chats in the island, and replies without opening WhatsApp. Experimental.",
++            "zh-Hans": "在岛中查看聊天，不打开 WhatsApp 也能回复。实验性功能。",
++            "hi": "आइलैंड में आपकी चैट, और WhatsApp खोले बिना जवाब। प्रायोगिक।",
++            "es": "Tus chats en la isla y respuestas sin abrir WhatsApp. Experimental.",
++            "ar": "محادثاتك في الشريط، والرد دون فتح واتساب. تجريبي.",
++            "fr": "Tes conversations dans l’île, et tes réponses sans ouvrir WhatsApp. Expérimental.",
++            "bn": "আইল্যান্ডে আপনার চ্যাট, আর WhatsApp না খুলেই উত্তর। পরীক্ষামূলক।",
++            "pt-BR": "Suas conversas na ilha e respostas sem abrir o WhatsApp. Experimental.",
++            "ru": "Чаты на острове и ответы без открытия WhatsApp. Экспериментально.",
++            "id": "Obrolanmu di pulau, dan balas tanpa membuka WhatsApp. Eksperimental.",
++            "de": "Deine Chats in der Insel und Antworten, ohne WhatsApp zu öffnen. Experimentell.",
++            "tr": "Sohbetlerin adada; WhatsApp’ı açmadan yanıtla. Deneysel."
++          }
++        },
++        {
++          "icon": "download",
++          "title": {
++            "en": "Set up in one click",
++            "zh-Hans": "一键设置",
++            "hi": "एक क्लिक में सेटअप",
++            "es": "Listo en un clic",
++            "ar": "الإعداد بنقرة واحدة",
++            "fr": "Installé en un clic",
++            "bn": "এক ক্লিকে সেটআপ",
++            "pt-BR": "Pronto em um clique",
++            "ru": "Настройка в один клик",
++            "id": "Siap dalam sekali klik",
++            "de": "Eingerichtet mit einem Klick",
++            "tr": "Tek tıkla kurulum"
++          },
++          "detail": {
++            "en": "Coucou installs the gateway, checks it and shows the QR code to scan.",
++            "zh-Hans": "Coucou 安装网关、进行校验，并显示要扫描的二维码。",
++            "hi": "Coucou गेटवे इंस्टॉल करता है, जाँचता है और स्कैन के लिए QR कोड दिखाता है।",
++            "es": "Coucou instala la pasarela, la comprueba y muestra el código QR.",
++            "ar": "يثبّت Coucou البوابة ويتحقق منها ويعرض رمز QR للمسح.",
++            "fr": "Coucou installe la passerelle, la vérifie et affiche le QR code à scanner.",
++            "bn": "Coucou গেটওয়ে ইনস্টল করে, যাচাই করে, তারপর স্ক্যানের QR কোড দেখায়।",
++            "pt-BR": "O Coucou instala o gateway, verifica e mostra o QR code para escanear.",
++            "ru": "Coucou ставит шлюз, проверяет его и показывает QR-код.",
++            "id": "Coucou memasang gateway, memeriksanya, dan menampilkan kode QR.",
++            "de": "Coucou installiert das Gateway, prüft es und zeigt den QR-Code.",
++            "tr": "Coucou ağ geçidini kurar, doğrular ve taranacak QR kodunu gösterir."
++          }
++        },
++        {
++          "icon": "shield",
++          "title": {
++            "en": "Nothing leaves your computer",
++            "zh-Hans": "数据不离开你的电脑",
++            "hi": "कुछ भी कंप्यूटर से बाहर नहीं जाता",
++            "es": "Nada sale de tu equipo",
++            "ar": "لا شيء يغادر حاسوبك",
++            "fr": "Rien ne quitte ton ordinateur",
++            "bn": "কিছুই কম্পিউটারের বাইরে যায় না",
++            "pt-BR": "Nada sai do seu computador",
++            "ru": "Ничего не покидает компьютер",
++            "id": "Tak ada yang keluar dari komputermu",
++            "de": "Nichts verlässt deinen Computer",
++            "tr": "Hiçbir şey bilgisayarından çıkmaz"
++          },
++          "detail": {
++            "en": "Messages stay in memory and are gone when Coucou quits.",
++            "zh-Hans": "消息只保存在内存中，退出 Coucou 后即消失。",
++            "hi": "संदेश सिर्फ़ मेमोरी में रहते हैं और Coucou बंद होते ही मिट जाते हैं।",
++            "es": "Los mensajes quedan en memoria y se borran al cerrar Coucou.",
++            "ar": "تبقى الرسائل في الذاكرة وتُمحى عند إغلاق Coucou.",
++            "fr": "Les messages restent en mémoire et disparaissent quand Coucou quitte.",
++            "bn": "বার্তা শুধু মেমোরিতে থাকে, Coucou বন্ধ হলেই মুছে যায়।",
++            "pt-BR": "As mensagens ficam na memória e somem quando o Coucou fecha.",
++            "ru": "Сообщения хранятся только в памяти и исчезают при выходе из Coucou.",
++            "id": "Pesan hanya di memori dan hilang saat Coucou ditutup.",
++            "de": "Nachrichten bleiben im Speicher und sind weg, wenn Coucou beendet wird.",
++            "tr": "Mesajlar bellekte kalır, Coucou kapanınca silinir."
++          }
++        }
++      ]
++    },
+     {
+       "version": "0.5.9",
        "items": [
-         {
-           "icon": "chat",
 diff --git a/windows/src/whats-new/whats-new.ts b/windows/src/whats-new/whats-new.ts
-index d21fb96..8be8906 100644
+index 305554e..4ca019e 100644
 --- a/windows/src/whats-new/whats-new.ts
 +++ b/windows/src/whats-new/whats-new.ts
 @@ -186,6 +186,7 @@ export function showsUpdateHint(waiting: boolean, state: BotStateName, pending:
@@ -8304,14 +8678,13 @@ index 0000000..0c8e0f5
 + State.tasks=[];room.sync();assert.equal(room.el.find('.agent-desk').length,0);assert.ok(room.el.textContent.includes('Conecta'));
 +});
 diff --git a/windows/tests/chat.test.mjs b/windows/tests/chat.test.mjs
-index ff03d4a..fed5e95 100644
+index 98f65c5..0cbeb63 100644
 --- a/windows/tests/chat.test.mjs
 +++ b/windows/tests/chat.test.mjs
-@@ -122,3 +122,14 @@ test("a local answer streams into one reply, then the finished text replaces it"
-   assert.deepEqual(State.chatHistory.map((m) => m.role), ["user", "assistant"]);
+@@ -136,6 +136,17 @@ test("a local answer streams into one reply, then the finished text replaces it"
    assert.ok(!$(".model-btn").disabled);
  });
-+
+ 
 +test("hidden chat removes the active nested view so approval buttons can receive clicks", () => {
 +  view.setVisible(true);
 +  assert.equal(view.el.querySelector('.view.on') !== null, true);
@@ -8322,6 +8695,10 @@ index ff03d4a..fed5e95 100644
 +  view.setVisible(true);
 +  assert.equal(view.el.querySelector('.view.on') !== null, true);
 +});
++
+ test("once the answer is in, the field takes the focus back, enabled", async () => {
+   let finish;
+   answers.chat_send = () => new Promise((resolve) => (finish = resolve));
 diff --git a/windows/tests/codex-chat.test.mjs b/windows/tests/codex-chat.test.mjs
 new file mode 100644
 index 0000000..1f7890f
@@ -8468,10 +8845,10 @@ index 0000000..12b5912
 +});
 diff --git a/windows/tests/compact-clock.test.mjs b/windows/tests/compact-clock.test.mjs
 new file mode 100644
-index 0000000..ec1e14e
+index 0000000..f4696ed
 --- /dev/null
 +++ b/windows/tests/compact-clock.test.mjs
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,86 @@
 +import { test } from 'node:test';
 +import assert from 'node:assert/strict';
 +import { State } from '../src/core/state.ts';
@@ -8522,6 +8899,41 @@ index 0000000..ec1e14e
 +  clock.sync(new Date(2026, 10, 1, 0, 0));
 +  assert.equal(clock.el.style['--clock-orbit'], '0deg');
 +  assert.equal(clock.el.children[1].textContent, new Date(2026, 10, 1).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }));
++});
++
++
++test('configurable closed island preserves the custom compact clock and music dimensions', () => {
++  const saved = { mode: State.mode, view: State.view, settings: State.settings };
++  const host = { closedW: 176, compactMusic: { visible: false } };
++  Object.defineProperty(host, 'closedShows', { get: () => Object.getOwnPropertyDescriptor(Island.prototype, 'closedShows').get.call(host) });
++  try {
++    State.settings = { ...State.settings, showClock: true, closedIsland: 'time' };
++    State.mode = 'compact';
++    assert.equal(Island.prototype.targetSize.call(host).w, 288);
++    host.compactMusic.visible = true;
++    assert.equal(Island.prototype.targetSize.call(host).w, 400);
++    State.mode = 'hidden';
++    assert.deepEqual(Island.prototype.targetSize.call(host), { w: 176, h: 24, r: 10 });
++    State.settings.closedIsland = 'hidden';
++    assert.equal(Island.prototype.targetSize.call(host).h, 0);
++  } finally { State.mode = saved.mode; State.view = saved.view; State.settings = saved.settings; }
++});
++
++test('folded window sends the configured closed size and then returns to the wake strip', async () => {
++  const { calls, sent } = await import('./tauri.mjs');
++  const saved = State.settings;
++  const host = { closedW: 176, collapsedTo: { w: 0, h: 0 } };
++  Object.defineProperty(host, 'closedShows', { get: () => Object.getOwnPropertyDescriptor(Island.prototype, 'closedShows').get.call(host) });
++  try {
++    calls.length = 0;
++    State.settings = { ...State.settings, closedIsland: 'datetime' };
++    Island.prototype.sendCollapsedSize.call(host);
++    Island.prototype.sendCollapsedSize.call(host);
++    assert.deepEqual(sent('set_collapsed'), [{ collapsed: true, width: 176, height: 24 }]);
++    State.settings.closedIsland = 'hidden';
++    Island.prototype.sendCollapsedSize.call(host);
++    assert.deepEqual(sent('set_collapsed').at(-1), { collapsed: true, width: null, height: null });
++  } finally { State.settings = saved; }
 +});
 diff --git a/windows/tests/compact-music.test.mjs b/windows/tests/compact-music.test.mjs
 new file mode 100644
@@ -8698,10 +9110,10 @@ index 0000000..357b4d3
 +  } finally {State.tasks=tasks;CodexFlow.tasks=flow;State.pendingApproval=pending;}
 +});
 diff --git a/windows/tests/fsm.test.mjs b/windows/tests/fsm.test.mjs
-index f1685dd..6e44175 100644
+index 547d56d..07cc26d 100644
 --- a/windows/tests/fsm.test.mjs
 +++ b/windows/tests/fsm.test.mjs
-@@ -377,3 +377,71 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
+@@ -400,3 +400,71 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
    seconds(2);
    assert.equal(fsm.state, "petit");
  });
@@ -8849,7 +9261,7 @@ index 0000000..b944148
 +serde = { version = "1", features = ["derive"] }
 +serde_json = { version = "1", features = ["preserve_order"] }
 diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
-index 45ec5ce..1834e60 100644
+index 0768ac2..e222fdb 100644
 --- a/windows/tests/hooks.test.mjs
 +++ b/windows/tests/hooks.test.mjs
 @@ -1,3 +1,4 @@
@@ -8857,7 +9269,7 @@ index 45ec5ce..1834e60 100644
  // Claude Code hook events → island state (src/island/hooks.ts), driven through
  // the real bridge: events come in the way Rust emits them, and what the island
  // answers is read from the commands it invokes.
-@@ -153,11 +154,11 @@ test("an unknown event changes nothing", () => {
+@@ -155,11 +156,11 @@ test("an unknown event changes nothing", () => {
  
  // ── Stop ──────────────────────────────────────────────────────────────────────
  
@@ -8871,8 +9283,23 @@ index 45ec5ce..1834e60 100644
    seconds(5.1);
    assert.equal(task().state, "finished");
    seconds(0.1);
-@@ -179,10 +180,10 @@ test("a session finishing behind another pill only badges its own, for 5.2 s", (
+@@ -181,12 +182,12 @@ test("a session finishing behind another pill only badges its own, for 5.2 s", (
    assert.equal(task().pillBadge, null);
+ });
+ 
+-test("alertsFromAllPills: unfocused pill alert opens the island and restores focus after 5.2 s", () => {
++test("alertsFromAllPills: unfocused pill alert reveals compact attention and restores focus after 5.2 s", () => {
+   State.settings.alertsFromAllPills = true;
+   State.setFocus("integration_n8n");
+   hook({ hook_event_name: "Stop" });
+   assert.equal(State.focusId, "integration_claude");
+-  assert.deepEqual(asked, ["alert:finished"]);
++  assert.deepEqual(asked, ["reveal"]);
+   seconds(5.2);
+   assert.equal(State.focusId, "integration_n8n");
+   State.settings.alertsFromAllPills = false;
+@@ -204,10 +205,10 @@ test("alertsFromAllPills: while the island is open the alert's pill keeps the fr
+   assert.equal(State.focusId, "integration_n8n");
  });
  
 -test("a failed stop shows the error view, or the error badge behind another pill", () => {
@@ -8884,7 +9311,7 @@ index 45ec5ce..1834e60 100644
    State.setFocus("integration_n8n");
    hook({ hook_event_name: "StopFailure" });
    assert.equal(task().pillBadge, "error");
-@@ -254,6 +255,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
+@@ -279,6 +280,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
    }
  });
  
@@ -8899,7 +9326,7 @@ index 45ec5ce..1834e60 100644
  test("Codex, Copilot CLI and Muse Code get the card on their own pill", () => {
    for (const agent of ["codex", "copilot", "muse"]) {
      State.pendingApproval = null;
-@@ -433,7 +442,7 @@ test("the card names the most specific thing the tool carries", () => {
+@@ -497,7 +506,7 @@ test("the card names the most specific thing the tool carries", () => {
    assert.equal(target("Bash", { command: "rm -rf build", file_path: "x" }), "Bash · rm -rf build");
    assert.equal(target("WebFetch", { url: "https://example.com" }), "WebFetch · https://example.com");
    assert.equal(target("Task", { prompt: "do it" }), "Task · do it");
@@ -8908,7 +9335,7 @@ index 45ec5ce..1834e60 100644
    assert.equal(target(undefined, undefined), "Tool");
  });
  
-@@ -751,3 +760,20 @@ test("Antigravity questions without usable text still alert with a translated la
+@@ -876,3 +885,53 @@ test("Antigravity questions without usable text still alert with a translated la
    assert.equal(asked.length, 5);
    assert.ok(asked.every((request) => request === "alert:overview"));
  });
@@ -8928,6 +9355,39 @@ index 45ec5ce..1834e60 100644
 +  assert.equal(taskHistory.get(`${CLAUDE}:history-B`).at(-1).kind,"turn_finished");
 +  hook({hook_event_name:"SessionEnd",session_id:"history-B"});
 +  assert.equal(taskHistory.get(`${CLAUDE}:history-B`).length,0);
++});
++
++
++test("a question answered by another pill cannot dismiss the active card with the same session id", () => {
++  const questions = [{ question: "Which?", options: [{ label: "A" }, { label: "B" }] }];
++  ask("q-shared", { session_id: "shared", tool_name: "AskUserQuestion", tool_input: { questions } });
++  hook({ hook_event_name: "PostToolUse", session_id: "shared", coucou_agent: "codex", tool_name: "AskUserQuestion" });
++  assert.equal(State.pendingApproval?.requestId, "q-shared");
++});
++
++test("a queued question answered in its terminal cannot later replace a permission card", () => {
++  ask("permission");
++  const questions = [{ question: "Which?", options: [{ label: "A" }, { label: "B" }] }];
++  ask("queued-question", { session_id: "s2", tool_name: "AskUserQuestion", tool_input: { questions } });
++  hook({ hook_event_name: "PostToolUse", session_id: "s2", tool_name: "AskUserQuestion" });
++  assert.equal(State.pendingApproval?.requestId, "permission");
++  assert.deepEqual(State.approvalQueue, []);
++  emit("approval-expired", "permission");
++  assert.equal(State.pendingApproval, null);
++});
++
++test("an expired queued request leaves the active card and a newer queue entry untouched", () => {
++  ask("active");
++  ask("expired");
++  seconds(60);
++  ask("newer");
++  emit("approval-expired", "expired");
++  assert.equal(State.pendingApproval?.requestId, "active");
++  assert.deepEqual(State.approvalQueue.map(x => x.requestId), ["newer"]);
++  seconds(50);
++  assert.equal(State.pendingApproval?.requestId, "newer");
++  seconds(60);
++  assert.equal(State.pendingApproval, null);
 +});
 diff --git a/windows/tests/island-border.test.mjs b/windows/tests/island-border.test.mjs
 new file mode 100644
