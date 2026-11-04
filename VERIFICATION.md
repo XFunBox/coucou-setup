@@ -6,6 +6,7 @@ Versión **0.5.3-sendoa.6**. Integra borde vivo, anillos de cuota disponible, m�
 - Rust release: 21 pruebas con filtro island (incluidas las regresiones de pantallas), cuatro codex_plan y 24 spotify, incluidas las fixtures de bus privado, aprobadas. No equivale a ejecutar la suite Rust completa ni a probar un reproductor real del usuario.
 - Revisión integrada: corregidas la ocultación de agentes externos al existir CodexFlow y las etiquetas ausentes del catálogo i18n. Pruebas de regresión correctas.
 - Navegador: cuotas sin datos y vencidas; música/pausa y reloj; avisos de 288 px, historial de 322 × 160 y constelación de 880 × 480 con +N, selección y Escape. Datos de prueba ficticios, sin errores de consola. No equivale a una captura de KDE.
+- Tauri release compilado e instalado en KDE Wayland/layer-shell. Versión .6, proceso activo y SHA-256 del ejecutable en memoria cotejados; ajustes, hooks, menú e inicio automático byte idénticos. Copia del hotfix anterior y restauración de binarios preparadas, no ejercitadas. Hooks reales recibidos después del arranque. No se inspeccionó visualmente la nueva instancia ni un recorrido entre monitores. El registro contiene avisos del portal de atajos y de tamaño inicial antes de la configuración de la superficie.
 - Fuente oficial fijada y tarball SHA-256 verificado. Parche aplicado desde base limpia y 1190 archivos cotejados; 80 archivos modificados. Hash del parche en source-lock.json. Diez pruebas Python del instalador y sintaxis Bash correctas.
 
 # Verificación — 2026-11-04 — hotfix de escalado
