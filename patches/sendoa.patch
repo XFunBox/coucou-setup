@@ -1,14 +1,13 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 4a9b2ea..00591b2 100644
+index 4a9b2ea..eabb6e9 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
-@@ -1,5 +1,21 @@
+@@ -1,5 +1,20 @@
  # Changelog
  
-+## Linux 0.5.3-sendoa.5 — November 4, 2026
++## Linux 0.5.3-sendoa.4 — October 29, 2026
 +
-+- Fix island and agent room sizing on Wayland displays with different scales. Linux geometry uses logical dimensions and the webview reads the current GTK scale.
-+
++- Add an inset live border aggregated across agents: requests take priority over errors, work and completion. Respect reduced motion without changing focus, dimensions, permissions or clock.
 +
 +## Linux 0.5.3-sendoa.3 — October 29, 2026
 +
@@ -25,20 +24,21 @@ index 4a9b2ea..00591b2 100644
  
  - **Mac: WhatsApp statuses aren't chats** — a contact's WhatsApp Status and channel posts no longer show up as a conversation in the WhatsApp pill (#901, same fix as #910)
 diff --git a/README.md b/README.md
-index 8bedf06..c37bf92 100644
+index 8bedf06..887d372 100644
 --- a/README.md
 +++ b/README.md
-@@ -173,6 +173,8 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
+@@ -173,6 +173,9 @@ Windows and Linux are released together, under the `windows-v*` and `linux-v*` t
  
  | Windows & Linux | Date | Highlights |
  |---------|------|------------|
++| 0.5.3-sendoa.4 (Linux fork) | Oct 29, 2026 | Live agent border with reduced-motion support |
 +| 0.5.3-sendoa.3 (Linux fork) | Oct 29, 2026 | Keep the compact clock visible after agents finish |
 +| 0.5.3-sendoa.2 (Linux fork) | Oct 29, 2026 | Compact music with artwork and waveform, persistent two-line clock and MPRIS fallback |
  | 0.5.3 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.3) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.3) | Oct 22, 2026 | WhatsApp in the island (experimental): one-click gateway install, your chats and replies |
  | 0.5.2 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.2) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.2) | Oct 22, 2026 | Mochi turns blue when a new version waits, What's new after each update; GitLab and Gitea pills; the weekly recap on Android |
  | 0.5.1 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.1) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.1) | Oct 20, 2026 | New version in the island, one click to install it on Windows; German and Turkish; an optional clock; Linux idle CPU fixed |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index 79ad9b1..c6659ac 100644
+index 79ad9b1..e51112c 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -719,7 +719,7 @@ dependencies = [
@@ -46,7 +46,7 @@ index 79ad9b1..c6659ac 100644
  [[package]]
  name = "coucou"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.5"
++version = "0.5.3-sendoa.6"
  dependencies = [
   "arboard",
   "cpal",
@@ -55,12 +55,12 @@ index 79ad9b1..c6659ac 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.3"
-+version = "0.5.3-sendoa.5"
++version = "0.5.3-sendoa.6"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 9c8410e..1793ea8 100644
+index 9c8410e..34c8c46 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -68,31 +68,31 @@ index 9c8410e..1793ea8 100644
  
  [workspace.package]
 -version = "0.5.3"
-+version = "0.5.3-sendoa.5"
++version = "0.5.3-sendoa.6"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index d5977dc..a6aef07 100644
+index d5977dc..e50d126 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.5",
++  "version": "0.5.3-sendoa.6",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.3",
-+      "version": "0.5.3-sendoa.5",
++      "version": "0.5.3-sendoa.6",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index 9113b8f..6023670 100644
+index 9113b8f..55fa423 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -100,7 +100,7 @@ index 9113b8f..6023670 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.5",
++  "version": "0.5.3-sendoa.6",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1132,6 +1132,32 @@ index 0000000..362df62
 +        assert_eq!(out.messages[1].content.len(),32768); assert!(!out.active);
 +    }
 +}
+diff --git a/windows/src-tauri/src/codex_plan.rs b/windows/src-tauri/src/codex_plan.rs
+index d3993ae..d0db7f6 100644
+--- a/windows/src-tauri/src/codex_plan.rs
++++ b/windows/src-tauri/src/codex_plan.rs
+@@ -128,6 +128,7 @@ pub fn first_answer(reader: impl BufRead) -> Option<Value> {
+ fn limits_only(result: &Value) -> Value {
+     json!({
+         "rateLimits": result.get("rateLimits").cloned().unwrap_or(Value::Null),
++        "rateLimitsByLimitId": result.get("rateLimitsByLimitId").cloned().unwrap_or(Value::Null),
+         "rateLimitResetCredits": result.get("rateLimitResetCredits").cloned().unwrap_or(Value::Null),
+     })
+ }
+@@ -201,11 +202,13 @@ mod tests {
+     fn only_the_limits_reach_the_webview() {
+         let result = json!({
+             "rateLimits": { "planType": "plus" },
++            "rateLimitsByLimitId": { "codex": { "primary": { "usedPercent": 25 } } },
+             "rateLimitResetCredits": { "availableCount": 1 },
+             "account": { "email": "me@example.com" }
+         });
+         let kept = limits_only(&result);
+         assert_eq!(kept["rateLimits"]["planType"], "plus");
++        assert_eq!(kept["rateLimitsByLimitId"]["codex"]["primary"]["usedPercent"], 25);
+         assert_eq!(kept["rateLimitResetCredits"]["availableCount"], 1);
+         assert!(kept.get("account").is_none());
+     }
 diff --git a/windows/src-tauri/src/desktop.rs b/windows/src-tauri/src/desktop.rs
 index 5b57f21..93d19b0 100644
 --- a/windows/src-tauri/src/desktop.rs
@@ -1747,7 +1773,7 @@ index 1893b83..c2b2983 100644
      coucou_lib::run()
  }
 diff --git a/windows/src-tauri/src/spotify.rs b/windows/src-tauri/src/spotify.rs
-index cb008bf..ee7281f 100644
+index cb008bf..2d92b74 100644
 --- a/windows/src-tauri/src/spotify.rs
 +++ b/windows/src-tauri/src/spotify.rs
 @@ -2,13 +2,15 @@
@@ -1769,24 +1795,127 @@ index cb008bf..ee7281f 100644
  // not signalled, so it is read when the status or the track changes and when
  // the card comes on screen; the page runs it on from a timestamp while playing,
  // as the Mac's `position(at:)` does. Turning the pill off ends the thread.
-@@ -107,6 +109,8 @@ pub struct Track {
+@@ -60,7 +62,7 @@ impl Value {
+     fn int(&self) -> Option<i64> {
+         match self {
+             Value::Int(n) => Some(*n),
+-            Value::Float(f) => Some(*f as i64),
++            Value::Float(f) if f.is_finite() => Some(*f as i64),
+             _ => None,
+         }
+     }
+@@ -104,9 +106,24 @@ pub struct Track {
+ }
+ 
+ /// What the island is told, whenever it changes.
++#[derive(Serialize, Clone, Debug, PartialEq, Default)]
++#[serde(rename_all = "camelCase")]
++pub struct Capabilities {
++    pub can_control: bool,
++    pub can_play: bool,
++    pub can_pause: bool,
++    pub can_go_next: bool,
++    pub can_go_previous: bool,
++    pub can_seek: bool,
++}
++
  #[derive(Serialize, Clone, Debug, PartialEq)]
  #[serde(rename_all = "camelCase")]
  pub struct PlayerState {
++    /// Only explicitly advertised capabilities enable a control.
++    pub capabilities: Capabilities,
 +    /// Display name of the selected Linux player (the pill id stays compatible).
 +    pub player_name: String,
      /// Spotify owns its name on the bus.
      pub running: bool,
      /// A `spotify` (or the Flatpak / Snap) is there to launch.
-@@ -127,6 +131,7 @@ pub struct PlayerState {
+@@ -115,6 +132,7 @@ pub struct PlayerState {
+     pub playing: bool,
+     /// Seconds at `position_at`; while playing, the real position runs on from there.
+     pub position: f64,
++    pub position_known: bool,
+     /// Unix milliseconds.
+     pub position_at: f64,
+     pub shuffle: bool,
+@@ -127,11 +145,14 @@ pub struct PlayerState {
  impl Default for PlayerState {
      fn default() -> Self {
          PlayerState {
++            capabilities: Capabilities::default(),
 +            player_name: "Spotify".into(),
              running: false,
              installed: false,
              track: None,
-@@ -290,6 +295,10 @@ pub fn spotify_id(trackid: &str, url: Option<&str>) -> String {
+             playing: false,
+             position: 0.0,
++            position_known: false,
+             position_at: 0.0,
+             shuffle: false,
+             repeat: false,
+@@ -167,11 +188,29 @@ impl PlayerState {
+ 
+     /// Spotify is gone, or the pill is off: nothing is playing.
+     pub fn clear(&mut self, now_ms: f64) {
++        self.capabilities = Capabilities::default();
++        self.clear_playback(now_ms);
++    }
++
++    fn clear_playback(&mut self, now_ms: f64) {
+         self.track = None;
+         self.playing = false;
++        self.position_known = false;
+         self.anchor(0.0, now_ms);
+     }
+ 
++    pub fn can_transport(&self, action: &str) -> bool {
++        if !self.running || !self.capabilities.can_control { return false; }
++        match action {
++            "playPause" => if self.playing { self.capabilities.can_pause } else { self.capabilities.can_play },
++            "next" => self.capabilities.can_go_next,
++            "previous" => self.capabilities.can_go_previous,
++            "seek" => self.capabilities.can_seek && self.position_known && self.position.is_finite()
++                && self.track.as_ref().is_some_and(|t| t.duration.is_finite() && t.duration > 0.0 && !t.id.starts_with("spotify:ad:")),
++            _ => false,
++        }
++    }
++
+     /// Applies Player properties (GetAll, or a PropertiesChanged). The
+     /// metadata goes first and the position last, whatever order they came in.
+     pub fn apply(&mut self, props: &[(String, Value)], now_ms: f64) -> Applied {
+@@ -199,6 +238,7 @@ impl PlayerState {
+                     };
+                     if !same {
+                         applied.track_changed = true;
++                        self.position_known = false;
+                         self.anchor(0.0, now_ms);
+                     }
+                     self.track = track;
+@@ -233,14 +273,23 @@ impl PlayerState {
+                 "Position" => {
+                     if let Some(us) = value.int() {
+                         self.anchor(us as f64 / 1_000_000.0, now_ms);
++                        self.position_known = us >= 0;
+                         applied.position_set = true;
++                    } else {
++                        self.position_known = false;
+                     }
+                 }
++                "CanControl" => self.capabilities.can_control = matches!(value, Value::Bool(true)),
++                "CanPlay" => self.capabilities.can_play = matches!(value, Value::Bool(true)),
++                "CanPause" => self.capabilities.can_pause = matches!(value, Value::Bool(true)),
++                "CanGoNext" => self.capabilities.can_go_next = matches!(value, Value::Bool(true)),
++                "CanGoPrevious" => self.capabilities.can_go_previous = matches!(value, Value::Bool(true)),
++                "CanSeek" => self.capabilities.can_seek = matches!(value, Value::Bool(true)),
+                 _ => {}
+             }
+         }
+         if stopped && self.track.is_some() {
+-            self.clear(now_ms);
++            self.clear_playback(now_ms);
+             applied.track_changed = true;
+         }
+         if self.track.is_none() {
+@@ -290,6 +339,10 @@ pub fn spotify_id(trackid: &str, url: Option<&str>) -> String {
              return format!("spotify:{}:{}", parts[0], parts[1..].join(":"));
          }
      }
@@ -1797,7 +1926,7 @@ index cb008bf..ee7281f 100644
      if let Some(rest) = url.and_then(|u| u.strip_prefix("https://open.spotify.com/")) {
          let parts: Vec<&str> = rest.split(['/', '?']).collect();
          if parts.len() >= 2 && !parts[0].is_empty() && !parts[1].is_empty() {
-@@ -524,6 +533,7 @@ mod linux {
+@@ -524,6 +577,7 @@ mod linux {
      use tauri::Emitter;
  
      const BUS: &str = "org.mpris.MediaPlayer2.spotify";
@@ -1805,7 +1934,7 @@ index cb008bf..ee7281f 100644
      const PATH: &str = "/org/mpris/MediaPlayer2";
      const ROOT: &str = "org.mpris.MediaPlayer2";
      const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
-@@ -536,9 +546,9 @@ mod linux {
+@@ -536,9 +590,9 @@ mod linux {
      const FLATPAK_ID: &str = "com.spotify.Client";
  
      const RULES: [&str; 3] = [
@@ -1818,7 +1947,7 @@ index cb008bf..ee7281f 100644
      ];
  
      struct Shared {
-@@ -547,13 +557,16 @@ mod linux {
+@@ -547,13 +601,16 @@ mod linux {
          active: bool,
          /// The listener's unique name, to wake it when it has to stop.
          listener: Option<String>,
@@ -1837,7 +1966,7 @@ index cb008bf..ee7281f 100644
      });
  
      /// The connection the controls and reads go through, made on first use.
-@@ -650,6 +663,8 @@ mod linux {
+@@ -650,6 +707,8 @@ mod linux {
              s.active = on;
              s.generation += 1;
              s.owner = None;
@@ -1846,7 +1975,7 @@ index cb008bf..ee7281f 100644
              s.state = PlayerState { installed: installed(), ..PlayerState::default() };
              s.listener.take()
          };
-@@ -744,47 +759,40 @@ mod linux {
+@@ -744,47 +803,40 @@ mod linux {
  
          match (interface.as_str(), member.as_str()) {
              (DBUS, "NameOwnerChanged") => {
@@ -1894,9 +2023,11 @@ index cb008bf..ee7281f 100644
                  // Properties that changed without their value: read them.
                  for name in invalidated {
 -                    if let Some(v) = get_property(conn, &name) {
-+                    if let Some(v) = get_property(conn, sender.as_deref().unwrap(), &name) {
-                         props.push((name, v));
-                     }
+-                        props.push((name, v));
+-                    }
++                    // Failed invalidated reads must revoke cached capabilities/position.
++                    let value = get_property(conn, sender.as_deref().unwrap(), &name).unwrap_or(Value::Other);
++                    props.push((name, value));
                  }
 -                apply_and_emit(conn, out, &props);
 +                apply_and_emit(conn, out, generation, sender.as_deref().unwrap(), &props);
@@ -1912,7 +2043,7 @@ index cb008bf..ee7281f 100644
              }
              _ => {}
          }
-@@ -794,62 +802,124 @@ mod linux {
+@@ -794,62 +846,129 @@ mod linux {
          let s = SHARED.lock().unwrap();
          match (&s.owner, sender) {
              (Some(owner), Some(sender)) => owner == sender,
@@ -2069,7 +2200,12 @@ index cb008bf..ee7281f 100644
 +            identity.unwrap_or_else(|| bus.trim_start_matches("org.mpris.MediaPlayer2.").to_string())
 +        } else { "Spotify".into() };
 +        match props {
-+            Some(props) => { s.state.apply(&props, now_ms()); }
++            Some(props) => {
++                // GetAll is authoritative, even if this owner stops reporting a field.
++                s.state.capabilities = Capabilities::default();
++                s.state.position_known = false;
++                s.state.apply(&props, now_ms());
++            }
 +            None => s.state.clear(now_ms()),
 +        }
 +        out.state(&s.state);
@@ -2077,7 +2213,7 @@ index cb008bf..ee7281f 100644
      }
  
      /// Runs `f` on the control connection, made (again) when needed.
-@@ -865,54 +935,23 @@ mod linux {
+@@ -865,56 +984,28 @@ mod linux {
      pub fn refresh(out: &Out) -> Option<PlayerState> {
          let generation = {
              let s = SHARED.lock().unwrap();
@@ -2131,15 +2267,21 @@ index cb008bf..ee7281f 100644
 -            return false;
 -        }
 +        let Some(owner) = owner else { return false; };
++        if matches!(action, "playPause" | "next" | "previous" | "seek") && !state.can_transport(action) { return false; }
++        if action == "seek" && !value.is_some_and(f64::is_finite) { return false; }
          let v = value.unwrap_or(0.0);
          let now = now_ms();
          let done = with_control(|c| {
 -            let p = c.with_proxy(BUS, PATH, CALL);
 +            let p = c.with_proxy(owner.as_str(), PATH, CALL);
              match action {
-                 "playPause" => p.method_call(PLAYER, "PlayPause", ()),
+-                "playPause" => p.method_call(PLAYER, "PlayPause", ()),
++                // MPRIS requires CanPause for PlayPause, including while paused.
++                "playPause" => p.method_call(PLAYER, if !state.playing && !state.capabilities.can_pause { "Play" } else { "PlayPause" }, ()),
                  "next" => p.method_call(PLAYER, "Next", ()),
-@@ -954,10 +993,12 @@ mod linux {
+                 "previous" => p.method_call(PLAYER, "Previous", ()),
+                 "seek" => {
+@@ -954,10 +1045,12 @@ mod linux {
          if let Some(prop) = optimistic {
              let state = {
                  let mut s = SHARED.lock().unwrap();
@@ -2153,7 +2295,7 @@ index cb008bf..ee7281f 100644
          }
          true
      }
-@@ -965,7 +1006,22 @@ mod linux {
+@@ -965,7 +1058,22 @@ mod linux {
      // ── Launching ─────────────────────────────────────────────────────────────
  
      /// How to start Spotify: the `spotify` on PATH, else the Flatpak, else the Snap.
@@ -2177,7 +2319,7 @@ index cb008bf..ee7281f 100644
          if let Some(bin) = crate::platform::find_on_path("spotify") {
              return Some(vec![bin.into()]);
          }
-@@ -987,28 +1043,23 @@ mod linux {
+@@ -987,28 +1095,23 @@ mod linux {
      }
  
      pub fn installed() -> bool {
@@ -2220,7 +2362,7 @@ index cb008bf..ee7281f 100644
              use std::os::unix::process::CommandExt;
              let mut cmd = Command::new(&argv[0]);
              cmd.args(&argv[1..])
-@@ -1029,7 +1080,7 @@ mod linux {
+@@ -1029,7 +1132,7 @@ mod linux {
                  Err(err) => crate::log::line(format!("spotify: could not start it: {err}")),
              }
          }
@@ -2229,7 +2371,17 @@ index cb008bf..ee7281f 100644
          false
      }
  
-@@ -1333,6 +1384,405 @@ mod linux {
+@@ -1269,6 +1372,9 @@ mod linux {
+                 props.insert("PlaybackStatus".into(), var(if playing { "Playing" } else { "Paused" }.to_string()));
+                 props.insert("Volume".into(), var(0.8f64));
+                 props.insert("Position".into(), var(position));
++                for key in ["CanControl", "CanPlay", "CanPause", "CanGoNext", "CanGoPrevious", "CanSeek"] {
++                    props.insert(key.into(), var(true));
++                }
+                 props
+             };
+             while !stop.load(Ordering::Relaxed) {
+@@ -1333,6 +1439,408 @@ mod linux {
              conn.channel().flush();
          }
  
@@ -2563,6 +2715,9 @@ index cb008bf..ee7281f 100644
 +                        props.insert("Metadata".into(), var(meta));
 +                        props.insert("PlaybackStatus".into(), var(if playing { "Playing" } else { "Paused" }.to_string()));
 +                        props.insert("Position".into(), var(31_000_000i64));
++                        for key in ["CanControl", "CanPlay", "CanPause", "CanGoNext", "CanGoPrevious", "CanSeek"] {
++                            props.insert(key.into(), var(true));
++                        }
 +                        props.insert("Volume".into(), var(0.8f64));
 +                        props
 +                    };
@@ -2635,6 +2790,136 @@ index cb008bf..ee7281f 100644
          fn value_box(v: &Box<dyn RefArg>) -> Box<dyn RefArg> {
              v.box_clone()
          }
+@@ -1606,6 +2114,7 @@ mod win {
+ 
+     /// Everything the session says, as it is now.
+     struct Snapshot {
++        capabilities: Capabilities,
+         track: Option<Track>,
+         playing: bool,
+         position: f64,
+@@ -1627,7 +2136,19 @@ mod win {
+             duration,
+         );
+         let info = session.GetPlaybackInfo()?;
++        let controls = info.Controls().ok();
++        let toggle = controls.as_ref().is_some_and(|c| c.IsPlayPauseToggleEnabled().unwrap_or(false));
++        let capabilities = Capabilities {
++            can_play: toggle || controls.as_ref().is_some_and(|c| c.IsPlayEnabled().unwrap_or(false)),
++            can_pause: toggle || controls.as_ref().is_some_and(|c| c.IsPauseEnabled().unwrap_or(false)),
++            can_go_next: controls.as_ref().is_some_and(|c| c.IsNextEnabled().unwrap_or(false)),
++            can_go_previous: controls.as_ref().is_some_and(|c| c.IsPreviousEnabled().unwrap_or(false)),
++            can_seek: controls.as_ref().is_some_and(|c| c.IsPlaybackPositionEnabled().unwrap_or(false)),
++            // Windows has per-command flags rather than MPRIS's global flag.
++            can_control: controls.is_some(),
++        };
+         let snapshot = Snapshot {
++            capabilities,
+             playing: info.PlaybackStatus()? == Status::Playing && track.is_some(),
+             track,
+             position: ticks_to_secs(timeline.Position()?.Duration - start),
+@@ -1656,10 +2177,12 @@ mod win {
+                     s.state.installed = true;
+                     s.state.track = snap.track;
+                     s.state.playing = snap.playing;
++                    s.state.capabilities = snap.capabilities;
+                     // The position was true when Windows last updated it; while
+                     // playing, the page runs it on from there.
+                     let at = snap.updated_at.filter(|&t| t <= now).unwrap_or(now);
+                     s.state.anchor(snap.position, at);
++                    s.state.position_known = true;
+                     s.state.shuffle = snap.shuffle;
+                     s.state.repeat = snap.repeat;
+                     if let Some(v) = volume {
+@@ -1803,6 +2326,8 @@ mod win {
+             }
+             s.state.clone()
+         };
++        if matches!(action, "playPause" | "next" | "previous" | "seek") && !state.can_transport(action) { return false; }
++        if action == "seek" && !value.is_some_and(f64::is_finite) { return false; }
+         com();
+         let Some(session) = Manager::RequestAsync().and_then(|op| op.get()).ok().and_then(|m| find_session(&m)) else {
+             return false;
+@@ -1816,7 +2341,16 @@ mod win {
+         }
+         let seek_to = state.track.as_ref().map(|t| v.clamp(0.0, (t.duration - 1.0).max(0.0)));
+         let done = match action {
+-            "playPause" => asked!(session.TryTogglePlayPauseAsync()),
++            "playPause" => {
++                let controls = session.GetPlaybackInfo().and_then(|i| i.Controls()).ok();
++                if state.playing && controls.as_ref().is_some_and(|c| c.IsPauseEnabled().unwrap_or(false)) {
++                    asked!(session.TryPauseAsync())
++                } else if !state.playing && controls.as_ref().is_some_and(|c| c.IsPlayEnabled().unwrap_or(false)) {
++                    asked!(session.TryPlayAsync())
++                } else if controls.as_ref().is_some_and(|c| c.IsPlayPauseToggleEnabled().unwrap_or(false)) {
++                    asked!(session.TryTogglePlayPauseAsync())
++                } else { false }
++            }
+             "next" => asked!(session.TrySkipNextAsync()),
+             "previous" => asked!(session.TrySkipPreviousAsync()),
+             "seek" => match (seek_to, session.GetTimelineProperties().and_then(|t| t.StartTime())) {
+@@ -2020,12 +2554,61 @@ mod tests {
+         assert_eq!(state.volume, 0);
+     }
+ 
++    #[test]
++    fn transport_requires_declared_capabilities_and_seek_requires_timeline_data() {
++        let mut state = PlayerState { running: true, ..PlayerState::default() };
++        state.apply(&[("Metadata".into(), metadata("/com/spotify/track/one", "One"))], 1.0);
++        for action in ["playPause", "next", "previous", "seek"] {
++            assert!(!state.can_transport(action), "missing flags must disable {action}");
++        }
++        assert!(!state.position_known, "metadata is not a position anchor");
++        let props = ["CanControl", "CanPlay", "CanPause", "CanGoNext", "CanGoPrevious", "CanSeek"]
++            .map(|key| (key.into(), Value::Bool(true)));
++        state.apply(&props, 2.0);
++        assert!(state.can_transport("playPause") && state.can_transport("next") && state.can_transport("previous"));
++        assert!(!state.can_transport("seek"));
++        state.apply(&[("Position".into(), Value::Int(0))], 3.0);
++        assert!(state.position_known && state.can_transport("seek"), "an actual zero is valid");
++        state.apply(&[("CanSeek".into(), Value::Bool(false))], 4.0);
++        assert!(!state.can_transport("seek"));
++        state.apply(&[("CanSeek".into(), Value::Bool(true)), ("Position".into(), Value::Other)], 5.0);
++        assert!(!state.can_transport("seek"), "invalidated position cannot remain usable");
++        state.apply(&[("Position".into(), Value::Float(f64::NAN))], 6.0);
++        assert!(!state.position_known);
++        state.apply(&[("Position".into(), Value::Int(1_000_000))], 7.0);
++        state.track.as_mut().unwrap().id = "spotify:ad:one".into();
++        assert!(!state.can_transport("seek"), "advertisements remain protected");
++        state.apply(&[("CanControl".into(), Value::Bool(false))], 8.0);
++        assert!(!state.can_transport("next"), "global flag wins over Next");
++    }
++
++    #[test]
++    fn capabilities_revoke_individually_and_clear_does_not_leak_them() {
++        let mut state = PlayerState { running: true, ..PlayerState::default() };
++        state.apply(&[
++            ("CanControl".into(), Value::Bool(true)), ("CanPlay".into(), Value::Bool(true)),
++            ("CanPause".into(), Value::Bool(false)), ("CanGoNext".into(), Value::Bool(true)),
++        ], 1.0);
++        assert!(state.can_transport("playPause"), "a player may allow Play but not Pause");
++        state.playing = true;
++        assert!(!state.can_transport("playPause"));
++        state.apply(&[("CanGoNext".into(), Value::Other)], 2.0);
++        assert!(!state.can_transport("next"), "a failed invalidated read revokes the cached flag");
++        state.clear(3.0);
++        assert_eq!(state.capabilities, Capabilities::default());
++        assert!(!state.position_known);
++        state.apply(&[("Metadata".into(), metadata("/com/spotify/track/new", "New"))], 4.0);
++        assert!(!state.can_transport("playPause"), "new metadata cannot restore old capabilities");
++    }
++
+     #[test]
+     fn the_state_reaches_the_page_in_camel_case() {
+         let mut state = PlayerState { running: true, installed: true, ..PlayerState::default() };
+         state.apply(&[("Metadata".into(), metadata("/com/spotify/track/ID1", "One"))], 7.0);
+         let json = serde_json::to_value(&state).unwrap();
+         assert_eq!(json["positionAt"], 7.0);
++        assert_eq!(json["positionKnown"], false);
++        assert_eq!(json["capabilities"]["canGoNext"], false);
+         assert_eq!(json["track"]["artUrl"], "https://i.scdn.co/image/abc");
+         assert_eq!(json["track"]["id"], "spotify:track:ID1");
+         assert!(json["track"].get("objectPath").is_none());
 diff --git a/windows/src-tauri/src/update.rs b/windows/src-tauri/src/update.rs
 index 2b3304c..68fb16d 100644
 --- a/windows/src-tauri/src/update.rs
@@ -2782,7 +3067,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 0be3d46..032fbae 100644
+index 0be3d46..7d939bb 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -2790,16 +3075,16 @@ index 0be3d46..032fbae 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.3",
-+  "version": "0.5.3-sendoa.5",
++  "version": "0.5.3-sendoa.6",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
 diff --git a/windows/src/core/agent-room.ts b/windows/src/core/agent-room.ts
 new file mode 100644
-index 0000000..bcc44bc
+index 0000000..40c5d1f
 --- /dev/null
 +++ b/windows/src/core/agent-room.ts
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,33 @@
 +import { CodexFlow } from "./codex-flow";
 +import type { AgentTask } from "./state";
 +import type { BotStateName } from "./layout";
@@ -2808,15 +3093,19 @@ index 0000000..bcc44bc
 +
 +/** Only agents/workspaces that actually exist in Coucou; services aren't workers. */
 +export function roomAgents(tasks: AgentTask[]): AgentTask[] {
-+  const hook = tasks.find(task => task.id === "agent_codex");
-+  if (CodexFlow.tasks.length && hook) return CodexFlow.tasks.map(task =>
-+    task.id === hook.id && ["question", "approval", "ratelimit", "error"].includes(hook.state)
-+      ? { ...task, state: hook.state } : task);
-+  return tasks.filter(task => {
++  const agents = tasks.filter(task => {
 +    const category = pillDefinition(task.id)?.category;
 +    return category === "workspace" || category === "agent" ||
 +      (!task.isIntegration && (task.source === "agent" || task.source === "claudeCode"));
 +  });
++  const hook = agents.find(task => task.id === "agent_codex");
++  if (!CodexFlow.tasks.length || !hook) return agents;
++  // Expand Codex in place; its snapshot must not hide other hook-driven agents.
++  const flow = CodexFlow.tasks.map(task => task.id === hook.id &&
++    ["question", "approval", "ratelimit", "error"].includes(hook.state)
++    ? { ...task, state: hook.state } : task);
++  const flowIds = new Set(flow.map(task => task.id));
++  return agents.flatMap(task => task.id === hook.id ? flow : flowIds.has(task.id) ? [] : [task]);
 +}
 +const STATUS: Record<BotStateName, [string, string]> = {
 +  idle: ["○", N_("Ready")], working: ["▶", N_("Working")], thinking: ["◌", N_("Thinking")],
@@ -3056,19 +3345,177 @@ index e6b990b..e28da2a 100644
  ];
  
  /** "#RRGGBB" in upper case, or null for anything that is not six hex digits. */
+diff --git a/windows/src/core/plan.ts b/windows/src/core/plan.ts
+index 47bac31..7436ba4 100644
+--- a/windows/src/core/plan.ts
++++ b/windows/src/core/plan.ts
+@@ -12,6 +12,8 @@
+ export interface PlanWindow {
+   /** 0–100, clamped. */
+   usedPct: number;
++  /** Reported duration; absent means unknown. */
++  durationMins?: number;
+   /** Epoch milliseconds. */
+   resetsAt: number;
+ }
+@@ -23,7 +25,14 @@ export interface PlanUsage {
+   updatedAt: number;
+ }
+ 
++export interface CodexQuotaGroup {
++  id: string;
++  label: string;
++  windows: PlanWindow[];
++}
++
+ export interface CodexPlanUsage extends PlanUsage {
++  quotaGroups?: CodexQuotaGroup[];
+   /** Free full resets available. */
+   resetCredits?: number;
+   /** Soonest expiry among the available ones (epoch ms). */
+@@ -91,27 +100,43 @@ export function parseClaudePlan(rateLimits: unknown, now = Date.now()): PlanUsag
+ 
+ /**
+  * CodexPlanGauge.parse: the result of `account/rateLimits/read`. `primary` and
+- * `secondary` are not tied to a window, so they are sorted by duration: a day or
+- * less is the 5-hour window, anything else (or no duration) the week.
++ * `secondary` keep their provider durations. Groups are independent; legacy
++ * limits are used only when the map supplies no valid groups.
+  */
+ export function parseCodexPlan(result: unknown, now = Date.now()): CodexPlanUsage | null {
+   const r = asObj(result);
+-  const limits = asObj(r?.rateLimits);
+-  if (!limits) return null;
+-  const usage: CodexPlanUsage = { updatedAt: now };
+-  if (typeof limits.planType === "string" && limits.planType) usage.planType = limits.planType;
+-  for (const key of ["primary", "secondary"]) {
+-    const w = asObj(limits[key]);
+-    if (!w || !isNum(w.usedPercent) || !isNum(w.resetsAt)) continue;
+-    const window: PlanWindow = {
+-      usedPct: Math.min(100, Math.max(0, w.usedPercent)),
+-      resetsAt: w.resetsAt * 1000,
+-    };
+-    if (Number.isInteger(w.windowDurationMins) && (w.windowDurationMins as number) <= 24 * 60) {
+-      usage.fiveHour = window;
+-    } else {
+-      usage.sevenDay = window;
++  const byId = asObj(r?.rateLimitsByLimitId);
++  const entries = byId ? Object.entries(byId) : [["codex", r?.rateLimits] as const];
++  const groups: CodexQuotaGroup[] = [];
++  for (const [id, raw] of entries) {
++    const limits = asObj(raw);
++    if (!limits) continue;
++    const windows: PlanWindow[] = [];
++    for (const key of ["primary", "secondary"]) {
++      const w = asObj(limits[key]);
++      if (!w || !isNum(w.usedPercent) || !isNum(w.resetsAt) || w.resetsAt <= 0 ||
++          w.resetsAt * 1000 > now + 400 * DAY_MS) continue;
++      const window: PlanWindow = {
++        usedPct: Math.min(100, Math.max(0, w.usedPercent)),
++        resetsAt: w.resetsAt * 1000,
++      };
++      if (isNum(w.windowDurationMins) && Number.isInteger(w.windowDurationMins) && w.windowDurationMins > 0) {
++        window.durationMins = w.windowDurationMins;
++      }
++      windows.push(window);
+     }
++    if (windows.length) groups.push({ id, label: typeof limits.limitName === "string" && limits.limitName ? limits.limitName : id, windows });
++  }
++  if (!groups.length && byId) return parseCodexPlan({ ...r, rateLimitsByLimitId: undefined }, now);
++  if (!groups.length) return null;
++  const selected = groups.find(g => g.id === "codex") ?? groups[0];
++  const usage: CodexPlanUsage = { updatedAt: now, quotaGroups: [selected, ...groups.filter(g => g !== selected)] };
++  const limits = asObj(byId ? byId[selected.id] : r?.rateLimits);
++  if (typeof limits?.planType === "string" && limits.planType) usage.planType = limits.planType;
++  // Compatibility for existing phone/voice consumers; the quota UI uses exact windows.
++  for (const window of selected.windows) {
++    if (window.durationMins != null && window.durationMins <= 24 * 60) usage.fiveHour = window;
++    else usage.sevenDay = window;
+   }
+   const credits = asObj(r?.rateLimitResetCredits);
+   if (credits) {
+@@ -125,6 +150,19 @@ export function parseCodexPlan(result: unknown, now = Date.now()): CodexPlanUsag
+   return usage.fiveHour || usage.sevenDay ? usage : null;
+ }
+ 
++/** A reset needs a new provider reading, never an assumed 100% available. */
++export function quotaAvailable(w: PlanWindow | undefined, now = Date.now()): number | null {
++  if (!w || !isNum(w.usedPct) || !isNum(w.resetsAt) || w.resetsAt <= now) return null;
++  return 100 - Math.min(100, Math.max(0, w.usedPct));
++}
++
++export function quotaWindowLabel(w: PlanWindow | undefined): string {
++  const mins = w?.durationMins;
++  if (mins == null) return t("Unknown window");
++  if (mins % 1440 === 0) return t("{n} d", { n: mins / 1440 });
++  return mins % 60 === 0 ? t("{n} h", { n: mins / 60 }) : t("{n} min", { n: mins });
++}
++
+ // ── Shared ────────────────────────────────────────────────────────────────────
+ 
+ /** What to show for a window: 0 once its reset time has passed. */
 diff --git a/windows/src/core/spotify.ts b/windows/src/core/spotify.ts
-index 47d7c20..95b8331 100644
+index 47d7c20..26e8d1c 100644
 --- a/windows/src/core/spotify.ts
 +++ b/windows/src/core/spotify.ts
-@@ -21,6 +21,8 @@ export interface SpotifyTrack {
+@@ -21,6 +21,17 @@ export interface SpotifyTrack {
  }
  
  export interface SpotifyState {
++  /** Reported by MPRIS or Windows media controls; missing means unavailable. */
++  capabilities?: {
++    canControl?: boolean;
++    canPlay?: boolean;
++    canPause?: boolean;
++    canGoNext?: boolean;
++    canGoPrevious?: boolean;
++    canSeek?: boolean;
++  };
 +  /** Selected Linux player; absent in older reports. */
 +  playerName?: string;
    /** Spotify is running. */
    running: boolean;
    /** There is a Spotify to launch. */
+@@ -29,6 +40,8 @@ export interface SpotifyState {
+   playing: boolean;
+   /** Seconds at `positionAt` (Unix ms); while playing it runs on from there. */
+   position: number;
++  /** False when the player has not supplied a valid position anchor. */
++  positionKnown?: boolean;
+   positionAt: number;
+   shuffle: boolean;
+   repeat: boolean;
+@@ -38,9 +51,29 @@ export interface SpotifyState {
+ 
+ export const IDLE_SPOTIFY: SpotifyState = {
+   running: false, installed: false, track: null, playing: false,
+-  position: 0, positionAt: 0, shuffle: false, repeat: false, volume: 50,
++  position: 0, positionAt: 0, positionKnown: false, shuffle: false, repeat: false, volume: 50,
+ };
+ 
++/** A bar needs real timeline data, including a position supplied by the player. */
++export function spotifyHasProgress(s: SpotifyState): boolean {
++  return s.positionKnown === true && Number.isFinite(s.position) && s.position >= 0 &&
++    Number.isFinite(s.positionAt) && Number.isFinite(s.track?.duration) && (s.track?.duration ?? 0) > 0;
++}
++
++export type SpotifyTransportAction = "playPause" | "next" | "previous" | "seek";
++
++/** Never infer transport support from metadata or from the selected player's name. */
++export function spotifyCanControl(s: SpotifyState, action: SpotifyTransportAction): boolean {
++  const c = s.capabilities;
++  if (!s.running || c?.canControl !== true) return false;
++  switch (action) {
++    case "playPause": return (s.playing ? c.canPause : c.canPlay) === true;
++    case "next": return c.canGoNext === true;
++    case "previous": return c.canGoPrevious === true;
++    case "seek": return c.canSeek === true && spotifyHasProgress(s) && !isAd(s.track);
++  }
++}
++
+ /** The page's copy of the player, and the cover of the track that has one. */
+ export const Spotify = {
+   state: { ...IDLE_SPOTIFY } as SpotifyState,
 diff --git a/windows/src/core/state.ts b/windows/src/core/state.ts
 index a99718d..52c06a8 100644
 --- a/windows/src/core/state.ts
@@ -3108,6 +3555,70 @@ index a99718d..52c06a8 100644
    }
  }
  
+diff --git a/windows/src/core/task-history.ts b/windows/src/core/task-history.ts
+new file mode 100644
+index 0000000..2205388
+--- /dev/null
++++ b/windows/src/core/task-history.ts
+@@ -0,0 +1,58 @@
++/** Session-only observations. The caller chooses one canonical source per event class. */
++export type TaskHistoryKind =
++  | "tool_started" | "tool_finished" | "permission_requested"
++  | "turn_finished" | "turn_failed" | "turn_cancelled";
++
++export interface TaskHistoryEvent {
++  readonly source: "hook" | "codex";
++  readonly kind: TaskHistoryKind;
++  /** A real event ID, not a tool, turn or session ID shared by several events. */
++  readonly eventId?: string;
++  /** Epoch milliseconds from the source, if available; never synthesized. */
++  readonly timestamp?: number;
++}
++
++export const TASK_HISTORY_LIMIT = 20;
++const KINDS: readonly string[] = [
++  "tool_started", "tool_finished", "permission_requested",
++  "turn_finished", "turn_failed", "turn_cancelled",
++];
++
++/** Use the session/thread identity as the key, rather than a pill shared by chats. */
++export class TaskHistory {
++  private tasks = new Map<string, readonly TaskHistoryEvent[]>();
++
++  /** True when an observation was added and retained in the bounded history. */
++  record(taskId: string, input: TaskHistoryEvent): boolean {
++    if (!taskId.trim() || !KINDS.includes(input.kind) || !["hook", "codex"].includes(input.source)) return false;
++    const previous = this.tasks.get(taskId) ?? [];
++    const eventId = typeof input.eventId === "string" && input.eventId ? input.eventId : undefined;
++    // Deduplication covers retained events only: no unbounded set of old IDs.
++    if (eventId && previous.some(event => event.source === input.source && event.eventId === eventId)) return false;
++    const timestamp = typeof input.timestamp === "number" && Number.isFinite(input.timestamp)
++      && input.timestamp >= 0 && input.timestamp <= 8.64e15 ? input.timestamp : undefined;
++    // Whitelist metadata: a raw hook/bridge payload must never be retained here.
++    const event: TaskHistoryEvent = Object.freeze({
++      source: input.source, kind: input.kind,
++      ...(eventId === undefined ? {} : { eventId }),
++      ...(timestamp === undefined ? {} : { timestamp }),
++    });
++    const next = [...previous, event].sort((a, b) => {
++      // Unknown dates follow dated observations, in arrival order. Sorting is stable.
++      if (a.timestamp === undefined) return b.timestamp === undefined ? 0 : 1;
++      if (b.timestamp === undefined) return -1;
++      return a.timestamp - b.timestamp;
++    }).slice(-TASK_HISTORY_LIMIT);
++    this.tasks.set(taskId, next);
++    return next.includes(event);
++  }
++
++  get(taskId: string): readonly TaskHistoryEvent[] {
++    return [...(this.tasks.get(taskId) ?? [])];
++  }
++
++  clear(taskId: string): void { this.tasks.delete(taskId); }
++  clearAll(): void { this.tasks.clear(); }
++}
++
++export const taskHistory = new TaskHistory();
 diff --git a/windows/src/hub/hero.ts b/windows/src/hub/hero.ts
 index b0dce33..8193c8e 100644
 --- a/windows/src/hub/hero.ts
@@ -3529,7 +4040,7 @@ index 252a0f1..ff2a971 100644
      }
      statusLine.append(h("i", { class: "dot", style: `background:${color}` }), h("span", { text }));
 diff --git a/windows/src/i18n/extra.json b/windows/src/i18n/extra.json
-index 06e3c49..677fcb8 100644
+index 06e3c49..a773fce 100644
 --- a/windows/src/i18n/extra.json
 +++ b/windows/src/i18n/extra.json
 @@ -1824,7 +1824,7 @@
@@ -3541,7 +4052,7 @@ index 06e3c49..677fcb8 100644
        "ar": "جاهز",
        "fr": "Prêt",
        "bn": "প্রস্তুত",
-@@ -6091,6 +6091,331 @@
+@@ -6091,6 +6091,539 @@
        "id": "Matikan pil lain untuk memberi tempat bagi WhatsApp (maksimal {max}).",
        "de": "Schalte eine andere Pill aus, um Platz für WhatsApp zu schaffen (höchstens {max}).",
        "tr": "WhatsApp’a yer açmak için başka bir hapı kapat (en fazla {max})."
@@ -3728,19 +4239,6 @@ index 06e3c49..677fcb8 100644
 +      "de": "Verbinde einen Agenten in den Einstellungen, um hier seine Aktivität zu sehen.",
 +      "tr": "Etkinliğini burada görmek için Ayarlar bölümünde bir ajan bağlayın."
 +    },
-+    "Live hook activity · Select a desk to see details": {
-+      "es": "Actividad recibida en directo · Pulsa un puesto para ver el detalle",
-+      "zh-Hans": "实时钩子活动 · 选择工位查看详情",
-+      "hi": "लाइव हुक गतिविधि · विवरण के लिए डेस्क चुनें",
-+      "ar": "نشاط مباشر عبر الخطافات · اختر مكتباً لعرض التفاصيل",
-+      "fr": "Activité des hooks en direct · Sélectionnez un bureau pour les détails",
-+      "bn": "সরাসরি হুক কার্যকলাপ · বিস্তারিত দেখতে ডেস্ক বাছুন",
-+      "pt-BR": "Atividade dos hooks ao vivo · Selecione uma mesa para ver detalhes",
-+      "ru": "События хуков в реальном времени · Выберите стол для подробностей",
-+      "id": "Aktivitas hook langsung · Pilih meja untuk melihat detail",
-+      "de": "Live-Hook-Aktivität · Wähle einen Arbeitsplatz für Details",
-+      "tr": "Canlı hook etkinliği · Ayrıntılar için bir masa seçin"
-+    },
 +    "Waiting for activity": {
 +      "es": "Esperando actividad",
 +      "zh-Hans": "等待活动",
@@ -3870,6 +4368,227 @@ index 06e3c49..677fcb8 100644
 +      "id": "Memulihkan",
 +      "de": "Erholt sich",
 +      "tr": "Toparlanıyor"
++    },
++    "Unknown window": {
++      "zh-Hans": "未知时间窗口",
++      "hi": "अज्ञात अवधि",
++      "es": "Ventana desconocida",
++      "ar": "فترة غير معروفة",
++      "fr": "Période inconnue",
++      "bn": "অজানা সময়সীমা",
++      "pt-BR": "Período desconhecido",
++      "ru": "Неизвестный период",
++      "id": "Periode tidak diketahui",
++      "de": "Unbekanntes Zeitfenster",
++      "tr": "Bilinmeyen dönem"
++    },
++    "No data": {
++      "zh-Hans": "无数据",
++      "hi": "कोई डेटा नहीं",
++      "es": "Sin datos",
++      "ar": "لا توجد بيانات",
++      "fr": "Aucune donnée",
++      "bn": "কোনো তথ্য নেই",
++      "pt-BR": "Sem dados",
++      "ru": "Нет данных",
++      "id": "Tidak ada data",
++      "de": "Keine Daten",
++      "tr": "Veri yok"
++    },
++    "{n}% available": {
++      "zh-Hans": "剩余 {n}%",
++      "hi": "{n}% उपलब्ध",
++      "es": "{n}% disponible",
++      "ar": "{n}% متاح",
++      "fr": "{n}% disponible",
++      "bn": "{n}% উপলব্ধ",
++      "pt-BR": "{n}% disponível",
++      "ru": "Доступно {n}%",
++      "id": "{n}% tersedia",
++      "de": "{n}% verfügbar",
++      "tr": "%{n} kullanılabilir"
++    },
++    "Update pending": {
++      "zh-Hans": "等待更新",
++      "hi": "अपडेट लंबित",
++      "es": "Actualización pendiente",
++      "ar": "التحديث قيد الانتظار",
++      "fr": "Mise à jour en attente",
++      "bn": "আপডেট বাকি",
++      "pt-BR": "Atualização pendente",
++      "ru": "Ожидается обновление",
++      "id": "Pembaruan tertunda",
++      "de": "Aktualisierung ausstehend",
++      "tr": "Güncelleme bekleniyor"
++    },
++    "{n} d": {
++      "zh-Hans": "{n} 天",
++      "hi": "{n} दिन",
++      "es": "{n} d",
++      "ar": "{n} يوم",
++      "fr": "{n} j",
++      "bn": "{n} দিন",
++      "pt-BR": "{n} d",
++      "ru": "{n} д",
++      "id": "{n} hr",
++      "de": "{n} T",
++      "tr": "{n} gün"
++    },
++    "{n} h": {
++      "zh-Hans": "{n} 小时",
++      "hi": "{n} घं",
++      "es": "{n} h",
++      "ar": "{n} س",
++      "fr": "{n} h",
++      "bn": "{n} ঘ",
++      "pt-BR": "{n} h",
++      "ru": "{n} ч",
++      "id": "{n} jam",
++      "de": "{n} Std",
++      "tr": "{n} sa"
++    },
++    "{n} min": {
++      "zh-Hans": "{n} 分钟",
++      "hi": "{n} मिनट",
++      "es": "{n} min",
++      "ar": "{n} د",
++      "fr": "{n} min",
++      "bn": "{n} মি",
++      "pt-BR": "{n} min",
++      "ru": "{n} мин",
++      "id": "{n} mnt",
++      "de": "{n} Min",
++      "tr": "{n} dk"
++    },
++    "Orbit: minutes within the hour": {
++      "zh-Hans": "轨道：当前小时内的分钟数",
++      "hi": "कक्षा: वर्तमान घंटे के मिनट",
++      "es": "Órbita: minutos de la hora actual",
++      "ar": "المدار: الدقائق ضمن الساعة الحالية",
++      "fr": "Orbite : minutes de l’heure en cours",
++      "bn": "কক্ষপথ: বর্তমান ঘণ্টার মিনিট",
++      "pt-BR": "Órbita: minutos da hora atual",
++      "ru": "Орбита: минуты текущего часа",
++      "id": "Orbit: menit dalam jam saat ini",
++      "de": "Umlauf: Minuten der aktuellen Stunde",
++      "tr": "Yörünge: geçerli saatin dakikaları"
++    },
++    "Tool started": {
++      "es": "Herramienta iniciada",
++      "fr": "Outil démarré",
++      "de": "Werkzeug gestartet",
++      "pt-BR": "Ferramenta iniciada",
++      "zh-Hans": "工具已启动",
++      "hi": "टूल शुरू हुआ",
++      "ar": "بدأت الأداة",
++      "bn": "টুল শুরু হয়েছে",
++      "ru": "Инструмент запущен",
++      "id": "Alat dimulai",
++      "tr": "Araç başlatıldı"
++    },
++    "Tool finished": {
++      "es": "Herramienta finalizada",
++      "fr": "Outil terminé",
++      "de": "Werkzeug beendet",
++      "pt-BR": "Ferramenta concluída",
++      "zh-Hans": "工具已结束",
++      "hi": "टूल समाप्त हुआ",
++      "ar": "انتهت الأداة",
++      "bn": "টুল শেষ হয়েছে",
++      "ru": "Инструмент завершён",
++      "id": "Alat selesai",
++      "tr": "Araç tamamlandı"
++    },
++    "Permission requested": {
++      "es": "Permiso solicitado",
++      "fr": "Autorisation demandée",
++      "de": "Berechtigung angefordert",
++      "pt-BR": "Permissão solicitada",
++      "zh-Hans": "已请求权限",
++      "hi": "अनुमति मांगी गई",
++      "ar": "طُلب الإذن",
++      "bn": "অনুমতি চাওয়া হয়েছে",
++      "ru": "Запрошено разрешение",
++      "id": "Izin diminta",
++      "tr": "İzin istendi"
++    },
++    "Turn finished": {
++      "es": "Turno finalizado",
++      "fr": "Tour terminé",
++      "de": "Durchgang beendet",
++      "pt-BR": "Turno concluído",
++      "zh-Hans": "轮次已结束",
++      "hi": "चरण समाप्त हुआ",
++      "ar": "انتهت الجولة",
++      "bn": "পর্ব শেষ হয়েছে",
++      "ru": "Ход завершён",
++      "id": "Giliran selesai",
++      "tr": "Tur tamamlandı"
++    },
++    "Turn failed": {
++      "es": "Turno fallido",
++      "fr": "Échec du tour",
++      "de": "Durchgang fehlgeschlagen",
++      "pt-BR": "Falha no turno",
++      "zh-Hans": "轮次失败",
++      "hi": "चरण विफल हुआ",
++      "ar": "فشلت الجولة",
++      "bn": "পর্ব ব্যর্থ হয়েছে",
++      "ru": "Ошибка хода",
++      "id": "Giliran gagal",
++      "tr": "Tur başarısız oldu"
++    },
++    "Turn cancelled": {
++      "es": "Turno cancelado",
++      "fr": "Tour annulé",
++      "de": "Durchgang abgebrochen",
++      "pt-BR": "Turno cancelado",
++      "zh-Hans": "轮次已取消",
++      "hi": "चरण रद्द हुआ",
++      "ar": "أُلغيت الجولة",
++      "bn": "পর্ব বাতিল হয়েছে",
++      "ru": "Ход отменён",
++      "id": "Giliran dibatalkan",
++      "tr": "Tur iptal edildi"
++    },
++    "More agents": {
++      "zh-Hans": "更多代理",
++      "hi": "और एजेंट",
++      "es": "Más agentes",
++      "ar": "المزيد من الوكلاء",
++      "fr": "Plus d’agents",
++      "bn": "আরও এজেন্ট",
++      "pt-BR": "Mais agentes",
++      "ru": "Другие агенты",
++      "id": "Agen lainnya",
++      "de": "Weitere Agenten",
++      "tr": "Diğer ajanlar"
++    },
++    "Show {count} more agents": {
++      "zh-Hans": "显示另外 {count} 个代理",
++      "hi": "{count} और एजेंट दिखाएँ",
++      "es": "Mostrar {count} agentes más",
++      "ar": "إظهار {count} وكلاء آخرين",
++      "fr": "Afficher {count} agents supplémentaires",
++      "bn": "আরও {count} জন এজেন্ট দেখান",
++      "pt-BR": "Mostrar mais {count} agentes",
++      "ru": "Показать ещё {count} агентов",
++      "id": "Tampilkan {count} agen lainnya",
++      "de": "{count} weitere Agenten anzeigen",
++      "tr": "{count} ajan daha göster"
++    },
++    "Live hook activity · Select an agent to see details": {
++      "zh-Hans": "实时钩子活动 · 选择代理查看详情",
++      "hi": "लाइव हुक गतिविधि · विवरण देखने के लिए एजेंट चुनें",
++      "es": "Actividad de hooks en directo · Selecciona un agente para ver los detalles",
++      "ar": "نشاط الخطافات المباشر · حدد وكيلاً لعرض التفاصيل",
++      "fr": "Activité des hooks en direct · Sélectionnez un agent pour voir les détails",
++      "bn": "সরাসরি হুক কার্যকলাপ · বিস্তারিত দেখতে একজন এজেন্ট নির্বাচন করুন",
++      "pt-BR": "Atividade dos hooks ao vivo · Selecione um agente para ver os detalhes",
++      "ru": "Активность хуков · Выберите агента для просмотра подробностей",
++      "id": "Aktivitas hook langsung · Pilih agen untuk melihat detail",
++      "de": "Live-Hook-Aktivität · Agenten auswählen, um Details anzuzeigen",
++      "tr": "Canlı hook etkinliği · Ayrıntılar için bir ajan seçin"
      }
    }
  }
@@ -3906,10 +4625,10 @@ index 0000000..8232d13
 +}
 diff --git a/windows/src/island/compact.ts b/windows/src/island/compact.ts
 new file mode 100644
-index 0000000..fc6efcb
+index 0000000..fece898
 --- /dev/null
 +++ b/windows/src/island/compact.ts
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,75 @@
 +// Compact island content. Media reports and artwork still come from the shared MPRIS cache.
 +import type { BotStateName } from "../core/layout";
 +import { currentArtwork, isAd, type SpotifyState, type SpotifyTrack } from "../core/spotify";
@@ -3923,12 +4642,15 @@ index 0000000..fc6efcb
 +export function buildCompactClock() {
 +  const time = h("span", { class: "compact-time" });
 +  const date = h("span", { class: "compact-date" });
-+  const el = h("div", { id: "island-clock" }, time, date);
++  const el = h("div", { id: "island-clock", role: "img" }, time, date);
 +  return {
 +    el,
 +    sync(now = new Date()) {
 +      time.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 +      date.textContent = now.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
++      el.style.setProperty("--clock-orbit", `${now.getMinutes() * 6}deg`);
++      el.title = t("Orbit: minutes within the hour");
++      el.setAttribute("aria-label", `${time.textContent} · ${date.textContent}. ${el.title}`);
 +    },
 +  };
 +}
@@ -4031,10 +4753,27 @@ index 23b65ee..04b5145 100644
          this.transition("petit");
        }
 diff --git a/windows/src/island/hooks.ts b/windows/src/island/hooks.ts
-index b39ecc2..e3a93f0 100644
+index b39ecc2..ccc6a39 100644
 --- a/windows/src/island/hooks.ts
 +++ b/windows/src/island/hooks.ts
-@@ -167,7 +167,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
+@@ -1,3 +1,4 @@
++import { taskHistory, type TaskHistoryKind } from "../core/task-history";
+ // Hook events from Claude Code and every other agent → island state.
+ // Port of HookServer.processEvent / processPermissionRequest from the macOS app.
+ // Difference from macOS: no terminal filter. On Windows the hook fires from any
+@@ -45,6 +46,11 @@ function cancelStopTimer(id: string): boolean {
+ }
+ 
+ /** Events after which a pending permission request of the same session is moot. */
++const historySessions = new Map<string, string>();
++const HISTORY_EVENTS: Record<string, TaskHistoryKind> = {
++  PreToolUse: "tool_started", PostToolUse: "tool_finished", PostToolUseFailure: "tool_finished",
++  PermissionRequest: "permission_requested", Stop: "turn_finished", StopFailure: "turn_failed", Interrupt: "turn_cancelled",
++};
+ const TURN_OVER = new Set(["Stop", "StopFailure", "UserPromptSubmit", "SessionEnd", "Interrupt"]);
+ 
+ interface HookPayload {
+@@ -167,7 +173,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
        return `${tool} · ${value.trim()}`;
      }
    }
@@ -4045,11 +4784,48 @@ index b39ecc2..e3a93f0 100644
  }
  
  /**
+@@ -278,6 +286,9 @@ function handleHook(island: Island, payload: HookPayload) {
+   const surface = (view: Parameters<Island["alert"]>[0], isAlert: boolean) => {
+     if (State.mode === "expanded") {
+       if (isAlert) island.setView(view);
++    } else if (isAlert && (view === "finished" || view === "error")) {
++      // Ordinary results use the compact slot; permission cards still pin/open.
++      if (State.mode === "hidden") island.reveal();
+     } else if (isAlert) {
+       island.alert(view);
+     } else if (State.mode === "hidden") {
+@@ -532,5 +543,21 @@ function handleHook(island: Island, payload: HookPayload) {
+     default:
+       break;
+   }
++  // Keep only observed event classes, never payload text, tool arguments or guessed dates.
++  // A pill can survive a session or briefly disappear after Stop; neither is a new session.
++  if (sessionId && (State.tasks.some(task => task.id === agentId) || name === "SessionEnd")) {
++    const historyKey = `${agentId}:${sessionId}`;
++    const previous = historySessions.get(agentId);
++    if (name === "SessionEnd") {
++      taskHistory.clear(historyKey);
++      if (previous === historyKey) historySessions.delete(agentId);
++    } else {
++      if (previous && previous !== historyKey) taskHistory.clear(previous);
++      historySessions.set(agentId, historyKey);
++    }
++    const kind = HISTORY_EVENTS[name];
++    const question = payload.tool_name === "AskUserQuestion" || payload.tool_name === "ask_question" || payload.tool_name?.endsWith(":ask_question");
++    if (kind && !(name === "PermissionRequest" && question)) taskHistory.record(historyKey, { source: "hook", kind });
++  }
+   State.notify();
+ }
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index 9248cce..d598d7f 100644
+index 9248cce..7c1317e 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
-@@ -12,7 +12,7 @@ import {
+@@ -1,3 +1,4 @@
++import { selectRoomAgent } from "../views/agent-room";
+ // The island: DOM shell, sizing animation, Mochi placement, mouse handling.
+ // Mirrors IslandRootView.swift + IslandWindowController.swift.
+ 
+@@ -12,17 +13,20 @@ import {
  } from "../core/layout";
  import { Sound } from "../core/sound";
  import { State } from "../core/state";
@@ -4058,30 +4834,37 @@ index 9248cce..d598d7f 100644
  import { BotEngine, hexToRGB } from "../mochi/engine";
  import { Greeting } from "../mochi/greeting";
  import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
-@@ -20,9 +20,11 @@ import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
+ import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
  import { UploadCanvas } from "../upload/canvas";
  import { USC, UploadSeq } from "../upload/sequence";
- import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
+-import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
++import { buildQuotaRings, refreshCodexPlanUsage, closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 +import { roomAgents, agentStatus } from "../core/agent-room";
  import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
  import { h } from "../views/dom";
  import { IslandStateMachine } from "./fsm";
++import { buildCompactNotice, selectCompactNotice, type CompactNotice } from "./notice";
 +import { buildCompactClock, buildCompactMusic, compactAlert } from "./compact";
  import { refreshHookPills } from "./integrations";
  import { DesktopLink } from "./desktop";
  import type { ViewCommand } from "./shortcuts";
-@@ -60,7 +62,10 @@ export class Island {
+@@ -60,8 +64,15 @@ export class Island {
    private botGlow!: HTMLElement;
    private greetingCanvas!: HTMLCanvasElement;
    private miniGrid!: HTMLElement;
 +  private compactStatus!: HTMLElement;
++  private compactNotice!: ReturnType<typeof buildCompactNotice>;
    private clockEl!: HTMLElement;
 +  private compactClock!: ReturnType<typeof buildCompactClock>;
 +  private compactMusic!: ReturnType<typeof buildCompactMusic>;
    private clockTimer?: number;
++  private quotaRings!: ReturnType<typeof buildQuotaRings>;
++  private quotaButton!: HTMLButtonElement;
++  private quotaShown = false;
    private countdown!: HTMLElement;
    private wakeStrip!: HTMLElement;
-@@ -138,6 +143,7 @@ export class Island {
+ 
+@@ -138,6 +149,7 @@ export class Island {
        this.onGreetingDone?.();
      };
      State.subscribe(() => {
@@ -4089,12 +4872,13 @@ index 9248cce..d598d7f 100644
        this.dirty = true;
        this.ensureRunning();
      });
-@@ -286,7 +292,14 @@ export class Island {
+@@ -286,7 +298,26 @@ export class Island {
      this.botCanvas = h("canvas", { id: "bot-canvas" });
      this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
      this.miniGrid = h("div", { id: "mini-grid" });
 -    this.clockEl = h("div", { id: "island-clock" });
 +    this.compactStatus = h("div", { id: "compact-agent-status" });
++    this.compactNotice = buildCompactNotice(notice => this.openCompactNotice(notice));
 +    this.compactClock = buildCompactClock();
 +    this.clockEl = this.compactClock.el;
 +    this.compactMusic = buildCompactMusic(() => {
@@ -4102,20 +4886,33 @@ index 9248cce..d598d7f 100644
 +      State.setFocus(SPOTIFY_ID);
 +      this.setView("overview");
 +    }, () => State.notify());
++    this.quotaRings = buildQuotaRings();
++    this.quotaButton = h("button", { id: "compact-quota", type: "button",
++      onmousedown: (event: Event) => event.stopPropagation(),
++      onclick: () => {
++        if (State.pendingApproval || compactAlert(State.effectiveState, false)) return;
++        State.planDetailIsCodex = true;
++        State.showingPlanDetail = true;
++        this.setView("overview");
++        refreshCodexPlanUsage();
++      },
++    }, this.quotaRings.el);
      this.countdown = h("div", { id: "countdown" });
  
      this.header = buildHeader(actions);
-@@ -321,7 +334,9 @@ export class Island {
+@@ -321,7 +352,11 @@ export class Island {
        this.botGlow,
        this.botCanvas,
        this.miniGrid,
 +      this.compactStatus,
++      this.compactNotice.el,
        this.clockEl,
 +      this.compactMusic.el,
++      this.quotaButton,
        this.countdown,
      );
  
-@@ -340,6 +355,7 @@ export class Island {
+@@ -340,6 +375,7 @@ export class Island {
    private wireFsm() {
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -4123,7 +4920,7 @@ index 9248cce..d598d7f 100644
      this.fsm.onTransition = (from, to) => {
        // The greeting is over, however it ended: back to his desktop spot.
        if (from === "coucou" && to !== "coucou") this.desktop.launch();
-@@ -422,6 +438,7 @@ export class Island {
+@@ -422,6 +458,7 @@ export class Island {
    }
  
    setView(view: IslandViewName) {
@@ -4131,7 +4928,7 @@ index 9248cce..d598d7f 100644
      this.stopSequenceIfLeaving(view);
      if (view !== "overview") closePlanCard();
      if (State.mode !== "expanded") {
-@@ -457,6 +474,9 @@ export class Island {
+@@ -457,6 +494,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -4141,18 +4938,19 @@ index 9248cce..d598d7f 100644
    }
  
    /** A new Coucou waits and Mochi has nothing else to say (he is blue). */
-@@ -687,8 +707,26 @@ export class Island {
+@@ -687,8 +727,27 @@ export class Island {
  
    // ── Geometry ────────────────────────────────────────────────────────────────
  
 +  private syncCompactMusic() {
-+    const blocked = State.paused || compactAlert(State.effectiveState, State.pendingApproval != null);
++    const blocked = State.paused || this.currentNotice() != null || (State.stateOverride != null && compactAlert(State.stateOverride, false));
 +    this.compactMusic.sync(Spotify.state, State.spotifyPlaying && !State.paused, blocked);
 +    const visible = this.compactMusic.visible;
 +    const held = this.fsm.musicVisible;
 +    this.fsm.musicVisible = visible;
 +    this.compactMusic.el.style.display = visible && State.mode === "compact" ? "flex" : "none";
 +    this.compactMusic.el.classList.toggle("on", visible && State.mode === "compact");
++    this.compactMusic.el.classList.toggle("with-clock", State.settings.showClock);
 +    if (visible !== held && State.mode === "compact") this.animateGeometry(!visible);
 +    if (held && !visible && this.fsm.state === "petit" && !this.wasInIsland) this.fsm.mouseLeft();
 +  }
@@ -4168,7 +4966,7 @@ index 9248cce..d598d7f 100644
      if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
        h = QUESTION_PICKER_H;
      }
-@@ -791,6 +829,7 @@ export class Island {
+@@ -791,6 +850,7 @@ export class Island {
          return;
        }
        if (State.mode !== "expanded") {
@@ -4176,7 +4974,7 @@ index 9248cce..d598d7f 100644
          this.fsm.click();
          return;
        }
-@@ -902,6 +941,7 @@ export class Island {
+@@ -902,6 +962,7 @@ export class Island {
        this.fsm.mouseEntered();
      }
      if (!inIsland && wasIn) {
@@ -4184,7 +4982,7 @@ index 9248cce..d598d7f 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1073,7 +1113,7 @@ export class Island {
+@@ -1073,7 +1134,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -4193,15 +4991,30 @@ index 9248cce..d598d7f 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1195,6 +1235,7 @@ export class Island {
+@@ -1193,8 +1254,22 @@ export class Island {
  
+   // ── DOM sync ────────────────────────────────────────────────────────────────
+ 
++  /** Aggregate agent activity without changing focus, geometry or the FSM. */
++  private syncBorder() {
++    const states = roomAgents(State.tasks).map(task => task.state);
++    if (State.stateOverride) states.push(State.stateOverride);
++    const border = State.mode === "hidden" || State.paused ? "hidden"
++      : State.pendingApproval || states.some(s => s === "approval" || s === "question" || s === "ratelimit") ? "attention"
++      : states.includes("error") ? "error"
++      : states.some(s => s === "working" || s === "thinking" || s === "searching") ? "working"
++      : states.includes("finished") ? "finished" : "idle";
++    if (this.islandEl.dataset.liveBorder !== border) this.islandEl.dataset.liveBorder = border;
++  }
++
    private syncDom() {
++    this.syncBorder();
      const expanded = State.mode === "expanded";
 +    this.fsm.chatOpen = expanded && State.view === "prompt";
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1215,6 +1256,7 @@ export class Island {
+@@ -1215,6 +1290,7 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -4209,12 +5022,18 @@ index 9248cce..d598d7f 100644
        if (on) view.sync();
      }
  
-@@ -1232,16 +1274,25 @@ export class Island {
+@@ -1231,38 +1307,91 @@ export class Island {
+       }
      }
  
++    // Compact attention remains accessible after folding a pinned request.
++    const notice = !State.paused && State.mode === "compact" ? this.currentNotice() : null;
++    this.compactNotice.sync(notice);
++    this.compactNotice.el.classList.toggle("with-clock", State.settings.showClock);
++    this.islandEl.classList.toggle("has-notice", notice != null);
      // Compact mini grid
 -    const showGrid = State.mode === "compact";
-+    const showGrid = State.mode === "compact" && !this.compactMusic.visible;
++    const showGrid = State.mode === "compact" && !this.compactMusic.visible && !notice;
      this.miniGrid.style.opacity = showGrid ? "1" : "0";
 +    const flowTasks = roomAgents(State.tasks);
 +    const focusAgent = flowTasks.find(task => task.id === State.focusId);
@@ -4238,9 +5057,10 @@ index 9248cce..d598d7f 100644
          }
          pruneMiniBots();
        }
-@@ -1249,20 +1300,22 @@ export class Island {
+     }
  
      this.updateClock();
++    this.updateQuota();
  
 -    syncMiniBotStates(State.tasks);
 +    for (const worker of Array.from(this.miniGrid.children) as HTMLElement[]) {
@@ -4251,11 +5071,48 @@ index 9248cce..d598d7f 100644
      this.engine.setState(State.effectiveState);
    }
  
-   /** The clock sits in the middle of the compact island, where the notch is on a Mac. */
+-  /** The clock sits in the middle of the compact island, where the notch is on a Mac. */
++  private currentNotice() {
++    return selectCompactNotice(roomAgents(State.tasks), State.pendingApproval);
++  }
++
++  /** Opening a notice cannot answer it; verify identity again after a refresh. */
++  private openCompactNotice(notice: CompactNotice) {
++    const current = this.currentNotice();
++    if (!current || current.pillId !== notice.pillId || current.requestId !== notice.requestId) return;
++    const pending = State.pendingApproval;
++    if (pending) {
++      State.setFocus(pending.pillId);
++      this.setView(pending.questions ? "question" : "approval");
++    } else {
++      const task = roomAgents(State.tasks).find(task => task.id === notice.pillId);
++      if (!task) return;
++      if (task.flow) { selectRoomAgent(task.id); this.setView("agents"); }
++      else { State.setFocus(task.id); this.setView(task.state === "error" ? "error" : "overview"); }
++    }
++  }
++
++  /** Cached rings share the clock tick; only becoming visible asks for new data. */
++  private updateQuota() {
++    const shown = State.mode === "compact" && !State.paused && State.settings.showCodexPlanInNotch &&
++      !this.compactMusic.visible && !this.currentNotice() && !(State.stateOverride != null && compactAlert(State.stateOverride, false));
++    this.quotaButton.style.display = shown ? "flex" : "none";
++    this.islandEl.classList.toggle("has-quota", shown);
++    if (shown) {
++      this.quotaRings.sync();
++      this.quotaButton.setAttribute("aria-label", this.quotaRings.el.getAttribute("aria-label") ?? "Codex");
++      this.quotaButton.title = this.quotaRings.el.title;
++      if (!this.quotaShown) refreshCodexPlanUsage();
++    }
++    this.quotaShown = shown;
++  }
++
++  /** Keep time readable beside music and let explicit status text take priority. */
    private updateClock() {
 -    const on = State.mode === "compact" && State.settings.showClock;
-+    const on = State.mode === "compact" && State.settings.showClock && !this.compactMusic.visible &&
++    const on = State.mode === "compact" && State.settings.showClock &&
 +      this.compactStatus.style.display === "none";
++    this.clockEl.classList.toggle("music-clock", this.compactMusic.visible);
      this.clockEl.style.opacity = on ? "1" : "0";
 +    this.clockEl.style.visibility = on ? "visible" : "hidden";
      if (!on) return;
@@ -4268,7 +5125,7 @@ index 9248cce..d598d7f 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1271,6 +1324,9 @@ export class Island {
+@@ -1271,9 +1400,12 @@ export class Island {
      Sound.setVolume(State.settings.soundVolume);
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -4277,8 +5134,12 @@ index 9248cce..d598d7f 100644
 +    if (this.fsm.state === "petit" && !this.wasInIsland) this.fsm.mouseLeft();
      State.notify();
      // ponytail: one timer for the life of the window; a minute is the clock's finest tick.
-     this.clockTimer ??= window.setInterval(() => this.updateClock(), 10_000);
-@@ -1281,6 +1337,6 @@ export class Island {
+-    this.clockTimer ??= window.setInterval(() => this.updateClock(), 10_000);
++    this.clockTimer ??= window.setInterval(() => { this.updateClock(); this.updateQuota(); }, 10_000);
+   }
+ 
+   get panelSize() {
+@@ -1281,6 +1413,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -4286,6 +5147,68 @@ index 9248cce..d598d7f 100644
 +    return this.views.get("prompt")?.height?.() ?? chatPromptHeight(State.chatHistory.length);
    }
  }
+diff --git a/windows/src/island/notice.ts b/windows/src/island/notice.ts
+new file mode 100644
+index 0000000..e1a9d4a
+--- /dev/null
++++ b/windows/src/island/notice.ts
+@@ -0,0 +1,56 @@
++import type { AgentTask, ApprovalInfo } from "../core/state";
++import type { BotStateName } from "../core/layout";
++import { agentStatus } from "../core/agent-room";
++import { h } from "../views/dom";
++
++export interface CompactNotice {
++  pillId: string;
++  name: string;
++  state: BotStateName;
++  requestId?: string;
++  count: number;
++}
++const PRIORITY: Partial<Record<BotStateName, number>> = {
++  approval: 0, question: 0, ratelimit: 1, error: 1, finished: 2, dizzy: 3,
++};
++/** Derive notices from the existing tasks; no second queue can consume a request. */
++export function selectCompactNotice(tasks: AgentTask[], pending: ApprovalInfo | null): CompactNotice | null {
++  const items = new Map<string, CompactNotice>();
++  if (pending) items.set(pending.pillId, {
++    pillId: pending.pillId, name: tasks.find(task => task.id === pending.pillId)?.name ?? pending.tool,
++    state: pending.questions ? "question" : "approval", requestId: pending.requestId, count: 0,
++  });
++  for (const task of tasks) {
++    if (task.flow?.status === "interrupted" && task.state === "error") continue;
++    if (task.flow && task.state === "finished") {
++      const age = Date.now() - Date.parse(task.flow.lastSeen ?? "");
++      if (!Number.isFinite(age) || age < 0 || age > 5200) continue;
++    }
++    if (PRIORITY[task.state] == null || items.has(task.id)) continue;
++    items.set(task.id, {pillId: task.id, name: task.name, state: task.state, count: 0});
++  }
++  const selected = [...items.values()].sort((a, b) => (a.requestId != null ? -1 : PRIORITY[a.state]!) -
++    (b.requestId != null ? -1 : PRIORITY[b.state]!))[0];
++  return selected ? {...selected, count: items.size} : null;
++}
++
++export function buildCompactNotice(open: (notice: CompactNotice) => void) {
++  let current: CompactNotice | null = null;
++  const name = h("span", {class: "compact-notice-name"});
++  const status = h("span", {class: "compact-notice-status"});
++  const el = h("button", {id: "compact-notice", type: "button",
++    onmousedown: (event: Event) => event.stopPropagation(),
++    onclick: (event: Event) => { event.stopPropagation(); if (current) open(current); },
++  }, name, status);
++  return {el, sync(notice: CompactNotice | null) {
++    current = notice;
++    el.style.display = notice ? "flex" : "none";
++    if (!notice) return;
++    const label = agentStatus(notice.state);
++    name.textContent = notice.name;
++    status.textContent = `${label}${notice.count > 1 ? ` · +${notice.count - 1}` : ""}`;
++    el.dataset.state = notice.state;
++    el.title = `${notice.name}: ${status.textContent}`;
++    el.setAttribute("aria-label", el.title);
++  }};
++}
 diff --git a/windows/src/main.ts b/windows/src/main.ts
 index 0a4f48e..7c35ae9 100644
 --- a/windows/src/main.ts
@@ -4797,7 +5720,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index ebc4093..ee51c27 100644
+index ebc4093..aeee3a2 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -4832,7 +5755,7 @@ index ebc4093..ee51c27 100644
    --cyan: #22d3ee;
    --indigo: #6366f1;
    --pink: #f472b6;
-@@ -74,7 +59,7 @@ body {
+@@ -74,12 +59,62 @@ body {
    position: absolute;
    top: 0;
    left: 50%;
@@ -4841,7 +5764,62 @@ index ebc4093..ee51c27 100644
    border-radius: 0 0 14px 14px;
    overflow: visible;
    will-change: width, height, transform;
-@@ -185,14 +170,52 @@ body {
+ }
+ 
++/* An inset overlay keeps the hit area and the layer-shell window unchanged. */
++#island::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  z-index: 20;
++  border: 1px solid var(--eva-line);
++  border-radius: inherit;
++  pointer-events: none;
++}
++
++#island[data-live-border="working"]::after,
++#island[data-live-border="finished"]::after {
++  border-color: var(--eva-accent);
++  box-shadow: inset 0 0 8px rgba(var(--eva-accent-rgb), .18);
++}
++
++#island[data-live-border="working"]::after {
++  animation: island-border-breathe 2.8s ease-in-out infinite;
++}
++
++#island[data-live-border="attention"]::after {
++  border-color: var(--eva-attention);
++  box-shadow: inset 0 0 8px rgba(var(--eva-attention-rgb), .15);
++}
++
++#island[data-live-border="error"]::after {
++  border-color: var(--eva-error);
++  box-shadow: inset 0 0 8px rgba(var(--eva-error-rgb), .15);
++}
++
++#island[data-live-border="finished"]::after {
++  animation: island-border-finish 1.2s ease-out forwards;
++}
++
++#island[data-live-border="hidden"]::after { display: none; }
++
++@keyframes island-border-breathe {
++  0%, 100% { opacity: .45; }
++  50% { opacity: .95; }
++}
++
++@keyframes island-border-finish {
++  to { border-color: var(--eva-line); box-shadow: none; }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  #island::after { animation: none !important; }
++}
++
+ #island-clip {
+   position: absolute;
+   inset: 0;
+@@ -185,14 +220,72 @@ body {
    display: flex;
    align-items: center;
    justify-content: center;
@@ -4856,6 +5834,26 @@ index ebc4093..ee51c27 100644
    transition: opacity 0.25s ease-in-out;
  }
  
++/* The orbit marks elapsed minutes of the current hour; no continuous animation. */
++#island-clock { padding-left: 30px; height: 30px; pointer-events: auto; }
++#island-clock::before {
++  content: "";
++  position: absolute;
++  left: calc(50% - 54px);
++  width: 24px;
++  height: 24px;
++  border-radius: 50%;
++  background: conic-gradient(var(--eva-accent) var(--clock-orbit, 0deg), var(--eva-border) 0);
++  mask: radial-gradient(circle, transparent 58%, black 62%);
++  opacity: .6;
++}
++#island-clock.music-clock { left: auto; right: 12px; width: 100px; padding-left: 22px; }
++#island-clock.music-clock::before { left: 0; width: 20px; height: 20px; }
++#compact-music.with-clock { right: 126px; }
++@media (prefers-reduced-motion: reduce) {
++  #island-clock::before { background: var(--eva-border); }
++}
++
 +#island-clock .compact-time { font-size: 16px; font-weight: 650; line-height: 18px; }
 +#island-clock .compact-date { font-size: 8px; line-height: 10px; color: var(--eva-secondary); }
 +
@@ -4896,7 +5894,7 @@ index ebc4093..ee51c27 100644
  /* A mini Mochi: the slot is the body, the canvas is larger and overflows it so
     hands, badges and particles are not cut off. */
  .mini {
-@@ -248,13 +271,13 @@ body {
+@@ -248,13 +341,13 @@ body {
  }
  
  .tab:hover {
@@ -4913,7 +5911,7 @@ index ebc4093..ee51c27 100644
  }
  
  .header-actions {
-@@ -360,17 +383,17 @@ body {
+@@ -360,17 +453,17 @@ body {
  }
  
  .btn.primary {
@@ -4935,7 +5933,7 @@ index ebc4093..ee51c27 100644
  }
  
  .btn .kbd {
-@@ -385,7 +408,7 @@ body {
+@@ -385,7 +478,7 @@ body {
  }
  
  .btn.secondary .kbd {
@@ -4944,7 +5942,7 @@ index ebc4093..ee51c27 100644
  }
  
  .link-btn {
-@@ -400,7 +423,7 @@ body {
+@@ -400,7 +493,7 @@ body {
    height: 16px;
    border: 0;
    border-radius: 50%;
@@ -4953,7 +5951,7 @@ index ebc4093..ee51c27 100644
    color: var(--dim-4);
    display: grid;
    place-items: center;
-@@ -620,7 +643,7 @@ body {
+@@ -620,7 +713,7 @@ body {
  
  .diff-line .sym {
    flex: 0 0 12px;
@@ -4962,7 +5960,7 @@ index ebc4093..ee51c27 100644
  }
  
  .diff-line .txt {
-@@ -632,8 +655,8 @@ body {
+@@ -632,8 +725,8 @@ body {
  }
  
  .diff-line.added {
@@ -4973,7 +5971,7 @@ index ebc4093..ee51c27 100644
  }
  
  .diff-line.added .sym {
-@@ -641,8 +664,8 @@ body {
+@@ -641,8 +734,8 @@ body {
  }
  
  .diff-line.removed {
@@ -4984,7 +5982,7 @@ index ebc4093..ee51c27 100644
  }
  
  .diff-line.removed .sym {
-@@ -692,7 +715,7 @@ body {
+@@ -692,7 +785,7 @@ body {
    height: 28px;
    border-radius: 999px;
    background: var(--card-flat);
@@ -4993,7 +5991,7 @@ index ebc4093..ee51c27 100644
    display: flex;
    align-items: center;
    cursor: default;
-@@ -730,7 +753,7 @@ body {
+@@ -730,7 +823,7 @@ body {
    width: 14px;
    height: 14px;
    border-radius: 50%;
@@ -5002,7 +6000,7 @@ index ebc4093..ee51c27 100644
    display: grid;
    place-items: center;
  }
-@@ -788,9 +811,9 @@ body {
+@@ -788,9 +881,9 @@ body {
  
  .code {
    font: 400 12px var(--mono);
@@ -5015,7 +6013,7 @@ index ebc4093..ee51c27 100644
    border-radius: 10px;
    padding: 5px 10px;
    max-width: 100%;
-@@ -854,7 +877,7 @@ body {
+@@ -854,7 +947,7 @@ body {
    align-items: center;
    gap: 10px;
    font: 400 12.5px var(--font);
@@ -5024,7 +6022,7 @@ index ebc4093..ee51c27 100644
  }
  
  .switch {
-@@ -862,7 +885,7 @@ body {
+@@ -862,7 +955,7 @@ body {
    width: 32px;
    height: 18px;
    border-radius: 9px;
@@ -5033,7 +6031,7 @@ index ebc4093..ee51c27 100644
    flex: 0 0 32px;
    transition: background 0.18s;
    cursor: default;
-@@ -881,11 +904,12 @@ body {
+@@ -881,11 +974,12 @@ body {
    width: 14px;
    height: 14px;
    border-radius: 50%;
@@ -5047,7 +6045,7 @@ index ebc4093..ee51c27 100644
    transform: translateX(14px);
  }
  
-@@ -894,7 +918,7 @@ input[type="range"] {
+@@ -894,7 +988,7 @@ input[type="range"] {
    appearance: none;
    height: 3px;
    border-radius: 2px;
@@ -5056,7 +6054,7 @@ index ebc4093..ee51c27 100644
    width: 72px;
  }
  
-@@ -903,7 +927,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -903,7 +997,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 11px;
    height: 11px;
    border-radius: 50%;
@@ -5065,7 +6063,7 @@ index ebc4093..ee51c27 100644
  }
  
  .seg {
-@@ -923,7 +947,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -923,7 +1017,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .seg button.on {
@@ -5074,7 +6072,7 @@ index ebc4093..ee51c27 100644
    color: var(--ink);
  }
  
-@@ -963,10 +987,10 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -963,10 +1057,10 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 6px;
    padding: 4px 10px;
    border-radius: 999px;
@@ -5087,7 +6085,7 @@ index ebc4093..ee51c27 100644
    transform: scale(1.06);
    transition: border-color 0.3s ease-out 0.45s, transform 0.3s ease-out 0.45s;
  }
-@@ -1005,7 +1029,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1005,7 +1099,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .bubble {
@@ -5096,7 +6094,7 @@ index ebc4093..ee51c27 100644
    border-radius: 12px;
    padding: 6px 10px;
    font: 400 12.5px var(--font);
-@@ -1016,7 +1040,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1016,7 +1110,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .reply {
    font: 400 12.5px var(--font);
@@ -5105,7 +6103,7 @@ index ebc4093..ee51c27 100644
    white-space: pre-wrap;
    padding-right: 8px;
    user-select: text;
-@@ -1031,7 +1055,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1031,7 +1125,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .md-p {
    font: 400 12.5px var(--font);
@@ -5114,7 +6112,7 @@ index ebc4093..ee51c27 100644
    white-space: pre-wrap;
    overflow-wrap: anywhere;
  }
-@@ -1048,16 +1072,16 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1048,16 +1142,16 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .reply strong {
@@ -5134,7 +6132,7 @@ index ebc4093..ee51c27 100644
  }
  
  .md-link {
-@@ -1071,16 +1095,16 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1071,16 +1165,16 @@ input[type="range"]::-webkit-slider-thumb {
    align-items: flex-start;
    gap: 8px;
    padding: 10px;
@@ -5154,7 +6152,7 @@ index ebc4093..ee51c27 100644
    white-space: pre-wrap;
    overflow-wrap: anywhere;
  }
-@@ -1094,7 +1118,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1094,7 +1188,7 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 0;
    border: 0;
    border-radius: 4px;
@@ -5163,7 +6161,7 @@ index ebc4093..ee51c27 100644
    color: var(--dim-3);
    cursor: default;
  }
-@@ -1133,13 +1157,13 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1133,13 +1227,13 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .md-quote .md-p {
@@ -5179,7 +6177,7 @@ index ebc4093..ee51c27 100644
    opacity: 0.3;
  }
  
-@@ -1186,14 +1210,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1186,14 +1280,14 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 4px 8px;
    border: 0;
    border-radius: 999px;
@@ -5197,7 +6195,7 @@ index ebc4093..ee51c27 100644
  }
  
  .model-btn:disabled {
-@@ -1213,7 +1237,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1213,7 +1307,7 @@ input[type="range"]::-webkit-slider-thumb {
    text-overflow: ellipsis;
    white-space: nowrap;
    font: 500 10.5px var(--font);
@@ -5206,7 +6204,7 @@ index ebc4093..ee51c27 100644
  }
  
  .picker {
-@@ -1224,8 +1248,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1224,8 +1318,8 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 8px;
    padding: 10px;
    border-radius: 12px;
@@ -5217,7 +6215,7 @@ index ebc4093..ee51c27 100644
  }
  
  .chat-body.picking .picker {
-@@ -1243,25 +1267,25 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1243,25 +1337,25 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 6px;
  }
  
@@ -5250,7 +6248,7 @@ index ebc4093..ee51c27 100644
    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
    background: color-mix(in srgb, var(--accent) 18%, transparent);
  }
-@@ -1275,7 +1299,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1275,7 +1369,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .picker-rule {
    flex: 0 0 1px;
@@ -5259,7 +6257,7 @@ index ebc4093..ee51c27 100644
    opacity: 0.4;
  }
  
-@@ -1298,19 +1322,19 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1298,19 +1392,19 @@ input[type="range"]::-webkit-slider-thumb {
    border: 0;
    border-radius: 6px;
    background: transparent;
@@ -5282,7 +6280,7 @@ index ebc4093..ee51c27 100644
    background: color-mix(in srgb, var(--accent) 10%, transparent);
  }
  
-@@ -1329,7 +1353,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1329,7 +1423,7 @@ input[type="range"]::-webkit-slider-thumb {
    flex-wrap: wrap;
    padding: 4px 0;
    font: 400 11px var(--font);
@@ -5291,7 +6289,7 @@ index ebc4093..ee51c27 100644
  }
  
  .picker-link {
-@@ -1346,7 +1370,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1346,7 +1440,7 @@ input[type="range"]::-webkit-slider-thumb {
    align-items: center;
    gap: 8px;
    padding: 6px 10px;
@@ -5300,7 +6298,7 @@ index ebc4093..ee51c27 100644
    border-radius: 12px;
  }
  
-@@ -1371,8 +1395,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1371,8 +1465,8 @@ input[type="range"]::-webkit-slider-thumb {
    flex: 0 0 28px;
    border: 0;
    border-radius: 50%;
@@ -5311,7 +6309,7 @@ index ebc4093..ee51c27 100644
    display: grid;
    place-items: center;
    cursor: default;
-@@ -1404,12 +1428,12 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1404,12 +1498,12 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .drop-card.over {
@@ -5326,7 +6324,7 @@ index ebc4093..ee51c27 100644
    animation: dash-march 1.1s linear infinite;
  }
  
-@@ -1435,7 +1459,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1435,7 +1529,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .drop-title {
    font: 500 13px var(--font);
@@ -5335,7 +6333,7 @@ index ebc4093..ee51c27 100644
    transition: color 0.2s;
  }
  
-@@ -1452,19 +1476,19 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1452,19 +1546,19 @@ input[type="range"]::-webkit-slider-thumb {
    font: 400 11px var(--font);
    padding: 3px 8px;
    border-radius: 999px;
@@ -5359,7 +6357,7 @@ index ebc4093..ee51c27 100644
      var(--card);
  }
  
-@@ -1477,7 +1501,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1477,7 +1571,7 @@ input[type="range"]::-webkit-slider-thumb {
    justify-content: space-between;
    gap: 8px;
    font: 400 12.5px var(--font);
@@ -5368,7 +6366,7 @@ index ebc4093..ee51c27 100644
  }
  
  .up-name {
-@@ -1504,13 +1528,13 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1504,13 +1598,13 @@ input[type="range"]::-webkit-slider-thumb {
    width: 526px;
    height: 6px;
    border-radius: 3px;
@@ -5384,7 +6382,7 @@ index ebc4093..ee51c27 100644
  }
  
  .up-glow {
-@@ -1520,7 +1544,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1520,7 +1614,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 28px;
    height: 12px;
    border-radius: 50%;
@@ -5393,7 +6391,7 @@ index ebc4093..ee51c27 100644
    filter: blur(5px);
    pointer-events: none;
  }
-@@ -1567,7 +1591,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1567,7 +1661,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-total span {
    font: 500 11px var(--font);
@@ -5402,7 +6400,7 @@ index ebc4093..ee51c27 100644
    font-variant-numeric: tabular-nums;
  }
  
-@@ -1623,7 +1647,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1623,7 +1717,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-name {
    font: 500 11px var(--font);
@@ -5411,7 +6409,7 @@ index ebc4093..ee51c27 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -1631,7 +1655,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1631,7 +1725,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .int-row.first .int-name {
@@ -5420,7 +6418,7 @@ index ebc4093..ee51c27 100644
  }
  
  .int-ago {
-@@ -1642,7 +1666,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1642,7 +1736,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-sub {
    font: 400 10px var(--font);
@@ -5429,7 +6427,7 @@ index ebc4093..ee51c27 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -1710,7 +1734,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1710,7 +1804,7 @@ input[type="range"]::-webkit-slider-thumb {
  .int-stat-value {
    margin-left: auto;
    font: 600 12px var(--font);
@@ -5438,7 +6436,7 @@ index ebc4093..ee51c27 100644
    font-variant-numeric: tabular-nums;
  }
  
-@@ -1745,7 +1769,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1745,7 +1839,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .int-page:hover {
@@ -5447,7 +6445,7 @@ index ebc4093..ee51c27 100644
    border-radius: 5px;
  }
  
-@@ -1811,7 +1835,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1811,7 +1905,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-commit {
    font: 400 10.5px var(--font);
@@ -5456,7 +6454,7 @@ index ebc4093..ee51c27 100644
    display: -webkit-box;
    -webkit-line-clamp: 2;
    -webkit-box-orient: vertical;
-@@ -1888,7 +1912,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1888,7 +1982,7 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 4px 8px;
    border: 1px solid color-mix(in srgb, var(--plan) 14%, transparent);
    border-radius: 999px;
@@ -5465,7 +6463,7 @@ index ebc4093..ee51c27 100644
    color: var(--dim-3);
    font: 600 10px var(--font);
    line-height: 12px;
-@@ -1966,7 +1990,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1966,7 +2060,7 @@ input[type="range"]::-webkit-slider-thumb {
    flex: 0 0 50px;
    height: 4px;
    border-radius: 2px;
@@ -5474,7 +6472,7 @@ index ebc4093..ee51c27 100644
    overflow: hidden;
  }
  
-@@ -1981,7 +2005,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1981,7 +2075,7 @@ input[type="range"]::-webkit-slider-thumb {
    text-align: right;
    font-weight: 600;
    font-variant-numeric: tabular-nums;
@@ -5483,7 +6481,7 @@ index ebc4093..ee51c27 100644
  }
  
  .plan-reset-icon {
-@@ -2000,7 +2024,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2000,7 +2094,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .plan-credits {
    font-weight: 600;
@@ -5492,7 +6490,7 @@ index ebc4093..ee51c27 100644
  }
  
  /* ── GitHub pulse (GitHubPulseCardView / GitHubDetailView) ─────────────── */
-@@ -2115,12 +2139,12 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2115,12 +2209,12 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .gh-row:hover {
@@ -5507,7 +6505,7 @@ index ebc4093..ee51c27 100644
  }
  
  .gh-gap {
-@@ -2130,14 +2154,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2130,14 +2224,14 @@ input[type="range"]::-webkit-slider-thumb {
  
  .gh-ref {
    font: 400 10.5px var(--font);
@@ -5524,7 +6522,7 @@ index ebc4093..ee51c27 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -2326,8 +2350,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2326,8 +2420,8 @@ input[type="range"]::-webkit-slider-thumb {
    height: 30px;
    padding: 0;
    border-radius: 7px;
@@ -5535,7 +6533,7 @@ index ebc4093..ee51c27 100644
    display: grid;
    place-items: center;
    cursor: default;
-@@ -2335,11 +2359,11 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2335,11 +2429,11 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .wardrobe-item:hover {
@@ -5549,7 +6547,7 @@ index ebc4093..ee51c27 100644
  }
  
  .wardrobe-item canvas {
-@@ -2364,14 +2388,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2364,14 +2458,14 @@ input[type="range"]::-webkit-slider-thumb {
    max-width: 260px;
    height: 4px;
    border-radius: 999px;
@@ -5566,7 +6564,7 @@ index ebc4093..ee51c27 100644
    transition: width 0.25s linear;
  }
  
-@@ -2535,7 +2559,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2535,7 +2629,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 36px;
    height: 36px;
    border-radius: 6px;
@@ -5575,7 +6573,7 @@ index ebc4093..ee51c27 100644
    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
    display: grid;
    place-items: center;
-@@ -2548,7 +2572,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2548,7 +2642,7 @@ input[type="range"]::-webkit-slider-thumb {
    position: absolute;
    inset: 0;
    border-radius: 6px;
@@ -5584,7 +6582,7 @@ index ebc4093..ee51c27 100644
    pointer-events: none;
  }
  
-@@ -2643,7 +2667,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2643,7 +2737,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .np-track {
    width: 100%;
@@ -5593,7 +6591,7 @@ index ebc4093..ee51c27 100644
  }
  
  .np-bar.active .np-track,
-@@ -3026,3 +3050,52 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -3026,3 +3120,109 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    unicode-bidi: plaintext;
    text-align: start;
  }
@@ -5646,6 +6644,63 @@ index ebc4093..ee51c27 100644
 +.codex-chat .chat-bar, .codex-toolbar, .codex-status { flex-shrink: 0; }
 +.codex-chat .chat-input { min-width: 0; }
 +.codex-chat button:disabled { opacity: .4; cursor: default; }
++
++/* Quota rings show available percentages, from the existing Codex cache. */
++.quota-rings { display: inline-flex; gap: 3px; align-items: center; }
++.quota-ring { --quota: 0%; --quota-color: var(--eva-secondary); display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%; background: radial-gradient(closest-side, var(--eva-panel) 69%, transparent 72%), conic-gradient(var(--quota-color) var(--quota), var(--eva-border) 0); color: var(--eva-text); font: 600 7px var(--font); }
++.quota-rings.stale { outline: 1px dashed var(--eva-secondary); outline-offset: 2px; border-radius: 12px; }
++.quota-group { color: var(--eva-secondary); font: 600 10px var(--font); }
++.quota-row { flex-wrap: wrap; }
++.quota-row .plan-label { flex-basis: auto; min-width: 40px; }
++.quota-value { color: var(--eva-text); }
++.plan-card { max-height: 100%; overflow-y: auto; }
++#compact-quota { position: absolute; right: 65px; top: 5px; padding: 2px; border: 0; background: transparent; cursor: pointer; }
++#compact-quota:focus-visible, .plan-pill:focus-visible { outline: 2px solid var(--eva-accent); outline-offset: 2px; }
++#island.has-quota #island-clock:not(.music-clock) { right: 114px; }
++#island.has-quota #compact-agent-status { width: 110px; }
++
++/* Compact notices borrow the music slot, leaving a permanent clock at right. */
++#compact-notice { display: none; position: absolute; top: 3px; left: 62px; right: 16px; height: 26px; padding: 1px 4px; border: 1px solid var(--eva-border); border-radius: 5px; background: var(--eva-panel); color: var(--eva-text); flex-direction: column; justify-content: center; text-align: left; cursor: pointer; overflow: hidden; }
++#compact-notice.with-clock { right: 112px; }
++#compact-notice span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.compact-notice-name { font-size: 9px; line-height: 11px; }
++.compact-notice-status { font-size: 8px; line-height: 10px; color: var(--eva-accent); }
++#compact-notice[data-state="approval"] .compact-notice-status, #compact-notice[data-state="question"] .compact-notice-status, #compact-notice[data-state="ratelimit"] .compact-notice-status { color: #ffa34d; }
++#compact-notice[data-state="error"] .compact-notice-status { color: #ff647c; }
++#compact-notice:focus-visible { outline: 2px solid var(--eva-accent); outline-offset: 1px; }
++#island.has-notice #island-clock:not(.music-clock) { left: auto; right: 8px; width: 92px; padding-left: 20px; }
++#island.has-notice #island-clock::before { left: 0; width: 18px; height: 18px; }
++
++.history-toggle { margin-left: auto; background: var(--eva-card); color: var(--eva-accent); border: 1px solid var(--eva-border); border-radius: 4px; font-size: 9px; cursor: pointer; }
++.history-toggle:focus-visible { outline: 2px solid var(--eva-accent); }
++.task-history { min-height: 0; overflow: auto; }
++
++.card-body > .task-history { margin: 6px 12px 0 108px; max-height: 108px; }
++.card-body > .task-history .int-rows { max-height: 82px !important; }
++.history-toggle { flex-shrink: 0; display: inline-flex; align-items: center; padding: 2px; }
++
++
++/* Agent constellation: fixed slots preserve the node under the pointer on refresh. */
++.agent-room { overflow-y: auto; }
++.agent-constellation { position: relative; display: block; flex: 1 0 216px; min-height: 216px; overflow: hidden; padding: 0; background: radial-gradient(circle, var(--eva-border) 1px, transparent 1px) 0 0 / 24px 24px; }
++.agent-constellation[hidden], .agent-overflow-toggle[hidden], .agent-overflow-list[hidden] { display: none; }
++.constellation-edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
++.constellation-edges line { stroke: var(--eva-border); stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
++.agent-node.agent-desk { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 0 8px; align-items: center; padding: 8px; border-radius: 8px; background: var(--eva-card); text-align: left; }
++.constellation-node { position: absolute; left: var(--node-x); top: var(--node-y); transform: translate(-50%, -50%); width: 26%; max-width: 180px; }
++.agent-node-point { grid-column: 1; grid-row: 1 / span 3; width: 12px; height: 12px; border: 2px solid var(--agent-color, var(--eva-accent)); border-radius: 50%; background: var(--eva-panel); }
++.agent-node-name, .agent-node-status, .agent-node-activity { grid-column: 2; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 16px; }
++.agent-node-name { font-size: 11px; font-weight: 650; color: var(--eva-text); }
++.agent-node-status, .agent-node-activity { font-size: 10px; color: var(--eva-secondary); }
++.agent-node[data-state='working'] .agent-node-status, .agent-node[data-state='finished'] .agent-node-status { color: var(--eva-accent); }
++.agent-node[data-state='approval'] .agent-node-status, .agent-node[data-state='question'] .agent-node-status, .agent-node[data-state='ratelimit'] .agent-node-status { color: var(--eva-attention); }
++.agent-node[data-state='error'] .agent-node-status { color: var(--eva-error); }
++.agent-node.selected .agent-node-point { background: var(--agent-color, var(--eva-accent)); }
++.agent-overflow-toggle { align-self: flex-end; padding: 4px 12px; border: 1px solid var(--eva-border); border-radius: 4px; background: var(--eva-card); color: var(--eva-accent); cursor: pointer; font: 600 11px var(--font); }
++.agent-overflow-toggle:focus-visible { outline: 2px solid var(--eva-accent); outline-offset: 2px; }
++.agent-overflow-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 112px; overflow-y: auto; flex-shrink: 0; }
++.agent-overflow-item { width: 100%; }
++@media (max-width: 650px) { .agent-node.agent-desk { gap: 0 4px; padding: 4px; } .agent-node-name { font-size: 10px; } .agent-node-status, .agent-node-activity { font-size: 9px; } }
 diff --git a/windows/src/theme.css b/windows/src/theme.css
 new file mode 100644
 index 0000000..91a8088
@@ -5714,91 +6769,153 @@ index 0000000..91a8088
 +}
 diff --git a/windows/src/views/agent-room.ts b/windows/src/views/agent-room.ts
 new file mode 100644
-index 0000000..fef268a
+index 0000000..a058592
 --- /dev/null
 +++ b/windows/src/views/agent-room.ts
-@@ -0,0 +1,84 @@
-+import { h } from "./dom";
+@@ -0,0 +1,146 @@
++import { h, clear } from "./dom";
 +import { CodexFlow } from "../core/codex-flow";
-+import { State } from "../core/state";
++import { State, type AgentTask } from "../core/state";
 +import { roomAgents, agentStatus } from "../core/agent-room";
-+import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
 +import { t, tl } from "../i18n/i18n";
 +import type { ViewActions, ViewHost } from "./views";
 +
-+/** A visual home for existing hook-driven agents, without a second state model. */
++export const ROOM_NODE_LIMIT = 6;
++const SLOTS = [[50, 16], [82, 34], [82, 72], [50, 84], [18, 72], [18, 34]];
++let selectedAgentId: string | null = null;
++
++/** UI selection for notices targeting a flow child, which is not a configured pill. */
++export function selectRoomAgent(id: string): boolean {
++  if (!roomAgents(State.tasks).some(task => task.id === id)) return false;
++  selectedAgentId = id;
++  State.notify();
++  return true;
++}
++
++function statusFor(task: AgentTask): string {
++  const seen = Date.parse(task.flow?.lastSeen ?? "");
++  const stale = task.flow?.status === "working" && Number.isFinite(seen) && Date.now() - seen > 90_000;
++  const alert = ["question", "approval", "ratelimit", "error"].includes(task.state)
++    && !(task.flow?.status === "interrupted" && task.state === "error");
++  return alert ? agentStatus(task.state) : stale ? "◌ Sin actividad reciente"
++    : task.flow?.status === "unknown" ? "○ Estado no registrado"
++    : task.flow?.status === "interrupted" ? "Ⅱ Interrumpido" : agentStatus(task.state);
++}
++
++/** Real room agents, stable slots and confirmed relationships; no simulation or polling. */
 +export function buildAgentRoom(actions: Pick<ViewActions, "setFocus" | "setView" | "blip">): ViewHost {
 +  const count = h("span", { class: "room-count" });
-+  const grid = h("div", { class: "agent-room-grid" });
++  const edges = document.createElementNS("http://www.w3.org/2000/svg", "svg");
++  edges.setAttribute("class", "constellation-edges");
++  edges.setAttribute("viewBox", "0 0 100 100");
++  edges.setAttribute("preserveAspectRatio", "none");
++  edges.setAttribute("aria-hidden", "true");
++  const grid = h("div", { class: "agent-room-grid agent-constellation", role: "group", "aria-label": tl("Agents") }, edges);
 +  const empty = h("div", { class: "room-empty", text: tl("Connect an agent in Settings to see its activity here.") });
 +  const detail = h("div", { class: "room-detail" });
 +  const caption = h("div", { class: "room-caption" });
-+  let selected: string | null = null;
++  const overflow = h("div", { class: "agent-overflow-list", id: "agent-room-more", role: "group", "aria-label": tl("More agents") });
++  overflow.hidden = true;
++  const more = h("button", { class: "agent-overflow-toggle", type: "button", "aria-controls": "agent-room-more", "aria-expanded": "false" });
++  function closeOverflow() { overflow.hidden = true; more.setAttribute("aria-expanded", "false"); }
++  more.addEventListener("click", () => {
++    overflow.hidden = !overflow.hidden;
++    more.setAttribute("aria-expanded", String(!overflow.hidden));
++  });
++  overflow.addEventListener("keydown", event => {
++    if (event.key !== "Escape") return;
++    event.preventDefault(); event.stopPropagation(); closeOverflow(); more.focus();
++  });
 +  const el = h("div", { class: "view agent-room" },
-+    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty, detail, caption);
-+  let key = "";
-+  let desks: { id: string; button: HTMLElement; name: HTMLElement; status: HTMLElement; step: HTMLElement }[] = [];
-+  function clear() {
-+    grid.replaceChildren(); desks = []; key = ""; pruneMiniBots();
++    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty, more, overflow, detail, caption);
++  const nodes = new Map<string, { button: HTMLElement; name: HTMLElement; status: HTMLElement; step: HTMLElement }>();
++  const slots: (string | null)[] = Array(ROOM_NODE_LIMIT).fill(null);
++
++  function activate(id: string) {
++    const current = roomAgents(State.tasks).find(task => task.id === id);
++    if (!current) return;
++    actions.blip();
++    const request = State.pendingApproval;
++    if (request?.pillId === id) {
++      actions.setFocus(id); actions.setView(request.questions ? "question" : "approval");
++    } else if (current.flow) selectRoomAgent(id);
++    else { actions.setFocus(id); actions.setView("overview"); }
 +  }
-+  // No extra canvases keep running after leaving the room or folding the notch.
-+  State.subscribe(() => { if (State.view !== "agents" || State.mode !== "expanded") clear(); });
++
 +  return { el, sync() {
-+    if (State.mode !== "expanded" || State.view !== "agents") { clear(); return; }
-+    const tasks = roomAgents(State.tasks);
-+    const next = JSON.stringify(tasks.map(task => task.id));
-+    if (key !== next) {
-+      grid.replaceChildren(); desks = []; key = next;
-+      for (const task of tasks) {
-+        const name = h("span", { class: "desk-name" });
-+        const status = h("span", { class: "desk-status" });
-+        const step = h("span", { class: "desk-step" });
-+        const button = h("button", { class: "agent-desk", onclick: () => {
-+          actions.blip();
-+          const current = roomAgents(State.tasks).find(item => item.id === task.id);
-+          if (!current) return;
-+          const request = State.pendingApproval;
-+          if (request?.pillId === task.id) {
-+            actions.setFocus(task.id);
-+            actions.setView(request.questions ? "question" : "approval");
-+            return;
-+          }
-+          if (current.flow) { selected = task.id; State.notify(); return; }
-+          actions.setFocus(task.id);
-+          actions.setView("overview");
-+        } }, h("span", { class: "desk-scene", "aria-hidden": "true" },
-+          h("span", { class: "desk-monitor" }), h("span", { class: "desk-surface" }),
-+          h("span", { class: "desk-worker" }, createMiniBot(task, 38))), name, status, step);
-+        grid.append(button); desks.push({ id: task.id, button, name, status, step });
-+      }
-+      pruneMiniBots();
++    const shown = State.mode === "expanded" && State.view === "agents";
++    const tasks = new Map((shown ? roomAgents(State.tasks) : []).map(task => [task.id, task]));
++    // Keep both DOM identity and the occupied slot when a snapshot is reordered.
++    for (const [id, node] of nodes) if (!tasks.has(id)) {
++      node.button.remove(); nodes.delete(id);
++      const slot = slots.indexOf(id); if (slot !== -1) slots[slot] = null;
 +    }
-+    const flow = tasks.some(task => task.flow);
-+    const active = tasks.filter(task => task.state === "working").length;
-+    count.textContent = flow ? `${active} activos · ${Math.max(0, tasks.length - 1)} subagentes` : String(tasks.length).padStart(2, "0");
-+    caption.textContent = flow ? `Registros locales de Codex · chat ${CodexFlow.snapshot?.rootId?.slice(0, 8) ?? ""} · actualización cada 2,5 s${CodexFlow.snapshot?.truncated ? " · lectura parcial" : ""}` : CodexFlow.error ? "Monitor de Codex no disponible · actividad de hooks" : t("Live hook activity · Select a desk to see details");
-+    const chosen = tasks.find(task => task.id === selected) ?? tasks[0];
-+    detail.style.display = flow ? "" : "none";
++    for (const id of tasks.keys()) if (!nodes.has(id)) {
++      const name = h("span", { class: "agent-node-name" });
++      const status = h("span", { class: "agent-node-status" });
++      const step = h("span", { class: "agent-node-activity" });
++      const button = h("button", { class: "agent-node agent-desk", type: "button", onclick: () => activate(id) },
++        h("span", { class: "agent-node-point", "aria-hidden": "true" }), name, status, step);
++      button.dataset.agentId = id;
++      nodes.set(id, { button, name, status, step });
++    }
++    for (const id of nodes.keys()) if (!slots.includes(id)) {
++      const slot = slots.indexOf(null); if (slot !== -1) slots[slot] = id;
++    }
++    const all = [...tasks.values()];
++    const chosen = tasks.get(selectedAgentId ?? "") ?? tasks.get(State.focusId ?? "") ?? all[0];
++    selectedAgentId = chosen?.id ?? null;
++    for (const [id, node] of nodes) {
++      const task = tasks.get(id)!;
++      const slot = slots.indexOf(id);
++      const host = slot === -1 ? overflow : grid;
++      if (node.button.parentNode !== host) host.append(node.button);
++      node.button.classList.toggle("constellation-node", slot !== -1);
++      node.button.classList.toggle("agent-overflow-item", slot === -1);
++      if (slot !== -1) {
++        node.button.style.setProperty("--node-x", `${SLOTS[slot][0]}%`);
++        node.button.style.setProperty("--node-y", `${SLOTS[slot][1]}%`);
++      }
++      const status = statusFor(task);
++      const activity = task.flow ? [task.flow.role, task.flow.tool].filter(Boolean).join(" · ") || t("Waiting for activity")
++        : task.finalLine || task.steps.at(-1) || t("Waiting for activity");
++      node.name.textContent = task.name; node.status.textContent = status; node.step.textContent = activity;
++      node.button.dataset.state = task.state;
++      node.button.classList.toggle("selected", id === chosen?.id);
++      node.button.setAttribute("aria-pressed", String(id === chosen?.id));
++      node.button.setAttribute("aria-label", `${task.name}: ${status}. ${activity}`);
++      node.button.title = `${task.name} — ${status}\n${activity}`;
++      node.button.style.setProperty("--agent-color", task.color);
++    }
++
++    clear(edges);
++    for (const child of all) {
++      const parent = child.flow?.parentId ? all.find(task => task.flow?.id === child.flow!.parentId) : undefined;
++      if (!parent || parent.id === child.id) continue;
++      const from = slots.indexOf(parent.id), to = slots.indexOf(child.id);
++      if (from === -1 || to === -1) continue;
++      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
++      for (const [key, value] of Object.entries({ x1: SLOTS[from][0], y1: SLOTS[from][1], x2: SLOTS[to][0], y2: SLOTS[to][1], "data-parent": parent.id, "data-child": child.id })) line.setAttribute(key, String(value));
++      edges.append(line);
++    }
++    const hidden = all.length - slots.filter(id => id !== null).length;
++    more.hidden = hidden === 0;
++    more.textContent = `+${hidden}`;
++    more.setAttribute("aria-label", t("Show {count} more agents", { count: hidden }));
++    if (!hidden || !shown) closeOverflow();
++    grid.hidden = all.length === 0;
++    empty.style.display = all.length ? "none" : "";
++    const flow = all.some(task => task.flow);
++    count.textContent = flow ? `${all.filter(task => task.state === "working").length} activos · ${all.filter(task => task.flow && task.flow.id !== CodexFlow.snapshot?.rootId).length} subagentes` : String(all.length).padStart(2, "0");
++    caption.textContent = !shown ? "" : flow ? `Registros locales de Codex · chat ${CodexFlow.snapshot?.rootId?.slice(0, 8) ?? ""}${CodexFlow.snapshot?.truncated ? " · lectura parcial" : ""}` : CodexFlow.error ? "Monitor de Codex no disponible · actividad de hooks" : t("Live hook activity · Select an agent to see details");
++    detail.style.display = chosen?.flow ? "" : "none";
++    detail.textContent = "";
 +    if (chosen?.flow) {
 +      const meta = chosen.flow;
-+      const parent = tasks.find(task => task.flow?.id === meta.parentId);
++      const parent = all.find(task => task.id !== chosen.id && task.flow?.id === meta.parentId);
 +      const seen = meta.lastSeen ? new Date(meta.lastSeen) : null;
 +      const stamp = seen && Number.isFinite(seen.getTime()) ? seen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "sin fecha";
-+      detail.textContent = `${chosen.name} · ${meta.role || "agente principal"} · ${meta.model || "modelo no registrado"}${meta.effort ? ` / ${meta.effort}` : ""}\n${parent ? `Depende de ${parent.name} · ` : "Coordina el flujo · "}${meta.tool ? `Última herramienta: ${meta.tool} · ` : ""}Último registro: ${stamp}`;
-+    }
-+    empty.style.display = tasks.length ? "none" : "";
-+    for (let i = 0; i < tasks.length; i++) {
-+      const task = tasks[i], desk = desks[i];
-+      const stale = task.flow?.status === "working" && (!task.flow.lastSeen || Date.now() - Date.parse(task.flow.lastSeen) > 90_000);
-+      const alert = ["question", "approval", "ratelimit", "error"].includes(task.state) && task.state !== (task.flow?.status === "interrupted" ? "error" : "");
-+      const status = alert ? agentStatus(task.state) : stale ? "◌ Sin actividad reciente" : task.flow?.status === "unknown" ? "○ Estado no registrado" : task.flow?.status === "interrupted" ? "Ⅱ Interrumpido" : agentStatus(task.state);
-+      const activity = task.flow ? [task.flow.role || (task.flow.parentId ? "subagente" : "coordinador"), task.flow.tool].filter(Boolean).join(" · ") : task.finalLine || task.steps.at(-1) || t("Waiting for activity");
-+      desk.name.textContent = task.name; desk.status.textContent = status; desk.step.textContent = activity;
-+      desk.button.dataset.state = task.state;
-+      desk.button.classList.toggle("selected", task.id === (flow ? chosen?.id : State.focusId));
-+      desk.button.setAttribute("aria-label", `${task.name}: ${status}. ${activity}`);
-+      desk.button.title = `${task.name} — ${status}\n${activity}`;
-+      desk.button.style.setProperty("--agent-color", task.color);
++      detail.textContent = `${chosen.name}${meta.role ? ` · ${meta.role}` : ""} · ${meta.model || "modelo no registrado"}${meta.effort ? ` / ${meta.effort}` : ""}\n${parent ? `Depende de ${parent.name} · ` : ""}${meta.tool ? `Última herramienta: ${meta.tool} · ` : ""}Último registro: ${stamp}`;
 +    }
 +  } };
 +}
@@ -6222,10 +7339,63 @@ index 4932b60..d64906a 100644
    }
    if (task.id === "integration_gitlab") {
 diff --git a/windows/src/views/spotify.ts b/windows/src/views/spotify.ts
-index 27fc2e5..9eaa3bf 100644
+index 27fc2e5..ad093f2 100644
 --- a/windows/src/views/spotify.ts
 +++ b/windows/src/views/spotify.ts
-@@ -127,7 +127,7 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
+@@ -12,7 +12,7 @@ import { ICONS } from "./icons";
+ import { Bridge } from "../core/bridge";
+ import { State, type AgentTask } from "../core/state";
+ import {
+-  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, currentArtwork, formatTime, isAd, spotifyPosition, volumeLevel, withPlaying,
++  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, currentArtwork, formatTime, isAd, spotifyPosition, spotifyCanControl, spotifyHasProgress, volumeLevel, withPlaying,
+   type SpotifyTrack,
+ } from "../core/spotify";
+ import { createMiniBot } from "../mochi/minibots";
+@@ -31,7 +31,7 @@ function lighter(hex: string, amount: number): string {
+ /** Play/pause, at once on the page, then in Spotify (SpotifyController.playPause). */
+ export function togglePlay() {
+   const s = Spotify.state;
+-  if (!s.running) return;
++  if (!spotifyCanControl(s, "playPause")) return;
+   Spotify.state = withPlaying(s, !s.playing, Date.now());
+   State.notify();
+   void Bridge.spotifyControl("playPause");
+@@ -40,13 +40,24 @@ export function togglePlay() {
+ function seek(seconds: number) {
+   const s = Spotify.state;
+   const track = s.track;
+-  if (!s.running || !track || isAd(track)) return;
++  if (!track || !Number.isFinite(seconds) || !spotifyCanControl(s, "seek")) return;
+   const target = Math.min(Math.max(0, seconds), Math.max(0, track.duration - 1));
+   Spotify.state = { ...s, position: target, positionAt: Date.now() };
+   State.notify();
+   void Bridge.spotifyControl("seek", target);
+ }
+ 
++function skip(action: "next" | "previous") {
++  if (spotifyCanControl(Spotify.state, action)) void Bridge.spotifyControl(action);
++}
++
++function enableButton(button: HTMLElement, enabled: boolean) {
++  if (enabled) button.removeAttribute("disabled");
++  else button.setAttribute("disabled", "");
++  button.style.opacity = enabled ? "" : "0.35";
++  button.style.cursor = enabled ? "" : "default";
++}
++
+ function setFlag(which: "shuffle" | "repeat", on: boolean) {
+   if (!Spotify.state.running) return;
+   Spotify.state = { ...Spotify.state, [which]: on };
+@@ -117,7 +128,7 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
+   const mini = createMiniBot(task, 24, () => State.spotifyPlaying);
+   const label = h("span", { class: "lbl", text: task.name });
+   const playBtn = pillButton(color, ICONS.play, togglePlay);
+-  const nextBtn = pillButton(color, ICONS.forward, () => void Bridge.spotifyControl("next"));
++  const nextBtn = pillButton(color, ICONS.forward, () => skip("next"));
+   const controls = h("div", { class: "np-pill-controls" }, playBtn, nextBtn);
+   const pill = h("div", { class: "pill np-pill", onclick: onTap }, mini, label, controls);
+   pill.style.borderColor = `${color}24`;
+@@ -127,7 +138,7 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
    const sync = () => {
      const s = Spotify.state;
      const current = State.tasks.find((x) => x.id === task.id);
@@ -6234,7 +7404,44 @@ index 27fc2e5..9eaa3bf 100644
      if (label.textContent !== name) label.textContent = name;
      const show = hovered && s.track != null;
      pill.classList.toggle("controls", show);
-@@ -313,8 +313,9 @@ export function buildSpotifyCard(): SpotifyCardHost {
+@@ -138,6 +149,8 @@ export function buildSpotifyPill(task: AgentTask, onTap: () => void): SpotifyPil
+     }
+     playBtn.title = s.playing ? t("Pause") : t("Play");
+     nextBtn.title = t("Next");
++    enableButton(playBtn, spotifyCanControl(s, "playPause"));
++    enableButton(nextBtn, spotifyCanControl(s, "next"));
+   };
+ 
+   pill.addEventListener("mouseenter", () => {
+@@ -173,7 +186,15 @@ class NowPlayingBar {
+   private hovering = false;
+   private dragging = false;
+   private fraction = 0;
+-  enabled = true;
++  private _enabled = true;
++  get enabled(): boolean { return this._enabled; }
++  set enabled(value: boolean) {
++    this._enabled = value;
++    if (!value) this.dragging = false;
++    this.el.setAttribute("aria-disabled", String(!value));
++    this.el.style.cursor = value ? "" : "default";
++    this.paint();
++  }
+   private onChange: (f: number) => void;
+   private onCommit: (f: number) => void;
+ 
+@@ -288,8 +309,8 @@ export function buildSpotifyCard(): SpotifyCardHost {
+   const progressRow = h("div", { class: "np-progress" }, elapsed, progress.el, remaining);
+ 
+   const shuffle = iconButton(ICONS.shuffle, 10, 2.2, () => setFlag("shuffle", !Spotify.state.shuffle));
+-  const prev = iconButton(ICONS.backward, 11, 0, () => void Bridge.spotifyControl("previous"));
+-  const next = iconButton(ICONS.forward, 11, 0, () => void Bridge.spotifyControl("next"));
++  const prev = iconButton(ICONS.backward, 11, 0, () => skip("previous"));
++  const next = iconButton(ICONS.forward, 11, 0, () => skip("next"));
+   const repeat = iconButton(ICONS.repeat, 10, 2.2, () => setFlag("repeat", !Spotify.state.repeat));
+   prev.style.color = "#C5C8CD";
+   next.style.color = "#C5C8CD";
+@@ -313,8 +334,9 @@ export function buildSpotifyCard(): SpotifyCardHost {
    const idleAction = h("button", { class: "link-btn", style: `color:${green}d9` });
    idleAction.addEventListener("click", () => void Bridge.spotifyOpen());
    const idleSub = h("span");
@@ -6245,7 +7452,21 @@ index 27fc2e5..9eaa3bf 100644
      h("div", { class: "int-status" }, idleDot, idleText),
      h("div", { class: "int-actions" }, idleAction),
    );
-@@ -366,7 +367,10 @@ export function buildSpotifyCard(): SpotifyCardHost {
+@@ -338,11 +360,11 @@ export function buildSpotifyCard(): SpotifyCardHost {
+ 
+   /** The position runs on its own clock, twice a second, only while it plays on screen. */
+   function syncTimer() {
+-    const run = Spotify.state.playing && showing === "playing" && el.isConnected &&
++    const run = spotifyHasProgress(Spotify.state) && Spotify.state.playing && showing === "playing" && el.isConnected &&
+       State.mode === "expanded" && State.view === "overview";
+     if (run && timer == null) {
+       timer = window.setInterval(() => {
+-        if (!(Spotify.state.playing && el.isConnected && State.mode === "expanded" && State.view === "overview")) {
++        if (!(spotifyHasProgress(Spotify.state) && Spotify.state.playing && el.isConnected && State.mode === "expanded" && State.view === "overview")) {
+           if (timer != null) window.clearInterval(timer);
+           timer = null;
+           return;
+@@ -366,7 +388,10 @@ export function buildSpotifyCard(): SpotifyCardHost {
      } else if (isAd(track)) {
        title.textContent = t("Advertisement");
      }
@@ -6257,7 +7478,30 @@ index 27fc2e5..9eaa3bf 100644
      const cover = currentArtwork(s);
      if (cover) {
        if (artImg.getAttribute("src") !== cover) artImg.setAttribute("src", cover);
-@@ -406,9 +410,13 @@ export function buildSpotifyCard(): SpotifyCardHost {
+@@ -376,8 +401,10 @@ export function buildSpotifyCard(): SpotifyCardHost {
+       artImg.removeAttribute("src");
+     }
+ 
+-    progress.enabled = !isAd(track) && track.duration > 0;
+-    paintProgress();
++    progress.enabled = spotifyCanControl(s, "seek");
++    if (!progress.enabled) dragFraction = null;
++    progressRow.style.display = spotifyHasProgress(s) ? "" : "none";
++    if (spotifyHasProgress(s)) paintProgress();
+ 
+     shuffle.style.color = s.shuffle ? green : "#6B7079";
+     shuffle.title = s.shuffle ? t("Shuffle on") : t("Shuffle off");
+@@ -385,6 +412,9 @@ export function buildSpotifyCard(): SpotifyCardHost {
+     repeat.title = s.repeat ? t("Repeat on") : t("Repeat off");
+     prev.title = t("Previous");
+     next.title = t("Next");
++    enableButton(prev, spotifyCanControl(s, "previous"));
++    enableButton(next, spotifyCanControl(s, "next"));
++    enableButton(play, spotifyCanControl(s, "playPause"));
+     if (playIcon !== s.playing) {
+       playIcon = s.playing;
+       clear(play);
+@@ -406,9 +436,13 @@ export function buildSpotifyCard(): SpotifyCardHost {
  
    function syncIdle() {
      const installed = Spotify.state.installed || Spotify.state.running;
@@ -6272,6 +7516,63 @@ index 27fc2e5..9eaa3bf 100644
      idleSub.textContent = t(pillDefinition(SPOTIFY_ID)?.subtitle ?? N_("Integration"));
    }
  
+diff --git a/windows/src/views/task-history.ts b/windows/src/views/task-history.ts
+new file mode 100644
+index 0000000..f5aeb0b
+--- /dev/null
++++ b/windows/src/views/task-history.ts
+@@ -0,0 +1,51 @@
++import type { TaskHistoryEvent, TaskHistoryKind } from "../core/task-history";
++import { language, tl, N_ } from "../i18n/i18n";
++import { h, clear, svg } from "./dom";
++import { ICONS } from "./icons";
++
++const LABELS: Record<TaskHistoryKind, string> = {
++  tool_started: N_("Tool started"),
++  tool_finished: N_("Tool finished"),
++  permission_requested: N_("Permission requested"),
++  turn_finished: N_("Turn finished"),
++  turn_failed: N_("Turn failed"),
++  turn_cancelled: N_("Turn cancelled"),
++};
++const GLYPHS: Record<TaskHistoryKind, string> = {
++  tool_started: ICONS.play,
++  tool_finished: ICONS.doc,
++  permission_requested: ICONS.bang,
++  turn_finished: ICONS.bubble,
++  turn_failed: ICONS.octagonX,
++  turn_cancelled: ICONS.xmark,
++};
++
++/** Passive view: its owner selects the task and calls sync from the existing update path. */
++export function buildTaskHistory() {
++  const rows = h("ol", {
++    class: "int-rows", role: "list",
++    style: "list-style:none;margin:0;padding:5px 0 0;max-height:180px;overflow:auto",
++  });
++  const empty = h("p", { class: "int-empty", text: tl("Waiting for activity") });
++  const el = h("section", { class: "task-history", "aria-label": tl("History") },
++    h("div", { class: "int-head" }, h("b", { text: tl("History") })), rows, empty);
++
++  function sync(events: readonly TaskHistoryEvent[]) {
++    clear(rows);
++    empty.style.display = events.length ? "none" : "";
++    for (const event of events) {
++      const row = h("li", { class: "int-row" },
++        svg(GLYPHS[event.kind], 12, { evenOdd: event.kind === "turn_failed" }),
++        h("span", { class: "int-name", text: tl(LABELS[event.kind]) }));
++      if (event.timestamp !== undefined) {
++        const date = new Date(event.timestamp);
++        if (Number.isFinite(date.getTime())) row.append(h("time", {
++          class: "int-ago", datetime: date.toISOString(), title: date.toLocaleString(language()),
++          text: date.toLocaleTimeString(language(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
++        }));
++      }
++      rows.append(row);
++    }
++  }
++  return { el, sync };
++}
 diff --git a/windows/src/views/update.ts b/windows/src/views/update.ts
 index e851100..3bcc407 100644
 --- a/windows/src/views/update.ts
@@ -6285,11 +7586,137 @@ index e851100..3bcc407 100644
          buttons("ask", () => [
            btn(t("Yes, tell me"), "primary", () => Updates.answer(true)),
            btn(t("No thanks"), "secondary", () => Updates.answer(false)),
+diff --git a/windows/src/views/usage.ts b/windows/src/views/usage.ts
+index 9abc2e0..39656e8 100644
+--- a/windows/src/views/usage.ts
++++ b/windows/src/views/usage.ts
+@@ -12,13 +12,13 @@
+ import { Bridge } from "../core/bridge";
+ import {
+   PLAN_TEXT, claudeSubtitle, codexIsStale, codexResetsLabel, codexSubtitle, dominantPct,
+-  effectivePct, parseCodexPlan, pillLabel, planColor, resetLabel,
++  ageLabel, quotaAvailable, quotaWindowLabel, effectivePct, parseCodexPlan, pillLabel, planColor, resetLabel,
+   type CodexPlanUsage, type PlanUsage, type PlanWindow,
+ } from "../core/plan";
+ import { State } from "../core/state";
+ import { clear, dot, h, svg } from "./dom";
+ import { ICONS } from "./icons";
+-import { language, tl } from "../i18n/i18n";
++import { language, t, tl } from "../i18n/i18n";
+ 
+ /** The Claude pill is in the header: overview, turned on, relay in. */
+ export function claudePillVisible(): boolean {
+@@ -105,6 +105,35 @@ export function refreshCodexPlanUsage(): void {
+     });
+ }
+ 
++/** Same cached Codex windows in the header and compact island. No polling here. */
++export function buildQuotaRings() {
++  const el = h("span", { class: "quota-rings", role: "img" });
++  const rings = [0, 1].map(() => h("span", { class: "quota-ring", "aria-hidden": "true" }));
++  el.append(...rings);
++  return {
++    el,
++    sync(now = Date.now()) {
++      const usage = State.codexPlanUsage;
++      const group = usage?.quotaGroups?.[0];
++      const labels: string[] = [];
++      for (let i = 0; i < rings.length; i++) {
++        const w = group?.windows[i];
++        const pct = quotaAvailable(w, now);
++        rings[i].style.setProperty("--quota", `${pct ?? 0}%`);
++        rings[i].style.setProperty("--quota-color", pct == null ? "var(--eva-secondary)" : planColor(100 - pct));
++        rings[i].textContent = pct == null ? "?" : String(Math.round(pct));
++        labels.push(`${quotaWindowLabel(w)}: ${pct == null ? t("No data") : t("{n}% available", { n: Math.round(pct) })}`);
++      }
++      const stale = codexIsStale(usage, now);
++      el.classList.toggle("stale", stale);
++      const description = `${group?.label ?? "Codex"} · ${labels.join(" · ")}` +
++        (usage ? ` · ${ageLabel(usage.updatedAt, now)}` : "") + (stale ? ` · ${t("Update pending")}` : "");
++      el.setAttribute("aria-label", description);
++      el.title = description;
++    },
++  };
++}
++
+ // ── Pill ──────────────────────────────────────────────────────────────────────
+ 
+ export interface PlanPill {
+@@ -116,6 +145,7 @@ export interface PlanPill {
+ export function buildPlanPill(codex: boolean): PlanPill {
+   const label = h("span", { class: "plan-pill-label" });
+   const dotEl = h("i", { class: "plan-pill-dot" });
++  const quota = codex ? buildQuotaRings() : null;
+   const isOpen = () => State.showingPlanDetail && State.planDetailIsCodex === codex;
+   const el = h("button", {
+     class: "plan-pill",
+@@ -127,7 +157,7 @@ export function buildPlanPill(codex: boolean): PlanPill {
+       if (codex) refreshCodexPlanUsage();
+       State.notify();
+     },
+-  }, dotEl, label);
++  }, quota?.el ?? dotEl, label);
+   return {
+     el,
+     sync() {
+@@ -135,8 +165,10 @@ export function buildPlanPill(codex: boolean): PlanPill {
+       el.style.setProperty("--plan", color);
+       el.classList.toggle("active", isOpen());
+       dotEl.style.background = color;
++      quota?.sync();
++      if (quota) el.setAttribute("aria-label", quota.el.getAttribute("aria-label") ?? "Codex");
+       label.textContent = codex
+-        ? pillLabel("Codex", State.codexPlanUsage)
++        ? "Codex"
+         : pillLabel("Claude", State.planUsage);
+     },
+   };
+@@ -200,15 +232,25 @@ export class PlanCard {
+ 
+   private drawCodex(u: CodexPlanUsage | null, now: number) {
+     const rows = h("div", { class: "plan-rows" });
+-    // Codex plans without a 5-hour window show the week alone, as on the Mac.
+-    if (u?.fiveHour) rows.append(gaugeRow(PLAN_TEXT.fiveHours, u.fiveHour, false, now));
+-    rows.append(
+-      gaugeRow(PLAN_TEXT.week, u?.sevenDay, true, now),
+-      h("div", { class: "plan-row" },
+-        h("span", { class: "plan-label", text: PLAN_TEXT.resets }),
+-        h("span", { class: "plan-credits", text: codexResetsLabel(u) }),
+-      ),
+-    );
++    for (const group of u?.quotaGroups ?? []) {
++      rows.append(h("div", { class: "quota-group", text: group.label }));
++      for (const w of group.windows) {
++        const pct = quotaAvailable(w, now);
++        const row = h("div", { class: "plan-row quota-row" },
++          h("span", { class: "plan-label", text: quotaWindowLabel(w) }),
++          h("span", { class: "quota-value", text: pct == null ? t("No data") : t("{n}% available", { n: Math.round(pct) }) }),
++        );
++        row.append(h("span", { class: "plan-reset", text: pct == null ? t("Update pending") :
++          `${t("Resets")}: ${new Date(w.resetsAt).toLocaleString(language(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` }));
++        rows.append(row);
++      }
++    }
++    if (!u?.quotaGroups?.length) rows.append(h("div", { class: "plan-none", text: t("No data") }));
++    if (codexIsStale(u, now)) rows.append(h("span", { class: "plan-none", text: t("Update pending") }));
++    rows.append(h("div", { class: "plan-row" },
++      h("span", { class: "plan-label", text: PLAN_TEXT.resets }),
++      h("span", { class: "plan-credits", text: codexResetsLabel(u) }),
++    ));
+     this.el.append(head(codexColor(now), PLAN_TEXT.codexTitle, codexSubtitle(u, now)), rows);
+   }
+ }
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index 491bc9b..b1a5e07 100644
+index 491bc9b..d29f8ae 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
-@@ -19,6 +19,7 @@ import {
+@@ -1,3 +1,5 @@
++import { taskHistory } from "../core/task-history";
++import { buildTaskHistory } from "./task-history";
+ // Island views — DOM ports of IslandViewContent.swift. Paddings, font sizes,
+ // colours and wording are copied from the Swift views so both platforms read
+ // identically.
+@@ -19,6 +21,7 @@ import {
  import { buildDiffCard } from "./diff";
  import { lastTextStep } from "../core/diff";
  import { Bridge } from "../core/bridge";
@@ -6297,7 +7724,7 @@ index 491bc9b..b1a5e07 100644
  import { buildRecap } from "./recap";
  import { buildWardrobe } from "./wardrobe";
  import { buildUpdate } from "./update";
-@@ -66,6 +67,9 @@ export interface ViewActions {
+@@ -66,6 +69,9 @@ export interface ViewActions {
  export interface ViewHost {
    el: HTMLElement;
    sync(): void;
@@ -6307,7 +7734,7 @@ index 491bc9b..b1a5e07 100644
    /** Called when the view becomes active, for views with a text field. */
    focus?(): void;
    /** Called every frame while the view is on screen. True = needs another frame. */
-@@ -116,6 +120,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
+@@ -116,6 +122,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
  
  export function buildHeader(actions: ViewActions): ViewHost {
    const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 13));
@@ -6315,7 +7742,7 @@ index 491bc9b..b1a5e07 100644
    const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
    const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 13));
  
-@@ -135,7 +140,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -135,7 +142,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
    const el = h(
      "div",
      { id: "header" },
@@ -6324,7 +7751,7 @@ index 491bc9b..b1a5e07 100644
      h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
    );
    const headerActions = el.lastElementChild as HTMLElement;
-@@ -145,6 +150,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -145,6 +152,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
      sync() {
        const v = State.view;
        tabHome.classList.toggle("on", v === "overview" || v === "empty");
@@ -6332,7 +7759,40 @@ index 491bc9b..b1a5e07 100644
        tabChat.classList.toggle("on", v === "prompt");
        tabDrop.classList.toggle("on", v === "upload");
        gearBtn.classList.toggle("on", v === "settings");
-@@ -555,6 +561,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+@@ -189,6 +197,11 @@ function buildOverview(actions: ViewActions): ViewHost {
+     activeDiffId = diffId;
+     State.notify();
+   });
++  let showHistory = false;
++  const history = buildTaskHistory();
++  const historyToggle = h("button", { class: "history-toggle", title: tl("History"), "aria-label": tl("History"), "aria-pressed": "false", onclick: () => {
++    showHistory = !showHistory; State.notify();
++  } }, svg(ICONS.doc, 11));
+   const who = h("div", { class: "who" });
+   const tickerBody = h("div", { class: "card-body" }, who, ticker.el);
+   const leftBody = h("div", { class: "left-body" });
+@@ -306,6 +319,7 @@ function buildOverview(actions: ViewActions): ViewHost {
+       const task = State.focusTask;
+       if (task?.id !== lastFocus) {
+         lastFocus = task?.id ?? null;
++        showHistory = false;
+         detailOpen = false;
+         activeDiffId = null;
+         cardKey = "";
+@@ -369,6 +383,12 @@ function buildOverview(actions: ViewActions): ViewHost {
+             text: `${Math.min(task.stepIndex + 1, task.steps.length)}/${task.steps.length}`,
+           }));
+         }
++        if (task.sessionId) who.append(historyToggle);
++        historyToggle.setAttribute("aria-pressed", String(showHistory));
++        ticker.el.style.display = showHistory ? "none" : "";
++        history.el.style.display = showHistory ? "" : "none";
++        if (history.el.parentElement !== tickerBody) tickerBody.append(history.el);
++        if (showHistory && task.sessionId) history.sync(taskHistory.get(`${task.id}:${task.sessionId}`));
+         ticker.sync(task);
+       } else if (task && task.id === SPOTIFY_ID) {
+         // Its own card for every state: playing, idle, not installed.
+@@ -555,6 +575,7 @@ function buildApproval(actions: ViewActions): ViewHost {
        // is the command, the file path or the URL being authorised, not just the
        // name of the tool asking.
        code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
@@ -6340,7 +7800,7 @@ index 491bc9b..b1a5e07 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
-@@ -830,6 +837,7 @@ export function buildViews(
+@@ -830,6 +851,7 @@ export function buildViews(
  ): Map<IslandViewName, ViewHost> {
    const map = new Map<IslandViewName, ViewHost>();
    map.set("overview", buildOverview(actions));
@@ -6349,14 +7809,81 @@ index 491bc9b..b1a5e07 100644
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index 0c338b4..6921c8d 100644
+index 0c338b4..9c5e59a 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -2,7 +2,146 @@
+@@ -2,7 +2,249 @@
    "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 12 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
      {
 -      "version": "0.5.3",
++      "version": "0.5.3-sendoa.6",
++      "items": [
++        {
++          "icon": "sparkles",
++          "title": {
++            "en": "Quotas, notices and agent activity",
++            "zh-Hans": "配额、通知与代理活动",
++            "hi": "कोटा, सूचनाएँ और एजेंट गतिविधि",
++            "es": "Cuotas, avisos y actividad de agentes",
++            "ar": "الحصص والإشعارات ونشاط الوكلاء",
++            "fr": "Quotas, avis et activité des agents",
++            "bn": "কোটা, বিজ্ঞপ্তি ও এজেন্ট কার্যকলাপ",
++            "pt-BR": "Cotas, avisos e atividade dos agentes",
++            "ru": "Квоты, уведомления и активность агентов",
++            "id": "Kuota, notifikasi, dan aktivitas agen",
++            "de": "Kontingente, Hinweise und Agentenaktivität",
++            "tr": "Kotalar, bildirimler ve ajan etkinliği"
++          },
++          "detail": {
++            "en": "Real quota rings, compact notices, session history and an agent constellation.",
++            "zh-Hans": "真实配额环、紧凑通知、会话历史及代理星座图。",
++            "hi": "वास्तविक कोटा रिंग, संक्षिप्त सूचनाएँ, सत्र इतिहास और एजेंट मानचित्र।",
++            "es": "Cuotas reales, avisos compactos, historial de sesión y constelación de agentes.",
++            "ar": "حصص فعلية وإشعارات مصغرة وسجل جلسة وخريطة للوكلاء.",
++            "fr": "Quotas réels, avis compacts, historique de session et constellation des agents.",
++            "bn": "প্রকৃত কোটা, সংক্ষিপ্ত বিজ্ঞপ্তি, সেশনের ইতিহাস ও এজেন্টের মানচিত্র।",
++            "pt-BR": "Cotas reais, avisos compactos, histórico da sessão e constelação de agentes.",
++            "ru": "Реальные квоты, компактные уведомления, история сеанса и созвездие агентов.",
++            "id": "Kuota nyata, notifikasi ringkas, riwayat sesi, dan konstelasi agen.",
++            "de": "Reale Kontingente, kompakte Hinweise, Sitzungsverlauf und Agentenkonstellation.",
++            "tr": "Gerçek kotalar, kısa bildirimler, oturum geçmişi ve ajan haritası."
++          }
++        },
++        {
++          "icon": "clock",
++          "title": {
++            "en": "Music alongside an orbital clock",
++            "zh-Hans": "音乐与轨道时钟",
++            "hi": "संगीत के साथ कक्षीय घड़ी",
++            "es": "Música junto al reloj orbital",
++            "ar": "الموسيقى بجوار الساعة المدارية",
++            "fr": "La musique à côté de l’horloge orbitale",
++            "bn": "সঙ্গীতের পাশে কক্ষীয় ঘড়ি",
++            "pt-BR": "Música junto ao relógio orbital",
++            "ru": "Музыка рядом с орбитальными часами",
++            "id": "Musik di samping jam orbital",
++            "de": "Musik neben der Orbitaluhr",
++            "tr": "Yörünge saatinin yanında müzik"
++          },
++          "detail": {
++            "en": "Clock stays with music; controls follow player capabilities and the decorative wave stops on pause.",
++            "zh-Hans": "音乐播放时保留时钟；控制遵循播放器能力，暂停时装饰波形停止。",
++            "hi": "संगीत के साथ घड़ी; नियंत्रण प्लेयर की क्षमताओं के अनुसार और विराम पर तरंग स्थिर।",
++            "es": "Reloj junto a la música; controles según el reproductor y onda decorativa detenida en pausa.",
++            "ar": "ساعة مع الموسيقى؛ أزرار حسب قدرات المشغل وموجة زخرفية تتوقف عند الإيقاف المؤقت.",
++            "fr": "Horloge avec la musique ; commandes adaptées au lecteur et vague décorative immobile en pause.",
++            "bn": "সঙ্গীতের পাশে ঘড়ি; প্লেয়ারের ক্ষমতা অনুযায়ী নিয়ন্ত্রণ এবং বিরতিতে তরঙ্গ স্থির।",
++            "pt-BR": "Relógio com música; controles conforme o player e onda decorativa parada na pausa.",
++            "ru": "Часы рядом с музыкой; управление по возможностям плеера, волна замирает на паузе.",
++            "id": "Jam bersama musik; kontrol sesuai kemampuan pemutar dan gelombang dekoratif berhenti saat jeda.",
++            "de": "Uhr neben Musik; Steuerung passend zum Player, dekorative Welle stoppt bei Pause.",
++            "tr": "Müzikle saat; oynatıcıya uygun kontroller ve duraklatmada duran dekoratif dalga."
++          }
++        }
++      ]
++    },
++    {
 +      "version": "0.5.3-sendoa.5",
 +      "items": [
 +        {
@@ -6388,6 +7915,42 @@ index 0c338b4..6921c8d 100644
 +            "hi": "अलग-अलग स्केल वाली स्क्रीन के बीच जाने पर आइलैंड और एजेंट रूम अपना आकार बनाए रखते हैं।",
 +            "bn": "ভিন্ন স্কেলের পর্দার মধ্যে বদলালে আইল্যান্ড ও এজেন্ট রুম তাদের আকার ধরে রাখে।",
 +            "ar": "تحافظ الجزيرة وغرفة الوكلاء على حجمهما عند الانتقال بين شاشات بمقاييس مختلفة."
++          }
++        }
++      ]
++    },
++    {
++      "version": "0.5.3-sendoa.4",
++      "items": [
++        {
++          "icon": "sparkles",
++          "title": {
++            "en": "A live border for agent activity",
++            "zh-Hans": "智能体活动动态边框",
++            "hi": "एजेंट गतिविधि का जीवंत बॉर्डर",
++            "es": "Borde vivo para la actividad de agentes",
++            "ar": "إطار حي لنشاط الوكلاء",
++            "fr": "Un contour vivant pour les agents",
++            "bn": "এজেন্টের কাজের জীবন্ত বর্ডার",
++            "pt-BR": "Borda viva para a atividade dos agentes",
++            "ru": "Живая рамка активности агентов",
++            "id": "Bingkai hidup untuk aktivitas agen",
++            "de": "Lebendiger Rand für Agentenaktivität",
++            "tr": "Ajan etkinliği için canlı kenarlık"
++          },
++          "detail": {
++            "en": "Green breathes while agents work; amber marks requests and red marks errors. Reduced motion keeps it still.",
++            "zh-Hans": "工作时绿色轻轻呼吸；请求为琥珀色，错误为红色。减少动态效果时保持静止。",
++            "hi": "काम के समय हरा बॉर्डर धीरे धड़कता है; अनुरोध अंबर और त्रुटियाँ लाल हैं। कम गति में स्थिर रहता है।",
++            "es": "Verde con respiración al trabajar; ámbar para solicitudes y rojo para errores. Con movimiento reducido queda estático.",
++            "ar": "يتنفس الأخضر أثناء العمل؛ الكهرماني للطلبات والأحمر للأخطاء. يبقى ثابتًا عند تقليل الحركة.",
++            "fr": "Le vert respire pendant le travail ; ambre pour les demandes, rouge pour les erreurs. Le mouvement réduit le fige.",
++            "bn": "কাজের সময় সবুজ বর্ডার ধীরে স্পন্দিত হয়; অনুরোধে অ্যাম্বার, ত্রুটিতে লাল। কম গতিতে স্থির থাকে।",
++            "pt-BR": "Verde pulsa suavemente durante o trabalho; âmbar indica pedidos e vermelho indica erros. Com movimento reduzido, fica estática.",
++            "ru": "Зелёная рамка плавно пульсирует при работе; запросы — янтарные, ошибки — красные. При уменьшении движения она неподвижна.",
++            "id": "Hijau berdenyut saat agen bekerja; kuning untuk permintaan dan merah untuk kesalahan. Pengurangan gerakan membuatnya diam.",
++            "de": "Grün pulsiert bei der Arbeit; Gelb zeigt Anfragen, Rot Fehler. Bei reduzierter Bewegung bleibt der Rand ruhig.",
++            "tr": "Çalışırken yeşil hafifçe nefes alır; istekler kehribar, hatalar kırmızıdır. Azaltılmış harekette sabit kalır."
 +          }
 +        }
 +      ]
@@ -6512,6 +8075,147 @@ index d21fb96..8be8906 100644
    return `https://github.com/Louis-CFM/coucou/releases/tag/${platform}-v${encodeURIComponent(version)}`;
  }
  
+diff --git a/windows/tests/agent-constellation.test.mjs b/windows/tests/agent-constellation.test.mjs
+new file mode 100644
+index 0000000..cfecaf1
+--- /dev/null
++++ b/windows/tests/agent-constellation.test.mjs
+@@ -0,0 +1,135 @@
++import { describe, beforeEach, afterEach, test } from "node:test";
++import assert from "node:assert/strict";
++import { installFakeDom } from "./fakedom.mjs";
++import { State } from "../src/core/state.ts";
++import { applyFlow } from "../src/core/codex-flow.ts";
++import { setLanguage } from "../src/i18n/i18n.ts";
++import { buildAgentRoom, ROOM_NODE_LIMIT, selectRoomAgent } from "../src/views/agent-room.ts";
++
++const task = (id, over = {}) => ({ id, name: id, color: "#b4ff39", state: "working", source: "agent", isIntegration: false, steps: [], stepIndex: 0, ...over });
++const agent = (id, parentId = null, over = {}) => ({ id, parentId, name: id, role: null, model: null, effort: null, status: "working", tool: null, lastSeen: null, ...over });
++const nodes = room => room.el.find(".constellation-node");
++const node = (room, id) => room.el.find(".agent-node").find(item => item.dataset.agentId === id);
++function build() {
++  const focus = [], views = [];
++  const room = buildAgentRoom({ setFocus: id => focus.push(id), setView: view => views.push(view), blip() {} });
++  return { room, focus, views };
++}
++function flow(agents) {
++  State.tasks = [task("agent_codex")];
++  applyFlow({ rootId: "root", agents, warnings: [], truncated: false });
++}
++describe("agent constellation", () => {
++beforeEach(() => {
++  installFakeDom(); setLanguage("en"); applyFlow(null);
++  State.mode = "expanded"; State.view = "agents"; State.tasks = [];
++  State.focusId = ""; State.pendingApproval = null;
++});
++afterEach(() => { applyFlow(null); State.tasks = []; State.pendingApproval = null; });
++
++test("the constellation contains only room agents, deduplicates identities and creates no canvases", () => {
++  State.tasks = [task("real", { name: "Agent <b>real</b>" }), task("real"), task("integration_spotify", { isIntegration: true })];
++  const { room } = build(); room.sync();
++  assert.equal(nodes(room).length, 1);
++  assert.equal(nodes(room)[0].tagName, "BUTTON");
++  assert.equal(nodes(room)[0].getAttribute("type"), "button");
++  assert.equal(room.el.find("CANVAS").length, 0);
++  assert.equal(room.el.find(".desk-scene").length, 0);
++  assert.equal(room.el.find("LINE").length, 0);
++});
++
++test("refreshes retain the DOM and slot of each agent despite reordered snapshots or removals", () => {
++  State.tasks = [task("a"), task("b"), task("c")];
++  const { room } = build(); room.sync();
++  const b = node(room, "b"), x = b.style["--node-x"], y = b.style["--node-y"];
++  State.tasks = [task("c"), task("a"), task("b", { state: "question" })]; room.sync();
++  assert.equal(node(room, "b"), b);
++  assert.deepEqual([b.style["--node-x"], b.style["--node-y"]], [x, y]);
++  assert.equal(b.dataset.state, "question");
++  State.tasks = [task("b"), task("d"), task("c")]; room.sync();
++  assert.equal(node(room, "b"), b);
++  assert.deepEqual([b.style["--node-x"], b.style["--node-y"]], [x, y]);
++  assert.equal(nodes(room).length, 3);
++});
++
++test("only confirmed visible parent IDs produce edges; absent and self parents produce none", () => {
++  flow([agent("root"), agent("child", "root"), agent("orphan", "missing"), agent("self", "self")]);
++  const { room } = build(); room.sync();
++  const edges = room.el.find("LINE");
++  assert.equal(edges.length, 1);
++  assert.equal(edges[0].getAttribute("data-parent"), "agent_codex");
++  assert.equal(edges[0].getAttribute("data-child"), "codex_child_child");
++  selectRoomAgent("codex_child_orphan"); room.sync();
++  assert.doesNotMatch(room.el.find(".room-detail")[0].textContent, /Coordina el flujo|agente principal|Depende de/);
++});
++
++test("mixed hook agents do not become Codex subagents and missing parents do not hide observed flow children", () => {
++  flow([agent("root"), agent("child", "root"), agent("without-parent")]);
++  State.tasks.push(task("claude", { name: "Claude" }));
++  const { room, focus, views } = build(); room.sync();
++  assert.equal(nodes(room).length, 4);
++  assert.match(room.el.find(".room-count")[0].textContent, /2 subagentes/);
++  node(room, "claude").fire("click");
++  assert.equal(focus.at(-1), "claude"); assert.equal(views.at(-1), "overview");
++});
++
++test("the visible limit exposes every remaining agent through an accessible +N disclosure", () => {
++  State.tasks = Array.from({ length: ROOM_NODE_LIMIT + 3 }, (_, i) => task(`agent-${i}`));
++  const { room, focus, views } = build(); room.sync();
++  assert.equal(ROOM_NODE_LIMIT, 6);
++  assert.equal(nodes(room).length, ROOM_NODE_LIMIT);
++  const more = room.el.find(".agent-overflow-toggle")[0];
++  const list = room.el.find(".agent-overflow-list")[0];
++  assert.equal(more.textContent, "+3");
++  assert.equal(more.getAttribute("aria-expanded"), "false");
++  assert.equal(more.getAttribute("aria-controls"), list.getAttribute("id"));
++  assert.equal(list.hidden, true);
++  more.fire("click");
++  assert.equal(more.getAttribute("aria-expanded"), "true");
++  assert.equal(list.hidden, false);
++  assert.equal(room.el.find(".agent-overflow-item").length, 3);
++  node(room, "agent-8").fire("click");
++  assert.equal(focus.at(-1), "agent-8"); assert.equal(views.at(-1), "overview");
++  let focused = false; more.focus = () => { focused = true; };
++  const escape = { key: "Escape", preventDefault() {}, stopPropagation() {} };
++  for (const listener of list.listeners.get("keydown") ?? []) listener(escape);
++  assert.equal(list.hidden, true); assert.equal(focused, true);
++});
++
++test("a notice can select an exact overflow child without changing the visible slots", () => {
++  flow([agent("root"), ...Array.from({ length: ROOM_NODE_LIMIT + 1 }, (_, i) => agent(`child-${i}`, "root"))]);
++  const { room } = build(); room.sync();
++  const first = nodes(room)[0];
++  assert.equal(selectRoomAgent("codex_child_child-6"), true); room.sync();
++  assert.equal(nodes(room)[0], first);
++  assert.equal(node(room, "codex_child_child-6").getAttribute("aria-pressed"), "true");
++  assert.ok(room.el.find(".room-detail")[0].textContent.includes("child-6"));
++  assert.equal(selectRoomAgent("missing"), false);
++});
++
++test("current permissions take priority over the agent detail and disappeared identities cannot navigate", () => {
++  flow([agent("root"), agent("child", "root")]);
++  const { room, focus, views } = build(); room.sync();
++  const root = node(room, "agent_codex"), child = node(room, "codex_child_child");
++  State.pendingApproval = { pillId: "agent_codex", requestId: "r", questions: [{}] };
++  root.fire("click");
++  assert.equal(focus.at(-1), "agent_codex"); assert.equal(views.at(-1), "question");
++  State.pendingApproval = null; child.fire("click"); room.sync();
++  assert.ok(room.el.find(".room-detail")[0].textContent.includes("child"));
++  const previous = views.length;
++  flow([agent("root")]); room.sync(); child.fire("click");
++  assert.equal(views.length, previous);
++  assert.equal(node(room, "codex_child_child"), undefined);
++});
++
++test("disconnecting or folding clears nodes, edges, disclosure and old details", () => {
++  flow([agent("root"), agent("child", "root")]);
++  const { room } = build(); room.sync();
++  applyFlow(null); State.tasks = []; room.sync();
++  assert.equal(nodes(room).length, 0); assert.equal(room.el.find("LINE").length, 0);
++  assert.equal(room.el.find(".room-detail")[0].textContent, "");
++  assert.equal(room.el.find(".agent-overflow-toggle")[0].hidden, true);
++  State.tasks = [task("new")]; room.sync(); assert.equal(nodes(room).length, 1);
++  State.mode = "compact"; room.sync(); assert.equal(nodes(room).length, 0);
++});
++});
 diff --git a/windows/tests/agent-room.test.mjs b/windows/tests/agent-room.test.mjs
 new file mode 100644
 index 0000000..0c8e0f5
@@ -6667,7 +8371,7 @@ index 0000000..1f7890f
 +});
 diff --git a/windows/tests/codex-flow.test.mjs b/windows/tests/codex-flow.test.mjs
 new file mode 100644
-index 0000000..51f0631
+index 0000000..12b5912
 --- /dev/null
 +++ b/windows/tests/codex-flow.test.mjs
 @@ -0,0 +1,43 @@
@@ -6678,10 +8382,10 @@ index 0000000..51f0631
 +import { roomAgents } from '../src/core/agent-room.ts';
 +const agent=(id,parentId=null,status='working')=>({id,parentId,name:`/root/${id}`,role:parentId?'sendoa-tecnico':null,model:'gpt-6.1-sol',effort:'high',status,tool:'exec',lastSeen:'2026-10-21T06:00:00Z'});
 +afterEach(()=>applyFlow(null));
-+test('monitor shows actual tree instead of configured product pills',()=>{
++test('monitor expands the Codex tree and preserves other agents',()=>{
 + applyFlow({rootId:'root',agents:[agent('root'),agent('child','root','completed')],truncated:false,warnings:[]});
 + const tasks=roomAgents([{id:'agent_codex'},{id:'agent_copilot'}]);
-+ assert.deepEqual(tasks.map(t=>t.id),['agent_codex','codex_child_child']);
++ assert.deepEqual(tasks.map(t=>t.id),['agent_codex','codex_child_child','agent_copilot']);
 + assert.equal(tasks[1].state,'finished');assert.equal(tasks[1].flow.parentId,'root');
 + applyFlow(null);assert.equal(CodexFlow.tasks.length,0);
 +});
@@ -6716,10 +8420,10 @@ index 0000000..51f0631
 +});
 diff --git a/windows/tests/compact-clock.test.mjs b/windows/tests/compact-clock.test.mjs
 new file mode 100644
-index 0000000..4945c23
+index 0000000..ec1e14e
 --- /dev/null
 +++ b/windows/tests/compact-clock.test.mjs
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,51 @@
 +import { test } from 'node:test';
 +import assert from 'node:assert/strict';
 +import { State } from '../src/core/state.ts';
@@ -6744,6 +8448,14 @@ index 0000000..4945c23
 +    draw(); assert.equal(host.clockEl.style.opacity, '1');
 +    State.stateOverride = 'error'; State.pendingApproval = null;
 +    draw(); assert.equal(host.clockEl.style.opacity, '1'); assert.ok(host.clockEl.textContent.length);
++    host.compactMusic.visible = true;
++    draw(); assert.equal(host.clockEl.style.opacity, '1', 'music keeps the clock visible');
++    assert.ok(host.clockEl.classList.contains('music-clock'));
++    host.compactMusic.visible = false;
++    draw(); assert.equal(host.clockEl.classList.contains('music-clock'), false);
++    host.compactStatus.style.display = 'block';
++    draw(); assert.equal(host.clockEl.style.visibility, 'hidden', 'status text keeps priority');
++    host.compactStatus.style.display = 'none';
 +    State.settings.showClock = false;
 +    draw(); assert.equal(host.clockEl.style.opacity, '0');
 +    State.settings.showClock = true; State.mode = 'expanded';
@@ -6752,9 +8464,20 @@ index 0000000..4945c23
 +    State.mode = mode; State.settings.showClock = showClock; State.stateOverride = override; State.pendingApproval = pending;
 +  }
 +});
++
++ test('clock orbit follows minutes within the hour and resets across midnight', () => {
++  installFakeDom();
++  const clock = buildCompactClock();
++  clock.sync(new Date(2026, 9, 31, 23, 59, 59));
++  assert.equal(clock.el.style['--clock-orbit'], '354deg');
++  assert.match(clock.el.getAttribute('aria-label'), /Orbit|Órbita/);
++  clock.sync(new Date(2026, 10, 1, 0, 0));
++  assert.equal(clock.el.style['--clock-orbit'], '0deg');
++  assert.equal(clock.el.children[1].textContent, new Date(2026, 10, 1).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }));
++});
 diff --git a/windows/tests/compact-music.test.mjs b/windows/tests/compact-music.test.mjs
 new file mode 100644
-index 0000000..3504be3
+index 0000000..ca2b556
 --- /dev/null
 +++ b/windows/tests/compact-music.test.mjs
 @@ -0,0 +1,97 @@
@@ -6837,7 +8560,7 @@ index 0000000..3504be3
 +    const draw = () => Island.prototype.syncCompactMusic.call(host);
 +    const music = buildCompactMusic(() => {}, draw);
 +    const sizes = [];
-+    host = { compactMusic: music, fsm: new IslandStateMachine(), wasInIsland: false,
++    host = { currentNotice: Island.prototype.currentNotice, compactMusic: music, fsm: new IslandStateMachine(), wasInIsland: false,
 +      animateGeometry() { sizes.push(Island.prototype.targetSize.call(host).w); } };
 +    host.fsm.reveal();
 +    Spotify.state = report(); draw();
@@ -6854,6 +8577,77 @@ index 0000000..3504be3
 +  } finally {
 +    State.settings = previous.settings; State.os = previous.os; State.mode = previous.mode; State.tasks = previous.tasks; State.focusId = previous.focusId; State.pendingApproval = previous.pendingApproval; Spotify.state = previous.spotify;
 +  }
++});
+diff --git a/windows/tests/compact-notice.test.mjs b/windows/tests/compact-notice.test.mjs
+new file mode 100644
+index 0000000..357b4d3
+--- /dev/null
++++ b/windows/tests/compact-notice.test.mjs
+@@ -0,0 +1,65 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { selectCompactNotice, buildCompactNotice } from '../src/island/notice.ts';
++import { installFakeDom } from './fakedom.mjs';
++const task = (id, state) => ({id, name: id, state});
++test('pending permission wins without losing other notices; selection stays stable by priority', () => {
++  const tasks = [task('finished','finished'),task('error','error'),task('other','approval')];
++  const pending = {pillId:'request', requestId:'one', questions:null};
++  const first = selectCompactNotice(tasks, pending);
++  assert.equal(first.pillId,'request'); assert.equal(first.requestId,'one'); assert.equal(first.count,4);
++  assert.equal(selectCompactNotice(tasks,null).pillId,'other');
++  tasks.pop(); assert.equal(selectCompactNotice(tasks,null).pillId,'error');
++  tasks.pop(); assert.equal(selectCompactNotice(tasks,null).pillId,'finished');
++  assert.equal(selectCompactNotice([task('idle','idle')],null),null);
++});
++test('one task creates one notice and a pending request is not counted twice', () => {
++  const pending={pillId:'same',requestId:'real'};
++  const result=selectCompactNotice([task('same','approval'),task('same','error')],pending);
++  assert.equal(result.count,1); assert.equal(result.requestId,'real');
++});
++test('compact notice click opens the exact displayed item and never responds', () => {
++  installFakeDom(); let opened=[];
++  const view=buildCompactNotice(item => opened.push(item));
++  const notice=selectCompactNotice([task('A','error')],null);
++  view.sync(notice); view.el.fire('click');
++  assert.equal(opened[0].pillId,'A'); assert.match(view.el.getAttribute('aria-label'),/A/);
++  view.sync(null); view.el.fire('click'); assert.equal(opened.length,1);
++  assert.equal(view.el.style.display,'none');
++});
++test('flow completion notices expire and interruption is not called an error', () => {
++  const now=Date.now();
++  assert.equal(selectCompactNotice([{...task('old','finished'),flow:{lastSeen:new Date(now-10000).toISOString()}}],null),null);
++  assert.equal(selectCompactNotice([{...task('new','finished'),flow:{lastSeen:new Date(now).toISOString()}}],null).pillId,'new');
++  assert.equal(selectCompactNotice([{...task('cancelled','error'),flow:{status:'interrupted'}}],null),null);
++});
++
++import { Island } from '../src/island/island.ts';
++import { State } from '../src/core/state.ts';
++test('opening a stale request cannot open or answer its replacement', () => {
++  const saved = State.pendingApproval;
++  const current = {pillId:'A',requestId:'new',state:'approval'};
++  const opened=[];
++  const host={currentNotice:()=>current,setView:view=>opened.push(view)};
++  State.pendingApproval={pillId:'A',requestId:'new',sessionId:'real'};
++  const focus=State.setFocus;
++  try {
++    State.setFocus=id=>opened.push(id);
++    Island.prototype.openCompactNotice.call(host,{...current,requestId:'old'});
++    assert.deepEqual(opened,[]);
++    Island.prototype.openCompactNotice.call(host,current);
++    assert.deepEqual(opened,['A','approval']);
++    assert.equal(State.pendingApproval.requestId,'new');
++  } finally {State.pendingApproval=saved;State.setFocus=focus;}
++});
++
++import { CodexFlow } from '../src/core/codex-flow.ts';
++test('a Codex snapshot never hides another agent error behind music or quotas', () => {
++  const tasks=State.tasks, flow=CodexFlow.tasks, pending=State.pendingApproval;
++  try {
++    State.pendingApproval=null;
++    State.tasks=[{...task('agent_codex','working'),source:'agent'}, {...task('integration_claude','error'),source:'claudeCode'}];
++    CodexFlow.tasks=[{...task('agent_codex','working'),flow:{id:'root',status:'working'}}];
++    assert.equal(Island.prototype.currentNotice.call({}).pillId,'integration_claude');
++  } finally {State.tasks=tasks;CodexFlow.tasks=flow;State.pendingApproval=pending;}
 +});
 diff --git a/windows/tests/fsm.test.mjs b/windows/tests/fsm.test.mjs
 index f1685dd..6e44175 100644
@@ -7007,10 +8801,42 @@ index 0000000..b944148
 +serde = { version = "1", features = ["derive"] }
 +serde_json = { version = "1", features = ["preserve_order"] }
 diff --git a/windows/tests/hooks.test.mjs b/windows/tests/hooks.test.mjs
-index 45ec5ce..e07a197 100644
+index 45ec5ce..1834e60 100644
 --- a/windows/tests/hooks.test.mjs
 +++ b/windows/tests/hooks.test.mjs
-@@ -254,6 +254,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
+@@ -1,3 +1,4 @@
++import { taskHistory } from "../src/core/task-history.ts";
+ // Claude Code hook events → island state (src/island/hooks.ts), driven through
+ // the real bridge: events come in the way Rust emits them, and what the island
+ // answers is read from the commands it invokes.
+@@ -153,11 +154,11 @@ test("an unknown event changes nothing", () => {
+ 
+ // ── Stop ──────────────────────────────────────────────────────────────────────
+ 
+-test("a finished session opens the finished view, then goes idle after 5.2 s", () => {
++test("a finished session reveals a compact notice, then goes idle after 5.2 s", () => {
+   hook({ hook_event_name: "Stop", message: "done" });
+   assert.equal(task().state, "finished");
+   assert.deepEqual(task().steps, ["done"]);
+-  assert.deepEqual(asked, ["alert:finished"]);
++  assert.deepEqual(asked, ["reveal"]);
+   seconds(5.1);
+   assert.equal(task().state, "finished");
+   seconds(0.1);
+@@ -179,10 +180,10 @@ test("a session finishing behind another pill only badges its own, for 5.2 s", (
+   assert.equal(task().pillBadge, null);
+ });
+ 
+-test("a failed stop shows the error view, or the error badge behind another pill", () => {
++test("a failed stop reveals compact attention, or badges behind another pill", () => {
+   hook({ hook_event_name: "StopFailure" });
+   assert.equal(task().state, "error");
+-  assert.deepEqual(asked, ["alert:error"]);
++  assert.deepEqual(asked, ["reveal"]);
+   State.setFocus("integration_n8n");
+   hook({ hook_event_name: "StopFailure" });
+   assert.equal(task().pillBadge, "error");
+@@ -254,6 +255,14 @@ test("an agent's permission request is declined, never shown as Claude Code's",
    }
  });
  
@@ -7025,7 +8851,7 @@ index 45ec5ce..e07a197 100644
  test("Codex, Copilot CLI and Muse Code get the card on their own pill", () => {
    for (const agent of ["codex", "copilot", "muse"]) {
      State.pendingApproval = null;
-@@ -433,7 +441,7 @@ test("the card names the most specific thing the tool carries", () => {
+@@ -433,7 +442,7 @@ test("the card names the most specific thing the tool carries", () => {
    assert.equal(target("Bash", { command: "rm -rf build", file_path: "x" }), "Bash · rm -rf build");
    assert.equal(target("WebFetch", { url: "https://example.com" }), "WebFetch · https://example.com");
    assert.equal(target("Task", { prompt: "do it" }), "Task · do it");
@@ -7034,6 +8860,65 @@ index 45ec5ce..e07a197 100644
    assert.equal(target(undefined, undefined), "Tool");
  });
  
+@@ -751,3 +760,20 @@ test("Antigravity questions without usable text still alert with a translated la
+   assert.equal(asked.length, 5);
+   assert.ok(asked.every((request) => request === "alert:overview"));
+ });
++
++test("history records observed events per session without retaining private payloads", () => {
++  taskHistory.clearAll();
++  hook({hook_event_name:"PreToolUse",session_id:"history-A", tool_name:"Bash",tool_input:{command:"SECRET_COMMAND"}});
++  hook({hook_event_name:"PostToolUse",session_id:"history-A", tool_name:"Bash"});
++  hook({hook_event_name:"Interrupt",session_id:"history-A"});
++  const events=taskHistory.get(`${CLAUDE}:history-A`);
++  assert.deepEqual(events.map(e=>e.kind),["tool_started","tool_finished","turn_cancelled"]);
++  assert.equal(JSON.stringify(events).includes("SECRET"),false);
++  assert.ok(events.every(e=>e.timestamp === undefined));
++  hook({hook_event_name:"SessionStart",session_id:"history-B"});
++  assert.equal(taskHistory.get(`${CLAUDE}:history-A`).length,0);
++  hook({hook_event_name:"Stop",session_id:"history-B"});
++  assert.equal(taskHistory.get(`${CLAUDE}:history-B`).at(-1).kind,"turn_finished");
++  hook({hook_event_name:"SessionEnd",session_id:"history-B"});
++  assert.equal(taskHistory.get(`${CLAUDE}:history-B`).length,0);
++});
+diff --git a/windows/tests/island-border.test.mjs b/windows/tests/island-border.test.mjs
+new file mode 100644
+index 0000000..bd5f619
+--- /dev/null
++++ b/windows/tests/island-border.test.mjs
+@@ -0,0 +1,32 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { State } from '../src/core/state.ts';
++import { Island } from '../src/island/island.ts';
++
++test('live border reflects all agents and prioritizes unanswered requests over activity', () => {
++  const saved = { tasks: State.tasks, pendingApproval: State.pendingApproval, mode: State.mode,
++    paused: State.paused, stateOverride: State.stateOverride };
++  const host = { islandEl: { dataset: {} } };
++  const task = (id, state) => ({ id, state, name: id, isIntegration: false, source: 'agent' });
++  const draw = () => { Island.prototype.syncBorder.call(host); return host.islandEl.dataset.liveBorder; };
++  try {
++    State.mode = 'compact'; State.paused = false; State.stateOverride = null; State.pendingApproval = null;
++    State.tasks = [task('one', 'idle'), task('two', 'working')];
++    assert.equal(draw(), 'working');
++    State.tasks[0].state = 'error'; assert.equal(draw(), 'error');
++    State.tasks[1].state = 'question'; assert.equal(draw(), 'attention');
++    State.tasks = [task('one', 'working')]; State.pendingApproval = { requestId: 'pending' };
++    assert.equal(draw(), 'attention');
++    State.pendingApproval = null; State.tasks = [task('one', 'ratelimit')];
++    assert.equal(draw(), 'attention');
++    State.tasks = [task('one', 'thinking')]; assert.equal(draw(), 'working');
++    State.tasks[0].state = 'searching'; assert.equal(draw(), 'working');
++    State.tasks[0].state = 'finished'; assert.equal(draw(), 'finished');
++    State.tasks[0].state = 'idle'; assert.equal(draw(), 'idle');
++    State.stateOverride = 'error'; assert.equal(draw(), 'error');
++    State.paused = true; assert.equal(draw(), 'hidden');
++    State.paused = false; State.mode = 'hidden'; assert.equal(draw(), 'hidden');
++    State.stateOverride = null; State.mode = 'expanded'; State.tasks = [];
++    assert.equal(draw(), 'idle');
++  } finally { Object.assign(State, saved); }
++});
 diff --git a/windows/tests/pill-colors.test.mjs b/windows/tests/pill-colors.test.mjs
 index c228887..838df38 100644
 --- a/windows/tests/pill-colors.test.mjs
@@ -7061,11 +8946,123 @@ index c228887..838df38 100644
    }
  });
  
+diff --git a/windows/tests/quota-rings.test.mjs b/windows/tests/quota-rings.test.mjs
+new file mode 100644
+index 0000000..0c8ebf4
+--- /dev/null
++++ b/windows/tests/quota-rings.test.mjs
+@@ -0,0 +1,96 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import * as plan from '../src/core/plan.ts';
++const now = Date.UTC(2026, 10, 1, 20);
++const window = (usedPercent, duration = 300, reset = now / 1000 + 3600) =>
++  ({ usedPercent, windowDurationMins: duration, resetsAt: reset });
++
++test('quota groups preserve durations and never combine model limits', () => {
++  const u = plan.parseCodexPlan({ rateLimits: { primary: window(99) }, rateLimitsByLimitId: {
++    codex: { limitName: 'Codex', primary: window(25, 120), secondary: window(80, 1440) },
++    review: { limitName: 'Review', primary: window(5, 10080) },
++  } }, now);
++  assert.equal(u.quotaGroups.length, 2);
++  assert.equal(u.quotaGroups[0].label, 'Codex');
++  assert.deepEqual(u.quotaGroups[0].windows.map(w => w.durationMins), [120, 1440]);
++  assert.equal(plan.quotaAvailable(u.quotaGroups[0].windows[0], now), 75);
++  assert.equal(u.quotaGroups[1].windows[0].usedPct, 5);
++});
++
++test('empty or invalid group maps retain valid legacy limits', () => {
++  for (const rateLimitsByLimitId of [{}, { review: { primary: window(null) } }]) {
++    const u = plan.parseCodexPlan({ rateLimits: { planType: 'plus', primary: window(20) }, rateLimitsByLimitId }, now);
++    assert.equal(u.quotaGroups[0].windows[0].usedPct, 20);
++    assert.equal(u.planType, 'plus');
++  }
++});
++
++test('missing, non-finite and reset windows never imply full availability', () => {
++  assert.equal(plan.quotaAvailable(undefined, now), null);
++  assert.equal(plan.quotaAvailable({ usedPct: 80, resetsAt: now }, now), null);
++  assert.equal(plan.quotaAvailable({ usedPct: NaN, resetsAt: now + 1000 }, now), null);
++  assert.equal(plan.quotaAvailable({ usedPct: 0, resetsAt: now + 1000 }, now), 100);
++  assert.equal(plan.quotaAvailable({ usedPct: 100, resetsAt: now + 1000 }, now), 0);
++  const u = plan.parseCodexPlan({ rateLimits: { primary: window(null), secondary: window(40, 300, 0) } }, now);
++  assert.equal(u, null);
++});
++
++test('legacy limits remain supported and unknown durations remain unknown', () => {
++  const u = plan.parseCodexPlan({ rateLimits: { primary: window(150, null), secondary: window(-5, 300) } }, now);
++  assert.deepEqual(u.quotaGroups[0].windows.map(w => w.usedPct), [100, 0]);
++  assert.equal(u.quotaGroups[0].windows[0].durationMins, undefined);
++});
++
++import { installFakeDom } from './fakedom.mjs';
++import { State } from '../src/core/state.ts';
++import { buildQuotaRings, PlanCard } from '../src/views/usage.ts';
++import { Island } from '../src/island/island.ts';
++
++test('rings label availability, stale readings and every provider group in the detail', () => {
++  installFakeDom();
++  State.codexPlanUsage = plan.parseCodexPlan({ rateLimitsByLimitId: {
++    codex: { primary: window(25, 120), secondary: window(100, 1440) },
++    review: { primary: window(5, 10080) },
++  } }, now);
++  const rings = buildQuotaRings();
++  rings.sync(now);
++  assert.match(rings.el.getAttribute('aria-label'), /2 h: 75% available/);
++  assert.match(rings.el.getAttribute('aria-label'), /1 d: 0% available/);
++  assert.deepEqual(rings.el.children.map(e => e.textContent), ['75', '0']);
++  rings.sync(now + 60_000);
++  assert.equal(rings.el.classList.contains('stale'), true);
++  rings.sync(now + 3600_000);
++  assert.deepEqual(rings.el.children.map(e => e.textContent), ['?', '?']);
++  State.planDetailIsCodex = true;
++  const card = new PlanCard();
++  card.sync(now);
++  assert.match(card.el.textContent, /review/);
++  assert.match(card.el.textContent, /95% available/);
++  State.codexPlanUsage = null;
++  rings.sync(now);
++  assert.match(rings.el.getAttribute('aria-label'), /No data/);
++  State.planDetailIsCodex = false;
++});
++
++test('compact rings yield to pending permissions, music, pause and hidden mode', () => {
++  installFakeDom();
++  const saved = { mode: State.mode, paused: State.paused, stateOverride: State.stateOverride,
++    pendingApproval: State.pendingApproval, codexPlanUsage: State.codexPlanUsage };
++  const show = State.settings.showCodexPlanInNotch;
++  const host = { currentNotice: Island.prototype.currentNotice, quotaButton: document.createElement('button'), islandEl: document.createElement('div'),
++    quotaRings: buildQuotaRings(), compactMusic: { visible: false }, quotaShown: true };
++  const draw = () => Island.prototype.updateQuota.call(host);
++  try {
++    State.mode = 'compact'; State.paused = false; State.settings.showCodexPlanInNotch = true;
++    State.stateOverride = 'working'; State.pendingApproval = null;
++    State.codexPlanUsage = plan.parseCodexPlan({ rateLimits: { primary: { ...window(25), resetsAt: Date.now() / 1000 + 3600 } } });
++    draw(); assert.equal(host.quotaButton.style.display, 'flex');
++    assert.equal(host.islandEl.classList.contains('has-quota'), true);
++    State.pendingApproval = {}; draw(); assert.equal(host.quotaButton.style.display, 'none');
++    State.pendingApproval = null; host.compactMusic.visible = true; draw(); assert.equal(host.quotaButton.style.display, 'none');
++    host.compactMusic.visible = false; State.paused = true; draw(); assert.equal(host.quotaButton.style.display, 'none');
++    State.paused = false; State.mode = 'hidden'; draw(); assert.equal(host.quotaButton.style.display, 'none');
++  } finally {
++    State.settings.showCodexPlanInNotch = show; Object.assign(State, saved);
++  }
++});
 diff --git a/windows/tests/spotify.test.mjs b/windows/tests/spotify.test.mjs
-index 36cd5d4..5cc17f8 100644
+index 36cd5d4..103b9f7 100644
 --- a/windows/tests/spotify.test.mjs
 +++ b/windows/tests/spotify.test.mjs
-@@ -302,3 +302,34 @@ test("the pill shows play/pause and next on hover, only with a track", () => {
+@@ -26,7 +26,8 @@ const track = (over = {}) => ({
+ 
+ const playing = (over = {}) => ({
+   ...IDLE_SPOTIFY, running: true, installed: true, track: track(), playing: true,
+-  position: 10, positionAt: 1_000, volume: 70, ...over,
++  position: 10, positionAt: 1_000, positionKnown: true, volume: 70,
++  capabilities: { canControl: true, canPlay: true, canPause: true, canGoNext: true, canGoPrevious: true, canSeek: true }, ...over,
+ });
+ 
+ // ── Position ──────────────────────────────────────────────────────────────────
+@@ -302,3 +303,97 @@ test("the pill shows play/pause and next on hover, only with a track", () => {
    pill.el.fire("mouseleave");
    assert.ok(!pill.el.classList.contains("controls"));
  });
@@ -7099,6 +9096,200 @@ index 36cd5d4..5cc17f8 100644
 +  emit("spotify", playing({ playerName: "Spotifast / EVA-01", track: track({ id: "spotify:ad:1", title: "" }) }));
 +  pill.sync();
 +  assert.equal(pill.el.querySelector("lbl").textContent, "Advertisement");
++});
++
++test("transport buttons reject unknown and revoked player capabilities", () => {
++  const card = buildSpotifyCard();
++  const pill = buildSpotifyPill(spotifyTask(), () => {});
++  Spotify.state = playing({ capabilities: undefined });
++  card.sync(); pill.sync();
++  const [, prev, play, next] = card.el.querySelector("np-buttons").children;
++  const [pillPlay, pillNext] = pill.el.querySelector("np-pill-controls").children;
++  const before = sent("spotify_control").length;
++  for (const button of [prev, play, next, pillPlay, pillNext]) {
++    assert.equal(button.getAttribute("disabled"), "");
++    button.fire("click");
++  }
++  assert.equal(sent("spotify_control").length, before);
++  assert.equal(Spotify.state.playing, true, "disabled click must not update playback optimistically");
++  Spotify.state = playing({ capabilities: { canControl: true, canPlay: true, canPause: false, canGoNext: true } });
++  card.sync(); pill.sync();
++  assert.equal(play.getAttribute("disabled"), "", "pause needs CanPause while playing");
++  assert.equal(prev.getAttribute("disabled"), "", "unknown previous stays disabled");
++  assert.equal(next.getAttribute("disabled"), null);
++  Spotify.state = { ...Spotify.state, playing: false }; card.sync();
++  assert.equal(play.getAttribute("disabled"), null, "play needs CanPlay while paused");
++  Spotify.state = { ...Spotify.state, capabilities: { ...Spotify.state.capabilities, canControl: false } };
++  next.fire("click");
++  assert.equal(sent("spotify_control").length, before, "click checks current capabilities before sync");
++  card.sync();
++  assert.equal(next.getAttribute("disabled"), "", "CanControl overrides specific capabilities");
++});
++
++test("a report from a different player cannot inherit transport capabilities or position", () => {
++  const card = buildSpotifyCard();
++  emit("spotify", playing({ playerName: "Spotifast" })); card.sync();
++  assert.equal(card.el.querySelector("np-buttons").children[3].getAttribute("disabled"), null);
++  emit("spotify", { ...IDLE_SPOTIFY, running: true, playerName: "Browser", track: track() }); card.sync();
++  assert.equal(card.el.querySelector("np-buttons").children[3].getAttribute("disabled"), "");
++  assert.equal(card.el.querySelector("np-progress").style.display, "none");
++});
++
++test("progress needs duration and position; seeking also needs CanSeek", () => {
++  const card = buildSpotifyCard();
++  for (const over of [{ positionKnown: false }, { position: Number.NaN }, { track: track({ duration: 0 }) }, { track: track({ duration: Number.NaN }) }]) {
++    Spotify.state = playing(over); card.sync();
++    assert.equal(card.el.querySelector("np-progress").style.display, "none");
++  }
++  Spotify.state = playing({ playing: false, capabilities: { canControl: true, canSeek: false } }); card.sync();
++  const row = card.el.querySelector("np-progress");
++  const bar = row.querySelector("np-bar");
++  assert.equal(row.style.display, "");
++  assert.equal(bar.getAttribute("aria-disabled"), "true");
++  const pointer = (type) => {
++    for (const fn of bar.listeners.get(type) ?? []) fn({ button: 0, pointerId: 1, clientX: 1, stopPropagation() {} });
++  };
++  const before = sent("spotify_control").length;
++  pointer("pointerdown"); pointer("pointerup");
++  assert.equal(sent("spotify_control").length, before);
++  Spotify.state = playing({ playing: false }); card.sync();
++  assert.equal(bar.getAttribute("aria-disabled"), "false");
++  pointer("pointerdown"); pointer("pointerup");
++  assert.equal(sent("spotify_control").length, before + 1);
++  assert.equal(sent("spotify_control").at(-1).action, "seek");
++  Spotify.state = playing({ track: track({ id: "spotify:ad:1" }) }); card.sync();
++  assert.equal(bar.getAttribute("aria-disabled"), "true", "ad seeking stays blocked");
++});
+diff --git a/windows/tests/task-history.test.mjs b/windows/tests/task-history.test.mjs
+new file mode 100644
+index 0000000..636b755
+--- /dev/null
++++ b/windows/tests/task-history.test.mjs
+@@ -0,0 +1,125 @@
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { installFakeDom } from "./fakedom.mjs";
++import { TaskHistory, TASK_HISTORY_LIMIT } from "../src/core/task-history.ts";
++import { buildTaskHistory } from "../src/views/task-history.ts";
++import { setLanguage, t } from "../src/i18n/i18n.ts";
++
++const event = (over = {}) => ({ source: "hook", kind: "tool_started", ...over });
++
++test("two chats keep separate events even when their event IDs match", () => {
++  const history = new TaskHistory();
++  history.record("chat-a", event({ eventId: "one" }));
++  history.record("chat-b", event({ eventId: "one", kind: "turn_failed" }));
++  assert.equal(history.get("chat-a")[0].kind, "tool_started");
++  assert.equal(history.get("chat-b")[0].kind, "turn_failed");
++  assert.deepEqual(history.get("unknown"), []);
++});
++
++test("replayed IDs are deduplicated per source; unidentified events are not guessed equal", () => {
++  const history = new TaskHistory();
++  assert.equal(history.record("chat", event({ eventId: "one" })), true);
++  assert.equal(history.record("chat", event({ eventId: "one" })), false);
++  assert.equal(history.record("chat", event({ source: "codex", eventId: "one" })), true);
++  history.record("chat", event());
++  history.record("chat", event());
++  assert.equal(history.get("chat").length, 4);
++});
++
++test("dated events are chronological, ties and undated events keep their arrival order", () => {
++  const history = new TaskHistory();
++  for (const [eventId, timestamp] of [["late", 300], ["unknown-a", undefined], ["early", 100], ["same", 100], ["unknown-b", undefined]]) {
++    history.record("chat", event({ eventId, timestamp }));
++  }
++  assert.deepEqual(history.get("chat").map(item => item.eventId), ["early", "same", "late", "unknown-a", "unknown-b"]);
++  assert.equal("timestamp" in history.get("chat")[3], false, "no clock is invented");
++});
++
++test("invalid timestamps remain undated instead of becoming plausible times", () => {
++  const history = new TaskHistory();
++  for (const timestamp of [NaN, Infinity, -1, 8.64e15 + 1]) history.record("chat", event({ timestamp }));
++  assert.equal(history.get("chat").length, 4);
++  assert.ok(history.get("chat").every(item => !("timestamp" in item)));
++  history.record("chat", event({ timestamp: 0 }));
++  assert.equal(history.get("chat")[0].timestamp, 0, "the epoch is a valid explicit date");
++});
++
++test("only the latest 20 dated events survive, including out-of-order replays", () => {
++  const history = new TaskHistory();
++  for (let i = 30; i >= 0; i--) history.record("chat", event({ eventId: String(i), timestamp: i }));
++  assert.equal(TASK_HISTORY_LIMIT, 20);
++  assert.deepEqual(history.get("chat").map(item => item.timestamp), Array.from({ length: 20 }, (_, i) => i + 11));
++  assert.equal(history.record("chat", event({ eventId: "0", timestamp: 0 })), false);
++  assert.equal(history.get("chat").length, 20);
++});
++
++test("undated events are also bounded, and clearing another task leaves them intact", () => {
++  const history = new TaskHistory();
++  for (let i = 0; i < 30; i++) history.record("chat", event({ eventId: String(i) }));
++  history.record("other", event());
++  history.clear("other");
++  assert.deepEqual(history.get("chat").map(item => item.eventId), Array.from({ length: 20 }, (_, i) => String(i + 10)));
++  assert.deepEqual(history.get("other"), []);
++});
++
++test("only safe metadata is retained and callers cannot mutate stored entries", () => {
++  const history = new TaskHistory();
++  const input = event({ eventId: "one", timestamp: 12, tool_input: { command: "secret" }, message: "private", tokens: 200 });
++  history.record("chat", input);
++  input.kind = "turn_failed";
++  const entries = history.get("chat");
++  assert.deepEqual(entries, [{ source: "hook", kind: "tool_started", eventId: "one", timestamp: 12 }]);
++  assert.throws(() => { entries[0].kind = "turn_failed"; }, TypeError);
++  entries.pop();
++  assert.equal(history.get("chat").length, 1);
++});
++
++test("task and session cleanup remove both the history and its dedup state", () => {
++  const history = new TaskHistory();
++  history.record("one", event({ eventId: "reusable" }));
++  history.record("two", event({ kind: "turn_cancelled" }));
++  history.clear("one");
++  assert.equal(history.record("one", event({ eventId: "reusable" })), true);
++  assert.equal(history.get("two").length, 1);
++  history.clearAll();
++  assert.deepEqual(history.get("one"), []);
++  assert.deepEqual(history.get("two"), []);
++  assert.equal(history.record("one", event({ eventId: "reusable" })), true);
++});
++
++test("unknown events, origins and missing task identity do not create history", () => {
++  const history = new TaskHistory();
++  assert.equal(history.record("", event()), false);
++  assert.equal(history.record(" ", event()), false);
++  assert.equal(history.record("chat", event({ kind: "working" })), false);
++  assert.equal(history.record("chat", event({ source: "snapshot" })), false);
++  assert.deepEqual(history.get("chat"), []);
++});
++
++test("the reusable view shows explicit observations and never turns completion into success", () => {
++  installFakeDom();
++  setLanguage("en");
++  const view = buildTaskHistory();
++  view.sync(["tool_started", "tool_finished", "permission_requested", "turn_finished", "turn_failed", "turn_cancelled"].map(kind => event({ kind })));
++  assert.deepEqual(view.el.find("LI").map(row => row.textContent), ["Tool started", "Tool finished", "Permission requested", "Turn finished", "Turn failed", "Turn cancelled"].map(t));
++  assert.equal(view.el.find("SVG").length, 6);
++  assert.equal(view.el.find("TIME").length, 0);
++  assert.doesNotMatch(view.el.textContent, /success|tests passed|investigation|checking/i);
++});
++
++test("sync replaces the selected task, shows only explicit dates, and clears stale rows", () => {
++  installFakeDom();
++  const history = new TaskHistory();
++  history.record("one", event({ timestamp: 1_000 }));
++  history.record("two", event({ kind: "turn_failed" }));
++  const view = buildTaskHistory();
++  view.sync(history.get("one"));
++  assert.equal(view.el.find("TIME")[0].getAttribute("datetime"), "1970-01-01T00:00:01.000Z");
++  view.sync(history.get("two"));
++  assert.equal(view.el.find("TIME").length, 0);
++  assert.equal(view.el.find("LI").length, 1);
++  assert.equal(view.el.find("LI")[0].textContent, t("Turn failed"));
++  view.sync([]);
++  assert.equal(view.el.find("LI").length, 0);
++  assert.ok(view.el.textContent.includes(t("Waiting for activity")));
 +});
 diff --git a/windows/tests/whats-new.test.mjs b/windows/tests/whats-new.test.mjs
 index 4647a57..62d5e10 100644

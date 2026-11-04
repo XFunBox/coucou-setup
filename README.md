@@ -2,7 +2,7 @@
 
 Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
 
-Setup de **Coucou 0.5.3-sendoa.5** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.3, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.3-sendoa.6** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.3, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 
 ## Así se ve
@@ -21,10 +21,14 @@ Capturas de la personalización EVA-01. Coucou y el personaje Mochi son de Louis
 
 Incluye:
 
+- Anillos de cuota disponible con ventanas y reinicios reales; avisos compactos priorizados; historial de hasta 20 eventos por sesión y constelación de agentes reales con navegación.
+- Reloj orbital compatible con música; controles MPRIS según capacidades reales y línea temporal solo cuando hay posición conocida. Borde vivo para actividad y solicitudes; movimiento reducido respetado.
+- Conserva el hotfix .5 de tamaño y zoom entre pantallas de distinta escala.
+
 - Base Linux 0.5.3: conserva las novedades oficiales de 0.5.2 y 0.5.3, incluidos GitLab/Gitea, WhatsApp experimental y la pantalla de novedades. Añade música compacta con carátula, título, artista y onda animada; al pausar vuelve al compacto tras un segundo. Con el reloj activado, la isla cerrada permanece visible. El reloj optativo muestra hora y fecha en dos líneas, con Mochi y miniagentes 2×2. Las solicitudes y alertas conservan la prioridad.
 - Avisos optativos de nuevas versiones del fork `XFunBox/coucou-setup`; el enlace abre su release para actualizar conservando las personalizaciones.
 
-- Sala EVA-01 ampliada (880 × 480): el agente principal y sus subagentes reales de Codex, con rol, modelo, esfuerzo, última herramienta y relación padre/hijo. La isla abre su vista habitual; la oficina se abre desde la pestaña «Sala de agentes». Pulsar un puesto muestra su ficha. Al salir el cursor se recoge al notch en 0,6 s; mantiene las solicitudes pendientes. En compacto muestra cuántos subagentes siguen activos.
+- Sala EVA-01 ampliada (880 × 480): el agente principal y sus subagentes reales de Codex, con rol, modelo, esfuerzo, última herramienta y relación padre/hijo. La isla abre su vista habitual; la oficina se abre desde la pestaña «Sala de agentes». Pulsar un nodo muestra su ficha; el excedente se abre con el botón +N. Al salir el cursor se recoge al notch en 0,6 s; mantiene las solicitudes pendientes. En compacto muestra cuántos subagentes siguen activos.
 
 - Autocierre corregido tras avisos consecutivos, manteniendo los avisos al terminar. Panel a 10 segundos, sonido desactivado y pantalla del cursor.
 - GitHub: repositorios propios, últimos commits y pipelines de Actions en ejecución; enlaces a cada elemento y textos en español.

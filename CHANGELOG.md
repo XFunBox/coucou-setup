@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.3-sendoa.6 — 2026-11-04
+
+- Entrega conjunta: borde vivo, cuotas disponibles, música según capacidades, reloj orbital, avisos compactos, historial de sesión y constelación de agentes reales.
+- Conserva la corrección .5 de escalado entre monitores y las preferencias existentes durante la actualización local de binarios.
+- No incorpora cambios de Mochi ni temporizador de enfoque.
+
 ## 0.5.3-sendoa.5 — 2026-11-04
 
 - Hotfix de escala y posición de la isla y la sala en Wayland al cambiar entre monitores con distinta escala. Conserva el tamaño lógico y consulta la escala actual de GTK.
