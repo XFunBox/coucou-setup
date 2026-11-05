@@ -1,3 +1,16 @@
+# Verificación — 2026-11-05 — utilidades
+
+Versión **0.5.9-sendoa.2**. Entrega original de Utilidades, anterior a la corrección musical de .3. Publicada retrospectivamente para completar las releases; .3 sigue siendo la versión recomendada.
+
+- 625 pruebas de aplicación y 34 del hook correctas; 14 integraciones omitidas. Incluye regresiones de lista permitida, carpeta personal y errores de lanzamiento.
+- Frontend: 608 pruebas completas correctas antes de la última regresión; ejecución posterior de 609 detectó solo la entrada de novedades ausente. Corregida y verificadas las 17 pruebas afectadas.
+- TypeScript, Vite y compilación Tauri release correctos. Navegador: Atrás/Escape, errores y distribución sin desbordamiento ni errores de consola. Revisión independiente y corrección de Escape desde cabecera verificadas.
+- Parche acumulativo aplicado a fuente canónica: 1278 archivos versionados idénticos. Instalación local .2 comprobada en su momento mediante servicio activo y hash del ejecutable; ajustes, hooks y accesos conservados.
+
+No se verificaron clics y foco en la ventana nativa KDE. Compilación con cachés existentes; reversión preparada, no ejercitada. Esta versión conserva la selección genérica MPRIS previa y puede seleccionar Chrome cuando están cerrados Spotifast y Spotify; corregido en .3.
+
+---
+
 # Verificación — 2026-11-04 — Linux 0.5.9 custom
 
 Versión **0.5.9-sendoa.1**, portada desde .7 sobre el commit oficial `74363634b037108393e450428e5f207515c2c29b`. Conserva EVA-01, chat Codex IPC, cuotas por grupo y barras, reloj permanente, MPRIS/Spotifast, historial y sala de agentes. Adapta el cierre configurable, cola de permisos y paginación GitHub.

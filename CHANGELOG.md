@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.9-sendoa.2 — 2026-11-05
+
+- Añade Utilidades compactas: Terminal, Carpeta personal y Obsidian, con Atrás/Escape, errores visibles y bloqueo durante solicitudes de permiso.
+- Los lanzamientos reciben identificadores cerrados, eligen ejecutables y argumentos en Rust y no ejecutan una shell.
+- Conserva las personalizaciones y el comportamiento musical de .1. La limitación de música a Spotifast/Spotify corresponde a .3.
+
 ## 0.5.9-sendoa.1 — 2026-11-04
 
 - Actualiza a Linux 0.5.9 conservando EVA-01, chat Codex compartido, cuotas por grupo, música MPRIS/Spotifast, historial y constelación de agentes.

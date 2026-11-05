@@ -2,7 +2,7 @@
 
 Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
 
-Setup de **Coucou 0.5.9-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.9, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.9-sendoa.2** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.9, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 
 ## Así se ve
@@ -20,6 +20,8 @@ Capturas de la personalización EVA-01. Coucou y el personaje Mochi son de Louis
 ## Funciones
 
 Incluye:
+
+- Utilidades compactas con accesos a Terminal, Carpeta personal y Obsidian; vuelta con Atrás o Escape.
 
 - Anillos de cuota disponible y barras restauradas en el detalle de Codex, con ventanas y reinicios reales; avisos compactos priorizados; historial de hasta 20 eventos por sesión y constelación de agentes reales con navegación.
 - Reloj orbital compatible con música; controles MPRIS según capacidades reales y línea temporal solo cuando hay posición conocida. Borde vivo para actividad y solicitudes; movimiento reducido respetado.

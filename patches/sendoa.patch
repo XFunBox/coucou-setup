@@ -45,7 +45,7 @@ index ab75aa7..7863ba5 100644
  | 0.5.8 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.8) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.8) | Oct 31, 2026 | 14 fixes and features by @Ohualtex: permission requests queue, Claude Desktop cards and pill, plan usage in the compact island, Flow pill in a corner |
  | 0.5.7 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.7) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.7) | Oct 31, 2026 | Mail with classic Outlook on Windows: search, filters, automatic sorting, mail plans from the chat; search the settings |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index e1436a2..60b3903 100644
+index e1436a2..53ef4f7 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -804,7 +804,7 @@ dependencies = [
@@ -53,7 +53,7 @@ index e1436a2..60b3903 100644
  [[package]]
  name = "coucou"
 -version = "0.5.9"
-+version = "0.5.9-sendoa.1"
++version = "0.5.9-sendoa.2"
  dependencies = [
   "arboard",
   "cpal",
@@ -62,12 +62,12 @@ index e1436a2..60b3903 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.9"
-+version = "0.5.9-sendoa.1"
++version = "0.5.9-sendoa.2"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 6233219..56eba74 100644
+index 6233219..053351a 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -75,31 +75,31 @@ index 6233219..56eba74 100644
  
  [workspace.package]
 -version = "0.5.9"
-+version = "0.5.9-sendoa.1"
++version = "0.5.9-sendoa.2"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index c248d64..7a57aa4 100644
+index c248d64..1a1803d 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.9",
-+  "version": "0.5.9-sendoa.1",
++  "version": "0.5.9-sendoa.2",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.9",
-+      "version": "0.5.9-sendoa.1",
++      "version": "0.5.9-sendoa.2",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index ad4baa4..9606496 100644
+index ad4baa4..c2f44dd 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -107,7 +107,7 @@ index ad4baa4..9606496 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.9",
-+  "version": "0.5.9-sendoa.1",
++  "version": "0.5.9-sendoa.2",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -1661,7 +1661,7 @@ index fff8bd8..1260c73 100644
          }
      }
 diff --git a/windows/src-tauri/src/lib.rs b/windows/src-tauri/src/lib.rs
-index 2acb29c..0082905 100644
+index 2acb29c..04c7979 100644
 --- a/windows/src-tauri/src/lib.rs
 +++ b/windows/src-tauri/src/lib.rs
 @@ -6,6 +6,8 @@ mod chat;
@@ -1673,7 +1673,15 @@ index 2acb29c..0082905 100644
  mod codex_plan;
  mod config_file;
  mod desktop;
-@@ -218,6 +220,12 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
+@@ -28,6 +30,7 @@ mod pipe;
+ mod platform;
+ #[cfg(target_os = "linux")]
+ mod portal;
++mod quick_actions;
+ mod recap;
+ mod secrets;
+ mod session_window;
+@@ -218,6 +221,12 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
  fn fit_zoom(app: AppHandle, dpr: f64) -> bool {
      let Some(win) = island::window(&app) else { return false };
      let scale = win.scale_factor().unwrap_or(1.0);
@@ -1686,7 +1694,7 @@ index 2acb29c..0082905 100644
      static ZOOM: std::sync::Mutex<f64> = std::sync::Mutex::new(1.0);
      let mut zoom = ZOOM.lock().unwrap();
      if let Some(new_zoom) = island::calculate_zoom_correction(*zoom, scale, dpr) {
-@@ -502,6 +510,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
+@@ -502,6 +511,63 @@ async fn codex_plan_usage() -> Option<serde_json::Value> {
      tauri::async_runtime::spawn_blocking(codex_plan::read).await.ok().flatten()
  }
  
@@ -1750,7 +1758,16 @@ index 2acb29c..0082905 100644
  #[tauri::command]
  fn approval_decision(app: AppHandle, request_id: String, decision: String) {
      recap::record_decision(&app, &request_id, &decision);
-@@ -926,6 +991,12 @@ pub fn run() {
+@@ -884,6 +950,8 @@ pub fn run() {
+         .manage(recap::load())
+         .invoke_handler(tauri::generate_handler![
+             boot,
++            quick_actions::list_quick_actions,
++            quick_actions::run_quick_action,
+             mail::mail_refresh,
+             mail::mail_more,
+             mail::mail_search,
+@@ -926,6 +994,12 @@ pub fn run() {
              status_line_preview,
              status_line_apply,
              codex_plan_usage,
@@ -1787,6 +1804,171 @@ index 1893b83..c2b2983 100644
 +    }
      coucou_lib::run()
  }
+diff --git a/windows/src-tauri/src/quick_actions.rs b/windows/src-tauri/src/quick_actions.rs
+new file mode 100644
+index 0000000..c1e7347
+--- /dev/null
++++ b/windows/src-tauri/src/quick_actions.rs
+@@ -0,0 +1,159 @@
++//! Fixed desktop favourites. The webview supplies an ID, never a command.
++
++use serde::Serialize;
++
++#[derive(Clone, Serialize)]
++pub struct QuickAction {
++    pub id: &'static str,
++    pub label: &'static str,
++    pub description: &'static str,
++}
++
++#[tauri::command]
++pub fn list_quick_actions() -> Vec<QuickAction> {
++    vec![
++        QuickAction { id: "terminal", label: "Terminal", description: "Abrir una terminal" },
++        QuickAction { id: "home", label: "Carpeta personal", description: "Abrir tu carpeta personal" },
++        QuickAction { id: "obsidian", label: "Obsidian", description: "Abrir tus notas" },
++    ]
++}
++
++fn validate_id(id: &str) -> Result<(), String> {
++    match id {
++        "terminal" | "home" | "obsidian" => Ok(()),
++        _ => Err("Acción rápida desconocida.".into()),
++    }
++}
++
++#[tauri::command]
++pub async fn run_quick_action(id: String) -> Result<(), String> {
++    validate_id(&id)?;
++    #[cfg(target_os = "linux")]
++    {
++        linux::run(&id).await
++    }
++    #[cfg(not(target_os = "linux"))]
++    {
++        Err("Las acciones rápidas están disponibles en Linux.".into())
++    }
++}
++
++#[cfg(target_os = "linux")]
++mod linux {
++    use std::path::PathBuf;
++    use std::process::Stdio;
++    use std::time::Duration;
++    use tokio::process::Command;
++
++    const OBSIDIAN: &str = "md.obsidian.Obsidian";
++
++    fn command(binary: &str) -> Result<Command, String> {
++        let path = crate::platform::find_on_path(binary)
++            .ok_or_else(|| format!("No se encuentra {binary}. Comprueba que está instalado."))?;
++        Ok(Command::new(path))
++    }
++
++    fn validate_home(home: PathBuf) -> Result<PathBuf, String> {
++        if home.is_absolute() && home.is_dir() {
++            Ok(home)
++        } else {
++            Err("HOME no apunta a una carpeta personal válida.".into())
++        }
++    }
++
++    pub(super) async fn run(id: &str) -> Result<(), String> {
++        let mut cmd = match id {
++            "terminal" => {
++                let binary = ["konsole", "ptyxis"].into_iter()
++                    .find_map(crate::platform::find_on_path)
++                    .ok_or("No se encuentra una terminal. Instala Konsole o Ptyxis.")?;
++                Command::new(binary)
++            }
++            "home" => {
++                let home = std::env::var_os("HOME")
++                    .ok_or("No se encuentra la variable HOME.")?;
++                let mut cmd = command("xdg-open")?;
++                cmd.arg(validate_home(PathBuf::from(home))?);
++                cmd
++            }
++            "obsidian" => {
++                let mut info = command("flatpak")?;
++                info.args(["info", OBSIDIAN]).stdin(Stdio::null())
++                    .stdout(Stdio::null()).stderr(Stdio::null()).kill_on_drop(true);
++                let status = tokio::time::timeout(Duration::from_secs(3), info.status()).await
++                    .map_err(|_| "Flatpak no respondió al comprobar Obsidian.".to_owned())?
++                    .map_err(|e| format!("No se pudo comprobar Obsidian con Flatpak: {e}"))?;
++                if !status.success() {
++                    return Err("Obsidian no está disponible en Flatpak (md.obsidian.Obsidian).".into());
++                }
++                let mut cmd = command("flatpak")?;
++                cmd.args(["run", OBSIDIAN]);
++                cmd
++            }
++            _ => return Err("Acción rápida desconocida.".into()),
++        };
++        launch(&mut cmd).await
++    }
++
++    async fn launch(cmd: &mut Command) -> Result<(), String> {
++        let binary = cmd.as_std().get_program().to_string_lossy().into_owned();
++        let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
++            .spawn().map_err(|e| format!("No se pudo abrir {binary}: {e}"))?;
++        // A desktop app can stay open indefinitely. Catch early launcher failures
++        // without blocking the UI, then reap the process when it eventually exits.
++        match tokio::time::timeout(Duration::from_millis(400), child.wait()).await {
++            Ok(Ok(status)) if status.success() => Ok(()),
++            Ok(Ok(status)) => Err(format!("No se pudo abrir {binary}: terminó con {status}.")),
++            Ok(Err(e)) => Err(format!("No se pudo comprobar el arranque de {binary}: {e}")),
++            Err(_) => {
++                tauri::async_runtime::spawn(async move {
++                    if let Ok(status) = child.wait().await {
++                        if !status.success() {
++                            crate::log::line(format!("Quick action {binary} exited with {status}"));
++                        }
++                    }
++                });
++                Ok(())
++            }
++        }
++    }
++
++    #[cfg(test)]
++    mod tests {
++        use super::*;
++
++        #[test]
++        fn home_must_be_an_existing_absolute_directory() {
++            assert!(validate_home(PathBuf::from(".")).is_err());
++            assert!(validate_home(PathBuf::from("-unsafe")).is_err());
++            assert!(validate_home(std::env::temp_dir()).is_ok());
++        }
++
++        #[tokio::test(flavor = "current_thread")]
++        async fn launch_reports_missing_binary_and_nonzero_exit() {
++            assert!(launch(&mut Command::new("/coucou-missing-quick-action-binary")).await.is_err());
++            let error = launch(&mut Command::new("/bin/false")).await.unwrap_err();
++            assert!(error.contains("/bin/false") && error.contains("exit status"));
++            assert!(launch(&mut Command::new("/bin/true")).await.is_ok());
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn only_the_three_fixed_favourites_are_accepted() {
++        let actions = list_quick_actions();
++        assert_eq!(actions.iter().map(|a| a.id).collect::<Vec<_>>(),
++            ["terminal", "home", "obsidian"]);
++        for action in actions {
++            assert!(validate_id(action.id).is_ok());
++            assert!(!action.label.is_empty() && !action.description.is_empty());
++        }
++        for id in ["", "Terminal", " terminal", "terminal; touch /tmp/no", "xdg-open", "../home"] {
++            assert!(validate_id(id).is_err(), "accepted {id:?}");
++        }
++    }
++}
 diff --git a/windows/src-tauri/src/spotify.rs b/windows/src-tauri/src/spotify.rs
 index cb008bf..2d92b74 100644
 --- a/windows/src-tauri/src/spotify.rs
@@ -3082,7 +3264,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 8002726..f7b35d7 100644
+index 8002726..cdff2b9 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -3090,7 +3272,7 @@ index 8002726..f7b35d7 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.9",
-+  "version": "0.5.9-sendoa.1",
++  "version": "0.5.9-sendoa.2",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -3258,7 +3440,7 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/core/layout.ts b/windows/src/core/layout.ts
-index 3b88a1d..8314232 100644
+index 3b88a1d..c5d0995 100644
 --- a/windows/src/core/layout.ts
 +++ b/windows/src/core/layout.ts
 @@ -5,6 +5,7 @@
@@ -3269,7 +3451,15 @@ index 3b88a1d..8314232 100644
    | "overview"
    | "empty"
    | "approval"
-@@ -54,8 +55,8 @@ export interface ViewLayout {
+@@ -20,6 +21,7 @@ export type IslandViewName =
+   | "searching"
+   | "result"
+   | "note"
++  | "utilities"
+   | "settings"
+   | "greeting"
+   | "recap"
+@@ -54,8 +56,8 @@ export interface ViewLayout {
  
  // The window is a fixed 720×320 (largest view) like the macOS panel; the island is
  // drawn inside it, glued to the top edge and horizontally centred.
@@ -3280,7 +3470,7 @@ index 3b88a1d..8314232 100644
  
  // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
  export const NOTCH_W = 184;
-@@ -71,6 +72,7 @@ export const WAKE_STRIP_W = 240;
+@@ -71,6 +73,7 @@ export const WAKE_STRIP_W = 240;
  export const WAKE_STRIP_H = 6;
  
  export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
@@ -3288,7 +3478,15 @@ index 3b88a1d..8314232 100644
    overview: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "pills" },
    empty: { height: 160, botX: 70, botY: null, botDiameter: 62, agentMode: "none" },
    approval: { height: 160, botX: 62, botY: null, botDiameter: 56, agentMode: "column" },
-@@ -128,7 +130,7 @@ export function islandSize(
+@@ -88,6 +91,7 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
+   searching: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
+   result: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
+   note: { height: 160, botX: 60, botY: null, botDiameter: 50, agentMode: "column" },
++  utilities: { height: 160, botX: 320, botY: null, botDiameter: 0, agentMode: "none" },
+   settings: { height: 160, botX: 54, botY: null, botDiameter: 46, agentMode: "none" },
+   greeting: { height: 150, botX: 320, botY: 90, botDiameter: 0, agentMode: "none" },
+   // Mac: 160. The extra 24 hold the two lines with top agent, project, busiest
+@@ -128,7 +132,7 @@ export function islandSize(
        return { w: COMPACT_W, h: NOTCH_H };
      case "expanded": {
        const h = view === "prompt" ? chatPromptHeight(chatCount) : VIEW_LAYOUTS[view].height;
@@ -3297,7 +3495,7 @@ index 3b88a1d..8314232 100644
      }
    }
  }
-@@ -182,16 +184,17 @@ export function botGlowColor(s: BotStateName): string {
+@@ -182,16 +186,17 @@ export function botGlowColor(s: BotStateName): string {
        return "#A78BFA";
      case "searching":
        return "#6366F1";
@@ -3320,7 +3518,7 @@ index 3b88a1d..8314232 100644
    }
  }
  
-@@ -241,13 +244,13 @@ export type Wash = "red" | "green" | "pink" | "amber" | "cyan" | "indigo" | "sof
+@@ -241,13 +246,13 @@ export type Wash = "red" | "green" | "pink" | "amber" | "cyan" | "indigo" | "sof
  export function washRGBA(wash: Wash): string {
    switch (wash) {
      case "red":
@@ -4934,7 +5132,7 @@ index c539648..d273ec2 100644
    State.notify();
  }
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index e237b0b..5dd8658 100644
+index e237b0b..a39ae88 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -1,3 +1,4 @@
@@ -5032,7 +5230,15 @@ index e237b0b..5dd8658 100644
      this.fsm.onTransition = (from, to) => {
        // The greeting is over, however it ended: back to his desktop spot.
        if (from === "coucou" && to !== "coucou") this.desktop.launch();
-@@ -493,6 +529,7 @@ export class Island {
+@@ -444,6 +480,7 @@ export class Island {
+       restoreAlertFocus();
+     }
+     if (mode !== "expanded") {
++      if (State.view === "utilities") State.view = State.defaultView();
+       closePlanCard();
+       this.engine.resetMorph();
+       // Nothing can be seen of the sequence once the island is shut, and leaving
+@@ -493,6 +530,7 @@ export class Island {
    }
  
    setView(view: IslandViewName) {
@@ -5040,7 +5246,7 @@ index e237b0b..5dd8658 100644
      this.stopSequenceIfLeaving(view);
      if (view !== "overview") closePlanCard();
      if (State.mode !== "expanded") {
-@@ -528,6 +565,9 @@ export class Island {
+@@ -528,6 +566,9 @@ export class Island {
      this.fsm.pinned = State.isPinned;
      this.fsm.forceHome();
      this.expand(view);
@@ -5050,7 +5256,7 @@ index e237b0b..5dd8658 100644
    }
  
    /** A new Coucou waits and Mochi has nothing else to say (he is blue). */
-@@ -758,6 +798,19 @@ export class Island {
+@@ -758,6 +799,19 @@ export class Island {
  
    // ── Geometry ────────────────────────────────────────────────────────────────
  
@@ -5070,7 +5276,7 @@ index e237b0b..5dd8658 100644
    /** The closed island stays on screen (anything but "hidden"). */
    private get closedShows(): boolean {
      return closedIsland(State.settings.closedIsland) !== "hidden";
-@@ -768,6 +821,12 @@ export class Island {
+@@ -768,6 +822,12 @@ export class Island {
        return { w: this.closedW, h: CLOSED_H, r: 10 };
      }
      let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
@@ -5083,7 +5289,7 @@ index e237b0b..5dd8658 100644
      if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
        h = QUESTION_PICKER_H;
      }
-@@ -956,6 +1015,7 @@ export class Island {
+@@ -956,6 +1016,7 @@ export class Island {
          return;
        }
        if (State.mode !== "expanded") {
@@ -5091,7 +5297,15 @@ index e237b0b..5dd8658 100644
          this.fsm.click();
          return;
        }
-@@ -1067,6 +1127,7 @@ export class Island {
+@@ -1000,6 +1061,7 @@ export class Island {
+     window.addEventListener("keydown", (e) => {
+       if (e.key === "Escape" && State.mode === "expanded") {
+         if (State.pendingApproval) this.foldApproval();
++        else if (State.view === "utilities") this.setView(State.defaultView());
+         else if (!State.isPinned) this.collapse();
+       }
+       State.lastActivity = performance.now();
+@@ -1067,6 +1129,7 @@ export class Island {
        this.fsm.mouseEntered();
      }
      if (!inIsland && wasIn) {
@@ -5099,7 +5313,7 @@ index e237b0b..5dd8658 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1245,7 +1306,7 @@ export class Island {
+@@ -1245,7 +1308,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -5108,7 +5322,7 @@ index e237b0b..5dd8658 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1373,8 +1434,22 @@ export class Island {
+@@ -1373,8 +1436,22 @@ export class Island {
  
    // ── DOM sync ────────────────────────────────────────────────────────────────
  
@@ -5131,7 +5345,7 @@ index e237b0b..5dd8658 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1395,6 +1470,7 @@ export class Island {
+@@ -1395,40 +1472,59 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -5139,7 +5353,22 @@ index e237b0b..5dd8658 100644
        if (on) view.sync();
      }
  
-@@ -1411,24 +1487,39 @@ export class Island {
+     // The chat is the only view with a text field, so it is the only time the
+     // island is allowed to take keyboard focus.
+     if (this.lastSyncedView !== State.view) {
+-      const wasChat = this.lastSyncedView === "prompt";
++      const wasChat = this.lastSyncedView === "prompt" || this.lastSyncedView === "utilities";
+       this.lastSyncedView = State.view;
+-      if (State.view === "prompt") {
++      if (expanded && (State.view === "prompt" || State.view === "utilities")) {
++        const focusedView = State.view;
+         void Bridge.focusWindow(true);
+-        window.setTimeout(() => this.views.get("prompt")?.focus?.(), 120);
++        window.setTimeout(() => {
++          if (State.mode === "expanded" && State.view === focusedView) this.views.get(focusedView)?.focus?.();
++        }, 120);
+       } else if (wasChat) {
+         void Bridge.focusWindow(false);
        }
      }
  
@@ -5183,7 +5412,7 @@ index e237b0b..5dd8658 100644
      this.compactPlan.style.opacity = showPlan ? "1" : "0";
      this.compactPlan.style.pointerEvents = showPlan ? "auto" : "none";
      if (showPlan) {
-@@ -1440,23 +1531,62 @@ export class Island {
+@@ -1440,23 +1536,62 @@ export class Island {
        this.compactPlanLabel.textContent = pct != null ? `${Math.round(pct)}%` : "—";
      }
  
@@ -5255,7 +5484,7 @@ index e237b0b..5dd8658 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1473,9 +1603,12 @@ export class Island {
+@@ -1473,9 +1608,12 @@ export class Island {
      Sound.setVolume(State.settings.soundVolume);
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -5269,7 +5498,7 @@ index e237b0b..5dd8658 100644
    }
  
    get panelSize() {
-@@ -1483,6 +1616,6 @@ export class Island {
+@@ -1483,6 +1621,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -5339,6 +5568,19 @@ index 0000000..e1a9d4a
 +    el.setAttribute("aria-label", el.title);
 +  }};
 +}
+diff --git a/windows/src/island/shortcuts.ts b/windows/src/island/shortcuts.ts
+index f00c1f2..2cfc1a0 100644
+--- a/windows/src/island/shortcuts.ts
++++ b/windows/src/island/shortcuts.ts
+@@ -201,7 +201,7 @@ export function registerShortcutHandlers(host: ShortcutHost, resume: () => void)
+   window.addEventListener(
+     "keydown",
+     (e: KeyboardEvent) => {
+-      if (State.mode !== "expanded") return;
++      if (State.mode !== "expanded" || State.view === "utilities") return;
+       const action = islandKeyAction(e, { view: State.view, inTextField: inTextField(e.target) });
+       if (!action) return;
+       e.preventDefault();
 diff --git a/windows/src/main.ts b/windows/src/main.ts
 index a84d3dc..1c768cc 100644
 --- a/windows/src/main.ts
@@ -5850,7 +6092,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index b7877d3..1f29a7b 100644
+index b7877d3..faf5056 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -6836,6 +7078,24 @@ index b7877d3..1f29a7b 100644
  /* ── Mail (classic Outlook) — MailViews.swift ─────────────────────────────── */
  .mail-card {
    height: 100%;
+@@ -3596,3 +3798,17 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+ ::-webkit-scrollbar-thumb:hover {
+   background-color: rgba(255, 255, 255, 0.3);
+ }
++
++/* Compact desktop utilities replace the central body. */
++#header .utilities-tab { width:auto; padding:0 9px; font-size:11px; }
++.utilities { padding:2px 6px 4px; display:flex; flex-direction:column; gap:5px; overflow:auto; }
++.utility-heading { display:flex; align-items:center; gap:14px; color:var(--dim-2); font-size:11px; }
++.utility-back,.utility-retry { background:transparent; color:var(--eva-accent); border:0; border-radius:6px; padding:3px 7px; cursor:pointer; }
++.utility-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
++.utility-action { min-width:0; border:1px solid color-mix(in srgb,var(--eva-accent) 28%,transparent); border-radius:10px; background:var(--eva-hover); color:var(--ink); padding:10px; display:flex; flex-direction:column; gap:4px; align-items:flex-start; cursor:pointer; text-align:left; }
++.utility-action span { font-size:12px; }
++.utility-action small { font-size:10px; color:var(--dim-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
++.utilities button:focus-visible { outline:2px solid var(--eva-accent); outline-offset:1px; }
++.utilities button:disabled { opacity:.5; cursor:wait; }
++.utility-status { font-size:10px; color:var(--dim-2); min-height:12px; overflow-wrap:anywhere; }
++.utility-retry { align-self:flex-start; }
 diff --git a/windows/src/theme.css b/windows/src/theme.css
 new file mode 100644
 index 0000000..91a8088
@@ -7851,8 +8111,116 @@ index d383339..513b26d 100644
      this.el.append(head(codexColor(now), PLAN_TEXT.codexTitle, codexSubtitle(u, now)), rows);
    }
  }
+diff --git a/windows/src/views/utilities.ts b/windows/src/views/utilities.ts
+new file mode 100644
+index 0000000..dc967e0
+--- /dev/null
++++ b/windows/src/views/utilities.ts
+@@ -0,0 +1,102 @@
++import { invoke } from "@tauri-apps/api/core";
++import { IS_TAURI } from "../core/bridge";
++import { State } from "../core/state";
++import { h, clear } from "./dom";
++import type { ViewActions, ViewHost } from "./views";
++
++interface QuickAction { id: string; label: string; description: string }
++interface ActionsApi { list(): Promise<QuickAction[]>; run(id: string): Promise<unknown> }
++const nativeApi: ActionsApi = {
++  list: () => IS_TAURI
++    ? invoke("list_quick_actions")
++    : Promise.reject(new Error("Abre Coucou en el escritorio para usar estas acciones.")),
++  run: id => invoke("run_quick_action", { id }),
++};
++
++/** The native allowlist owns commands; the webview only sends an action ID. */
++export function buildUtilities(
++  actions: Pick<ViewActions, "setView" | "holdOpen">,
++  api: ActionsApi = nativeApi,
++): ViewHost {
++  let visible = false;
++  let generation = 0;
++  let busy = false;
++  const back = h("button", {
++    class: "utility-back", text: "← Atrás",
++    onclick: () => actions.setView(State.defaultView()),
++  });
++  const status = h("div", { class: "utility-status", role: "status", "aria-live": "polite" });
++  const list = h("div", { class: "utility-list" });
++  const retry = h("button", { class: "utility-retry", text: "Reintentar", onclick: () => void load() });
++  retry.hidden = true;
++  const el = h("div", { class: "view utilities", "aria-label": "Utilidades" },
++    h("div", { class: "utility-heading" }, back, h("span", { text: "Acciones rápidas" })),
++    list, status, retry,
++  );
++  el.inert = true;
++  el.addEventListener("keydown", e => {
++    e.stopPropagation();
++    if (e.key === "Escape") {
++      e.preventDefault();
++      actions.setView(State.defaultView());
++    }
++  });
++  const message = (error: unknown) => error instanceof Error ? error.message : String(error);
++
++  async function load() {
++    const current = ++generation;
++    clear(list);
++    retry.hidden = true;
++    status.textContent = "Cargando…";
++    try {
++      const items = await api.list();
++      if (!visible || current !== generation) return;
++      status.textContent = items.length ? "" : "No hay acciones disponibles.";
++      for (const item of items) {
++        const button = h("button", {
++          class: "utility-action", title: item.description,
++          onclick: () => void run(item, button),
++        }, h("span", { text: item.label }), h("small", { text: item.description }));
++        list.append(button);
++      }
++    } catch (error) {
++      if (!visible || current !== generation) return;
++      status.textContent = message(error);
++      retry.hidden = false;
++    }
++  }
++
++  async function run(item: QuickAction, button: HTMLButtonElement) {
++    if (!visible || busy || State.pendingApproval) return;
++    const current = generation;
++    busy = true;
++    button.disabled = true;
++    status.textContent = "Abriendo…";
++    try {
++      await api.run(item.id);
++      if (visible && current === generation) status.textContent = `${item.label}: solicitud enviada.`;
++    } catch (error) {
++      if (visible && current === generation) status.textContent = message(error);
++    } finally {
++      busy = false;
++      button.disabled = false;
++    }
++  }
++
++  return {
++    el, sync() {}, focus: () => back.focus(),
++    setVisible(on) {
++      if (on === visible) return;
++      visible = on;
++      el.inert = !on;
++      actions.holdOpen(on);
++      if (on) void load();
++      else {
++        ++generation;
++        clear(list);
++        status.textContent = "";
++        retry.hidden = true;
++      }
++    },
++  };
++}
 diff --git a/windows/src/views/views.ts b/windows/src/views/views.ts
-index d29f9b6..d698a4d 100644
+index d29f9b6..a5f0b05 100644
 --- a/windows/src/views/views.ts
 +++ b/windows/src/views/views.ts
 @@ -1,3 +1,5 @@
@@ -7861,7 +8229,7 @@ index d29f9b6..d698a4d 100644
  // Island views — DOM ports of IslandViewContent.swift. Paddings, font sizes,
  // colours and wording are copied from the Swift views so both platforms read
  // identically.
-@@ -19,6 +21,7 @@ import {
+@@ -19,9 +21,11 @@ import {
  import { buildDiffCard } from "./diff";
  import { lastTextStep } from "../core/diff";
  import { Bridge } from "../core/bridge";
@@ -7869,7 +8237,11 @@ index d29f9b6..d698a4d 100644
  import { buildRecap } from "./recap";
  import { buildWardrobe } from "./wardrobe";
  import { buildUpdate } from "./update";
-@@ -68,6 +71,9 @@ export interface ViewActions {
++import { buildUtilities } from "./utilities";
+ import { buildWhatsNew } from "./whatsnew";
+ import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
+ import { SPOTIFY_ID } from "../core/spotify";
+@@ -68,6 +72,9 @@ export interface ViewActions {
  export interface ViewHost {
    el: HTMLElement;
    sync(): void;
@@ -7879,7 +8251,7 @@ index d29f9b6..d698a4d 100644
    /** Called when the view becomes active, for views with a text field. */
    focus?(): void;
    /** Called every frame while the view is on screen. True = needs another frame. */
-@@ -118,6 +124,7 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
+@@ -118,9 +125,11 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
  
  export function buildHeader(actions: ViewActions): ViewHost {
    const tabHome = h("button", { class: "tab", title: tl("Overview"), onclick: () => go("overview") }, svg(ICONS.house, 17));
@@ -7887,24 +8259,32 @@ index d29f9b6..d698a4d 100644
    const tabChat = h("button", { class: "tab", title: tl("Ask"), onclick: () => go("prompt") }, svg(ICONS.bubbleRound, 19));
    const tabDrop = h("button", { class: "tab", title: tl("Drop"), onclick: () => go("upload") }, svg(ICONS.plus, 16));
  
-@@ -140,7 +147,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
++  const utilitiesBtn = h("button", { class: "tab utilities-tab", text: "Utilidades", onclick: () => { if (!State.pendingApproval) go("utilities"); } });
+   const gearBtn = h("button", { title: tl("Settings"), onclick: () => go("settings") }, svg(ICONS.gearLine, 18, { stroke: 1.6 }));
+   const soundBtn = h("button", { title: tl("Mute"), onclick: () => actions.toggleSound() }, svg(ICONS.speakerLine, 18, { stroke: 1.6 }));
+   // Folds back to the compact island now, without waiting for the timer (the
+@@ -140,7 +149,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
    const el = h(
      "div",
      { id: "header" },
 -    h("div", { class: "tabs" }, tabHome, tabChat, tabDrop),
-+    h("div", { class: "tabs" }, tabHome, tabRoom, tabChat, tabDrop),
++    h("div", { class: "tabs" }, tabHome, tabRoom, tabChat, tabDrop, utilitiesBtn),
      h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn, closeBtn),
    );
    const headerActions = el.lastElementChild as HTMLElement;
-@@ -150,6 +157,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
+@@ -149,7 +158,11 @@ export function buildHeader(actions: ViewActions): ViewHost {
+     el,
      sync() {
        const v = State.view;
++      utilitiesBtn.disabled = Boolean(State.pendingApproval);
++      utilitiesBtn.classList.toggle("on", v === "utilities");
++      utilitiesBtn.setAttribute("aria-pressed", String(v === "utilities"));
        tabHome.classList.toggle("on", v === "overview" || v === "empty");
 +      tabRoom.classList.toggle("on", v === "agents");
        tabChat.classList.toggle("on", v === "prompt");
        tabDrop.classList.toggle("on", v === "upload");
        gearBtn.classList.toggle("on", v === "settings");
-@@ -195,6 +203,11 @@ function buildOverview(actions: ViewActions): ViewHost {
+@@ -195,6 +208,11 @@ function buildOverview(actions: ViewActions): ViewHost {
      activeDiffId = diffId;
      State.notify();
    });
@@ -7916,7 +8296,7 @@ index d29f9b6..d698a4d 100644
    const who = h("div", { class: "who" });
    const tickerBody = h("div", { class: "card-body" }, who, ticker.el);
    const leftBody = h("div", { class: "left-body" });
-@@ -314,6 +327,7 @@ function buildOverview(actions: ViewActions): ViewHost {
+@@ -314,6 +332,7 @@ function buildOverview(actions: ViewActions): ViewHost {
        const task = State.focusTask;
        if (task?.id !== lastFocus) {
          lastFocus = task?.id ?? null;
@@ -7924,7 +8304,7 @@ index d29f9b6..d698a4d 100644
          detailOpen = false;
          activeDiffId = null;
          cardKey = "";
-@@ -377,6 +391,12 @@ function buildOverview(actions: ViewActions): ViewHost {
+@@ -377,6 +396,12 @@ function buildOverview(actions: ViewActions): ViewHost {
              text: `${Math.min(task.stepIndex + 1, task.steps.length)}/${task.steps.length}`,
            }));
          }
@@ -7937,7 +8317,7 @@ index d29f9b6..d698a4d 100644
          ticker.sync(task);
        } else if (task && task.id === SPOTIFY_ID) {
          // Its own card for every state: playing, idle, not installed.
-@@ -571,6 +591,7 @@ function buildApproval(actions: ViewActions): ViewHost {
+@@ -571,6 +596,7 @@ function buildApproval(actions: ViewActions): ViewHost {
        // is the command, the file path or the URL being authorised, not just the
        // name of the tool asking.
        code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
@@ -7945,7 +8325,7 @@ index d29f9b6..d698a4d 100644
        // Two buttons, built once. Rebuilding them between a mouse-down and a
        // mouse-up would swallow the click, and there is nothing left to vary:
        // "Always" is gone until the remembered-rules list exists to back it.
-@@ -846,6 +867,7 @@ export function buildViews(
+@@ -846,6 +872,7 @@ export function buildViews(
  ): Map<IslandViewName, ViewHost> {
    const map = new Map<IslandViewName, ViewHost>();
    map.set("overview", buildOverview(actions));
@@ -7953,14 +8333,62 @@ index d29f9b6..d698a4d 100644
    map.set("empty", buildEmpty(actions));
    map.set("approval", buildApproval(actions));
    map.set("question", buildQuestion(actions));
+@@ -853,6 +880,7 @@ export function buildViews(
+   map.set("finished", buildFinished(actions));
+   map.set("confused", buildConfused());
+   map.set("note", buildNote());
++  map.set("utilities", buildUtilities(actions));
+   map.set("settings", buildSettings(actions));
+   map.set("prompt", buildPrompt(onChatHeightChange));
+   map.set("upload", buildUpload());
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index e98f0d5..c13fc05 100644
+index e98f0d5..ef5be01 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -1,6 +1,527 @@
+@@ -1,6 +1,567 @@
  {
    "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 14 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
++    {
++      "version": "0.5.9-sendoa.2",
++      "items": [
++        {
++          "icon": "terminal",
++          "title": {
++            "en": "Compact utilities",
++            "es": "Utilidades compactas",
++            "fr": "Utilitaires compacts",
++            "de": "Kompakte Werkzeuge",
++            "pt-BR": "Utilitários compactos",
++            "tr": "Kompakt araçlar",
++            "ru": "Компактные инструменты",
++            "id": "Utilitas ringkas",
++            "zh-Hans": "紧凑工具",
++            "hi": "कॉम्पैक्ट उपयोगिताएँ",
++            "ar": "أدوات مدمجة",
++            "bn": "ছোট ইউটিলিটি প্যানেল",
++            "ko": "간결한 유틸리티",
++            "ja": "コンパクトなユーティリティ"
++          },
++          "detail": {
++            "en": "Open the terminal, home folder or Obsidian from Utilities. Back or Escape returns to the usual view.",
++            "es": "Abre la terminal, tu carpeta personal u Obsidian desde Utilidades. Atrás o Escape recupera la vista habitual.",
++            "fr": "Ouvrez le terminal, le dossier personnel ou Obsidian depuis Utilitaires. Retour ou Échap rétablit la vue habituelle.",
++            "de": "Öffne Terminal, persönlichen Ordner oder Obsidian unter Werkzeuge. Zurück oder Escape stellt die normale Ansicht wieder her.",
++            "pt-BR": "Abra o terminal, a pasta pessoal ou o Obsidian em Utilitários. Voltar ou Escape retorna à vista habitual.",
++            "tr": "Araçlardan terminali, kişisel klasörü veya Obsidian’ı açın. Geri veya Escape normal görünüme döndürür.",
++            "ru": "Открывайте терминал, домашнюю папку или Obsidian из инструментов. Назад или Escape возвращает обычный вид.",
++            "id": "Buka terminal, folder pribadi atau Obsidian dari Utilitas. Kembali atau Escape mengembalikan tampilan biasa.",
++            "zh-Hans": "从工具中打开终端、主文件夹或 Obsidian。返回或 Escape 可恢复通常视图。",
++            "hi": "उपयोगिताओं से टर्मिनल, होम फ़ोल्डर या Obsidian खोलें। वापस या Escape से सामान्य दृश्य पर लौटें।",
++            "ar": "افتح الطرفية أو المجلد الشخصي أو Obsidian من الأدوات. يعيدك رجوع أو Escape إلى العرض المعتاد.",
++            "bn": "ইউটিলিটি থেকে টার্মিনাল, হোম ফোল্ডার বা Obsidian খুলুন। ফিরে যান বা Escape স্বাভাবিক দৃশ্যে ফেরায়।",
++            "ko": "유틸리티에서 터미널, 홈 폴더 또는 Obsidian을 여세요. 뒤로 또는 Escape로 기본 화면에 돌아갑니다.",
++            "ja": "ユーティリティからターミナル、ホームフォルダ、Obsidian を開けます。戻るか Escape で通常の表示に戻ります。"
++          }
++        }
++      ]
++    },
 +    {
 +      "version": "0.5.9-sendoa.1",
 +      "items": [
@@ -9807,6 +10235,63 @@ index 0000000..636b755
 +  view.sync([]);
 +  assert.equal(view.el.find("LI").length, 0);
 +  assert.ok(view.el.textContent.includes(t("Waiting for activity")));
++});
+diff --git a/windows/tests/utilities.test.mjs b/windows/tests/utilities.test.mjs
+new file mode 100644
+index 0000000..eab7571
+--- /dev/null
++++ b/windows/tests/utilities.test.mjs
+@@ -0,0 +1,51 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { State } from '../src/core/state.ts';
++import { installFakeDom } from './fakedom.mjs';
++import { buildUtilities } from '../src/views/utilities.ts';
++installFakeDom();
++const flush = () => new Promise(resolve => setImmediate(resolve));
++function fixture(api) {
++  const events = [];
++  const view = buildUtilities({setView:v=>events.push(v), holdOpen:v=>events.push(v)}, api);
++  return {view, events};
++}
++test('failed launch stays visible and permits retry; concurrent clicks launch once', async () => {
++  let reject, runs = 0;
++  const {view} = fixture({list:async()=>[{id:'terminal',label:'Terminal',description:'Abrir terminal'}], run:()=>{ runs++; return new Promise((_,r)=>reject=r); }});
++  view.setVisible(true); await flush();
++  const button = view.el.querySelector('.utility-action');
++  button.fire('click'); button.fire('click');
++  assert.equal(runs,1);
++  reject(new Error('Terminal no disponible')); await flush();
++  assert.match(view.el.textContent,/Terminal no disponible/);
++  assert.equal(button.disabled,false);
++});
++test('a late load cannot repopulate a folded utility and reopening retries', async () => {
++  let resolve, loads=0;
++  const {view,events} = fixture({list:()=>{loads++;return new Promise(r=>resolve=r);},run:async()=>{}});
++  view.setVisible(true); view.setVisible(false);
++  resolve([{id:'terminal',label:'Tardío',description:''}]); await flush();
++  assert.doesNotMatch(view.el.textContent,/Tardío/);
++  assert.deepEqual(events,[true,false]);
++  view.setVisible(true); assert.equal(loads,2);
++});
++test('load error offers a retry and Back restores the normal view', async () => {
++  let loads=0;
++  const {view,events}=fixture({list:async()=>{if(++loads===1)throw new Error('Sin conexión');return[];},run:async()=>{}});
++  view.setVisible(true); await flush();
++  assert.match(view.el.textContent,/Sin conexión/);
++  view.el.querySelector('.utility-retry').fire('click'); await flush();
++  assert.equal(loads,2);
++  view.el.querySelector('.utility-back').fire('click');
++  assert.equal(events.at(-1),State.defaultView());
++});
++test('pending permission prevents launching a desktop action', async () => {
++  let runs=0;
++  const {view}=fixture({list:async()=>[{id:'home',label:'Carpeta',description:''}],run:async()=>{runs++;}});
++  view.setVisible(true); await flush();
++  const previous=State.pendingApproval;
++  State.pendingApproval={requestId:'pending'};
++  try { view.el.querySelector('.utility-action').fire('click'); assert.equal(runs,0); }
++  finally { State.pendingApproval=previous; view.setVisible(false); }
 +});
 diff --git a/windows/tests/whats-new.test.mjs b/windows/tests/whats-new.test.mjs
 index 4647a57..62d5e10 100644
