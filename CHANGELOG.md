@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.5.9-sendoa.3 — 2026-11-05
+
+- Añade Utilidades compactas: Terminal, Carpeta personal y Obsidian, con Atrás/Escape y errores visibles. Los lanzamientos usan identificadores cerrados y no ejecutan una shell.
+- Limita música a Spotifast y Spotify. Prioriza Spotifast y deja la tarjeta sin reproductor al cerrar ambos; excluye Chrome y otros servicios MPRIS.
+- Incluye la entrega local .2 de utilidades y conserva las personalizaciones de .1.
+
 ## 0.5.9-sendoa.1 — 2026-11-04
 
 - Actualiza a Linux 0.5.9 conservando EVA-01, chat Codex compartido, cuotas por grupo, música MPRIS/Spotifast, historial y constelación de agentes.

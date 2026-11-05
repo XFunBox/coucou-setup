@@ -2,7 +2,7 @@
 
 Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
 
-Setup de **Coucou 0.5.9-sendoa.1** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.9, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.9-sendoa.3** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.9, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 
 ## Así se ve
@@ -20,6 +20,9 @@ Capturas de la personalización EVA-01. Coucou y el personaje Mochi son de Louis
 ## Funciones
 
 Incluye:
+
+- Utilidades compactas con accesos a Terminal, Carpeta personal y Obsidian; vuelta con Atrás o Escape.
+- Música limitada a Spotifast y Spotify, con prioridad para Spotifast. Al cerrar ambos, la tarjeta queda sin reproductor y no selecciona Chrome ni otros servicios MPRIS.
 
 - Anillos de cuota disponible y barras restauradas en el detalle de Codex, con ventanas y reinicios reales; avisos compactos priorizados; historial de hasta 20 eventos por sesión y constelación de agentes reales con navegación.
 - Reloj orbital compatible con música; controles MPRIS según capacidades reales y línea temporal solo cuando hay posición conocida. Borde vivo para actividad y solicitudes; movimiento reducido respetado.
@@ -129,6 +132,6 @@ Procedencia:
 
 Resultados y límites de las pruebas: [VERIFICATION.md](VERIFICATION.md).
 
-- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/841a81ce1d75b65882b30139e6b716d0837dce30).
+- [Código base oficial de Coucou](https://github.com/Louis-CFM/coucou/tree/74363634b037108393e450428e5f207515c2c29b).
 - [Codex CLI 0.159.2](https://github.com/openai/codex/releases/tag/rust-v0.159.2).
 - [Hooks de Codex](https://learn.chatgpt.com/docs/hooks).

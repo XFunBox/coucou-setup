@@ -1,3 +1,16 @@
+# Verificación — 2026-11-05 — utilidades y selección musical
+
+Versión **0.5.9-sendoa.3**, sobre la fuente Linux 0.5.9 ya fijada. Incluye la entrega local .2 de utilidades y corrige la selección de reproductor.
+
+- Música: regresión reproducida antes del cambio; **24 pruebas correctas**, incluidas las integraciones con D-Bus privado, prioridad Spotifast/Spotify, controles, desconexiones y exclusión de Chrome. **13 pruebas de novedades** correctas. Revisión independiente sin hallazgos accionables.
+- Utilidades (.2): 625 pruebas de aplicación y 34 del hook correctas, 14 integraciones omitidas. Frontend: 608 pruebas completas correctas antes de la última regresión; ejecución posterior de 609 detectó solo una entrada de novedades ausente, corregida y comprobada con las 17 pruebas afectadas. Navegación, Escape, errores y distribución verificados en navegador. Revisión y corrección de Escape desde la cabecera comprobadas.
+- TypeScript, Vite y compilación Tauri release final correctos. Instalación .3 comprobada mediante servicio activo y hash del ejecutable en memoria; ajustes, hooks y accesos conservados. Copia de reversión preparada.
+- Parche acumulativo aplicado a fuente canónica limpia: **1278 archivos versionados idénticos**. SHA-256 del parche fijado en source-lock.json.
+
+No se repitió la suite general Rust/Node después de la corrección musical: se ejecutaron las pruebas afectadas y la compilación final. La selección al cerrar ambos reproductores se comprobó con simuladores, sin modificar la reproducción del usuario. No se inspeccionaron los clics ni el foco de las utilidades en la ventana nativa KDE. Compilación con cachés existentes; reversión preparada, no ejercitada tras la instalación correcta.
+
+---
+
 # Verificación — 2026-11-04 — Linux 0.5.9 custom
 
 Versión **0.5.9-sendoa.1**, portada desde .7 sobre el commit oficial `74363634b037108393e450428e5f207515c2c29b`. Conserva EVA-01, chat Codex IPC, cuotas por grupo y barras, reloj permanente, MPRIS/Spotifast, historial y sala de agentes. Adapta el cierre configurable, cola de permisos y paginación GitHub.
