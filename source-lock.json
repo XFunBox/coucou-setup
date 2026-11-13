@@ -3,7 +3,7 @@
   "upstreamCommit": "74363634b037108393e450428e5f207515c2c29b",
   "sourceUrl": "https://codeload.github.com/Louis-CFM/coucou/tar.gz/74363634b037108393e450428e5f207515c2c29b",
   "sourceSha256": "f54437075c43c9baa40eae17c61a39f1b2d2011b3252620fb2788ca63d3cb32a",
-  "patchSha256": "27a3dd7c91e9186e0c206acf16edd56426da1275fec84680733de0fc88acdbca",
+  "patchSha256": "3f4da80d3e34eede4abb1b63243fc1b318ac4833fbfff58527397d7020a2085e",
   "nodeImage": "node:22.23.3-bookworm-slim",
   "rustImage": "rust:1.99-bookworm"
 }

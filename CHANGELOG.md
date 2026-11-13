@@ -6,6 +6,7 @@
 - Consulta acotada al chat elegido, solo con la vista visible; conserva la selección y descarta respuestas tardías. No ejecuta comandos desde el panel.
 - Reduce el Mochi principal compacto a 18 px y los miniagentes a 11 px.
 - Restaura el blanco/gris original del Mochi principal recogido, sin tintes de integración/actualización, actividad ni traje. Mantiene ojos e insignias de estado y el tamaño cerrado original de 18 px.
+- Corrige la postura del Mochi al parar música y plegar: termina la transición del baile antes de detener el dibujo.
 - Documenta la navegación y añade capturas de demostración sin conversaciones personales.
 
 ## 0.5.9-sendoa.3 — 2026-11-05

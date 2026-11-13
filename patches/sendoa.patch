@@ -5246,7 +5246,7 @@ index c539648..d273ec2 100644
    State.notify();
  }
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index e237b0b..118293b 100644
+index e237b0b..4f1afa5 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -1,3 +1,4 @@
@@ -5427,7 +5427,32 @@ index e237b0b..118293b 100644
        this.fsm.mouseLeft();
      }
  
-@@ -1245,7 +1308,7 @@ export class Island {
+@@ -1206,8 +1269,8 @@ export class Island {
+     if (UploadSeq.isActive) this.stepSequence();
+     this.updateCountdown(nowMs);
+ 
+-    // Nothing is drawn while the island is hidden, so nothing may keep the loop
+-    // alive either. This used to read `... || this.engine.busy || State.mode !==
++    // The folded island must not keep every engine animation alive.
++    // This used to read `... || this.engine.busy || State.mode !==
+     // "hidden"`, and engine.busy is permanently true for any state with a
+     // looping animation — breathing, ratelimit sweat, sleeping z's, the search
+     // sweep — so a hidden island went on burning frames in exactly the states it
+@@ -1215,10 +1278,11 @@ export class Island {
+     const settling =
+       this.width.animating || this.height.animating || this.radius.animating;
+     const botMoving = !this.botCx.settled || !this.botCy.settled || !this.botSize.settled;
+-    // Closed, only the folding — and Mochi reaching his place in the closed island.
++    // Let the visible Mochi finish fading out his dance before sleeping; otherwise
++    // the last transformed posture stays frozen until the island opens again.
+     const busy = State.mode === "hidden"
+       ? settling || (closedIsland(State.settings.closedIsland) === "mochi" &&
+-        (botMoving || nowMs < this.closedAwakeUntil))
++        (botMoving || this.engine.dancingLevel > 0.001 || nowMs < this.closedAwakeUntil))
+       : settling ||
+         !this.botCx.settled || !this.botCy.settled || !this.botSize.settled ||
+         greetingActive || this.engine.busy || UploadSeq.isActive || viewAnimating;
+@@ -1245,7 +1309,7 @@ export class Island {
      // The drop canvas draws its own Mochi; two of them would overlap. Out on the
      // desktop, he isn't here at all.
      const away = State.mochiOnDesktop;
@@ -5436,7 +5461,7 @@ index e237b0b..118293b 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1288,6 +1351,7 @@ export class Island {
+@@ -1288,6 +1352,7 @@ export class Island {
      const focus = State.focusTask;
      // A new Coucou waits: over an idle or sleeping Mochi, the blue and the arrow
      // badge (whats-new.ts). Anything Mochi has to say comes first.
@@ -5444,7 +5469,7 @@ index e237b0b..118293b 100644
      this.engine.setUpdateHint(this.updateHintOn() ? UPDATE_BLUE_RGB : null);
      // While a plan card is open Mochi wears the plan's colour, like its pill.
      this.engine.bodyColor = planCardOpen()
-@@ -1317,7 +1381,7 @@ export class Island {
+@@ -1317,7 +1382,7 @@ export class Island {
      const mainFocused = State.focusId == null || State.focusId === State.mainPillId;
      const showOutfit = mainFocused || State.mode !== "expanded" || inWardrobe;
      const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit));
@@ -5453,7 +5478,7 @@ index e237b0b..118293b 100644
      // Dances while music plays: always in the compact island, expanded only on
      // the music pill's card (BotCanvasView, macOS). Asked every frame.
      this.engine.setDancing(islandDances({
-@@ -1373,8 +1437,22 @@ export class Island {
+@@ -1373,8 +1438,22 @@ export class Island {
  
    // ── DOM sync ────────────────────────────────────────────────────────────────
  
@@ -5476,7 +5501,7 @@ index e237b0b..118293b 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1395,40 +1473,59 @@ export class Island {
+@@ -1395,40 +1474,59 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -5543,7 +5568,7 @@ index e237b0b..118293b 100644
      this.compactPlan.style.opacity = showPlan ? "1" : "0";
      this.compactPlan.style.pointerEvents = showPlan ? "auto" : "none";
      if (showPlan) {
-@@ -1440,23 +1537,62 @@ export class Island {
+@@ -1440,23 +1538,62 @@ export class Island {
        this.compactPlanLabel.textContent = pct != null ? `${Math.round(pct)}%` : "—";
      }
  
@@ -5615,7 +5640,7 @@ index e237b0b..118293b 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1473,9 +1609,12 @@ export class Island {
+@@ -1473,9 +1610,12 @@ export class Island {
      Sound.setVolume(State.settings.soundVolume);
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -5629,7 +5654,7 @@ index e237b0b..118293b 100644
    }
  
    get panelSize() {
-@@ -1483,6 +1622,6 @@ export class Island {
+@@ -1483,6 +1623,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -9639,6 +9664,58 @@ index 98f65c5..0cbeb63 100644
  test("once the answer is in, the field takes the focus back, enabled", async () => {
    let finish;
    answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+diff --git a/windows/tests/closed-dance.test.mjs b/windows/tests/closed-dance.test.mjs
+new file mode 100644
+index 0000000..f810670
+--- /dev/null
++++ b/windows/tests/closed-dance.test.mjs
+@@ -0,0 +1,46 @@
++import { test, mock } from 'node:test';
++import assert from 'node:assert/strict';
++import { installFakeDom } from './fakedom.mjs';
++import { Island } from '../src/island/island.ts';
++import { State } from '../src/core/state.ts';
++
++test('folded Mochi finishes the dance fade before sleeping, without a permanent loop', () => {
++  const dom = installFakeDom();
++  const frames = [];
++  globalThis.requestAnimationFrame = callback => frames.push(callback);
++  for (const method of ['build', 'wireFsm', 'wireInput', 'applyGeometry', 'updateBotTargets', 'updateCountdown']) {
++    mock.method(Island.prototype, method, () => {});
++  }
++  const island = new Island(dom.root());
++  island.dirty = false;
++  island.running = true;
++  island.lastFrame = 950;
++  island.views = new Map();
++  island.viewsEl = dom.root();
++  island.uploadCanvas = { el: dom.root() };
++  island.engine.dancingLevel = 1;
++  island.engine.setDancing(true);
++  island.drawBot = dt => {
++    island.engine.setDancing(false);
++    island.engine.update(dt);
++  };
++  State.mode = 'hidden';
++  State.settings.closedIsland = 'mochi';
++  try {
++    island.frame(1000);
++    assert.equal(frames.length, 1, 'keep drawing the remaining dance transition');
++    let now = 1000;
++    let count = 0;
++    while (frames.length && count++ < 60) frames.shift()(now += 16);
++    assert.ok(count < 60, 'the folded island must eventually stop drawing');
++    assert.ok(island.engine.dancingLevel <= 0.001);
++    assert.equal(island.running, false);
++
++    State.settings.closedIsland = 'hidden';
++    island.engine.dancingLevel = 1;
++    island.frame(now + 16);
++    assert.equal(frames.length, 0, 'an invisible Mochi does not need a dance transition');
++  } finally {
++    mock.restoreAll();
++  }
++});
 diff --git a/windows/tests/closed.test.mjs b/windows/tests/closed.test.mjs
 index de4ae57..3243067 100644
 --- a/windows/tests/closed.test.mjs
