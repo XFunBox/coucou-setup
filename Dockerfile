@@ -26,7 +26,7 @@ COPY LICENSE LICENSE-ASSETS.md /app/
 COPY android/LICENSE /app/LICENSE-ANDROID
 ENV CARGO_BUILD_JOBS=2
 COPY android/relay/test-vectors.json /app/android/relay/test-vectors.json
-RUN npm test
+RUN node --experimental-transform-types --import ./tests/setup.mjs --test --test-force-exit "tests/**/*.test.mjs"
 RUN cargo test --manifest-path tests/github-rust/Cargo.toml --target-dir /app/github-test-target
 RUN cargo build --locked --release -p coucou-hook
 RUN cargo test --locked --workspace --release

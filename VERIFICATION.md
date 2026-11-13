@@ -1,3 +1,18 @@
+# Verificación — 2026-11-13 — actividad de Codex y Mochi original
+
+Versión **0.5.9-sendoa.4**, sobre la misma fuente oficial Linux 0.5.9. Conserva las personalizaciones publicadas en .3.
+
+- Actividad: 14 pruebas Rust del módulo real mediante harness aislado; 51 archivos de pruebas Node aprobados con `--test-force-exit`. Sin esa opción, WhatsApp deja un temporizador abierto al terminar las pruebas; el Dockerfile del setup utiliza la misma opción para que el runner finalice.
+- Regresiones: líneas `---`/`+++` dentro de hunks, selección manual conservada con nuevas acciones y límites/filtrado de actividad. Revisión independiente y comprobación visual del componente real en navegador con datos sintéticos.
+- Mochi: fallo de color reproducido antes de corregirlo; siete pruebas directas de cerrado y cuatro suites afectadas correctas. TypeScript y Vite correctos tras los cambios finales.
+- Binario release final compilado en Docker y arrancado 15 segundos en Xvfb aislado. Instalado localmente; servicio activo, hash del ejecutable cargado coincidente y ajustes, hooks y lanzadores conservados. Apariencia final aceptada por el usuario.
+- Diez pruebas Python del instalador, sintaxis Bash y enlaces locales del README correctos. `bash build.sh --prepare-only` descarga la fuente, verifica hashes y aplica el parche; los 1280 archivos preparados coinciden con la fuente final.
+- Parche acumulativo reconstruido desde el tarball canónico, cuyo SHA-256 coincide con source-lock.json; **1280 archivos versionados idénticos** a la fuente final comprobada.
+
+La captura de actividad y la comparación de Mochi usan datos de demostración. No equivalen a probar un chat real a través del IPC privado de Codex. La compatibilidad de ese IPC conserva los límites descritos en el README. No se ha realizado una instalación completa de apt en un equipo limpio ni una recompilación sin caché para esta publicación; se reutiliza la compilación final ya verificada. No se publican conversaciones, configuración privada ni binarios.
+
+---
+
 # Verificación — 2026-11-05 — utilidades y selección musical
 
 Versión **0.5.9-sendoa.3**, sobre la fuente Linux 0.5.9 ya fijada. Incluye la entrega local .2 de utilidades y corrige la selección de reproductor.

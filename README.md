@@ -1,15 +1,19 @@
 # Coucou con Codex, GitHub y Spotify
 
-Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos.
+Apariencia EVA-01 aplicada a isla, Hub, ajustes, módulos y Mochi: fondos oscuros, morado y verde vivo. Conserva los colores personalizados de los módulos. Al recoger la isla, el Mochi principal conserva el blanco/gris original.
 
-Setup de **Coucou 0.5.9-sendoa.3** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.9, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
+Setup de **Coucou 0.5.9-sendoa.4** para Ubuntu/Debian amd64. Descarga el código oficial de Linux 0.5.9, verifica su SHA-256, aplica el parche de este repositorio y compila la versión personalizada en Docker. No necesita las imágenes ni los binarios de otro equipo.
 
 
 ## Así se ve
 
-**Reloj y miniagentes** — captura real en KDE Plasma. La isla cerrada mantiene la hora y la fecha visibles.
+**Actividad de Codex** — vista de prueba con datos de demostración. Acciones a la izquierda y cambios de código a la derecha, con líneas añadidas y eliminadas.
 
-![Coucou cerrado con la hora, la fecha y los miniagentes](docs/images/reloj-compacto.png)
+![Detalle de actividad de Codex con una edición y su diff](docs/images/codex-actividad.png)
+
+**Mochi recogido** — comparación con el motor real y datos de demostración. El cuerpo recupera el blanco/gris original incluso cuando una integración o actualización solicita otro color. Cerrado mide 18 px; en compacto, principal de 18 px y miniagentes de 11 px.
+
+![Comparación del Mochi: tinte azul anterior y blanco original restaurado](docs/images/mochi-original.png)
 
 **Música compacta** — vista de prueba de la interfaz con datos de demostración. Muestra carátula, título, artista y onda animada; al pulsar abre los controles.
 
@@ -20,6 +24,9 @@ Capturas de la personalización EVA-01. Coucou y el personaje Mochi son de Louis
 ## Funciones
 
 Incluye:
+
+- Detalle de actividad de Codex: lecturas, ediciones, comandos y estados; selección de archivos, diffs y salida acotada cuando Codex los comunica. Funciona para el agente principal y sus subagentes disponibles.
+- Mochi principal blanco/gris original con la isla recogida, sin tinte de actividad ni traje; ojos e insignias conservan el estado. Mochis compactos más pequeños.
 
 - Utilidades compactas con accesos a Terminal, Carpeta personal y Obsidian; vuelta con Atrás o Escape.
 - Música limitada a Spotifast y Spotify, con prioridad para Spotifast. Al cerrar ambos, la tarjeta queda sin reproductor y no selecciona Chrome ni otros servicios MPRIS.
@@ -39,6 +46,15 @@ Incluye:
 - Enlace opcional con Coucou para Android desde Settings → Android phone: desactivado por defecto, sin servidor escuchando hasta activarlo. Emparejamiento QR con certificado fijado, controles separados para detalles, preguntas, chat, diffs, uso y servicios; «Pair again» desconecta los móviles anteriores. El APK se obtiene o compila por separado y no se instala con este setup.
 - Spotify o Spotifast/EVA-01 mediante MPRIS: se prefiere Spotifast si ambos están abiertos, los controles siguen al propietario activo y se reconoce el lanzador `eva-01-audio`. Muñeco de escritorio desactivado.
 - Inicio automático y acceso del menú apuntando al **binario personalizado**, con copias previas y restauración.
+
+## Ver qué está haciendo Codex
+
+1. Abre la isla y entra en **Sala de agentes**.
+2. Pulsa la tarjeta del agente Codex que quieras consultar.
+3. Selecciona una acción a la izquierda. A la derecha verás el archivo y su diff, o el comando y la salida que haya comunicado Codex. Si hay varios archivos, elige su pestaña.
+4. Pulsa **‹ Agentes** para volver o **Abrir en Codex** para ir al chat completo.
+
+El detalle se actualiza cada 2,5 segundos mientras está visible y conserva la selección manual al llegar acciones nuevas. Si falta un diff o falla la conexión, lo indica. Muestra las últimas 40 acciones, con límites de 256 KiB de actividad total, 16 KiB de salida y 64 KiB de diff por acción. Este panel es de consulta; las aprobaciones mantienen sus controles habituales.
 
 ## Clonar e instalar
 
@@ -83,7 +99,7 @@ Las preferencias se preparan automáticamente; las cuentas se autentican en cada
 
 GitHub lista hasta 500 repositorios propios, hasta veinte commits recientes de los diez repositorios con actividad más reciente y Actions `in_progress` de los repositorios listados no archivados. Los errores de acceso se indican como datos parciales. Se renueva cada cinco minutos sin ejecuciones activas y cada minuto con ejecuciones, adaptándose a cuentas grandes; abrir la sección y refrescar también permite actualizar.
 
-El monitor lee metadatos de los registros locales de Codex (`CODEX_HOME/sessions` o `~/.codex/sessions`), cada 2,5 s, sin iniciar otra sesión. Usa el chat identificado por el hook activo o el chat con registro modificado más recientemente; muestra su identificador abreviado. Solo incluye subagentes `thread_spawn`, excluye guardianes y no muestra mensajes ni argumentos de herramientas. El formato de estos registros puede cambiar: una lectura parcial o desconocida se indica, y la actividad antigua no confirma que un proceso siga vivo. La consola `coucou --agent-monitor-json [UUID]` permite consultar los mismos metadatos desde otras herramientas. Si no hay árbol disponible, conserva la vista de agentes de hooks. Las preguntas usan el canal existente de cada integración: no se añade un canal nuevo de respuestas para Codex.
+El monitor lee metadatos de los registros locales de Codex (`CODEX_HOME/sessions` o `~/.codex/sessions`), cada 2,5 s, sin iniciar otra sesión. Usa el chat identificado por el hook activo o el chat con registro modificado más recientemente; muestra su identificador abreviado. Solo incluye subagentes `thread_spawn`, excluye guardianes y su vista general no muestra mensajes ni argumentos de herramientas. El detalle abierto expresamente puede mostrar comandos, salida y diffs comunicados por Codex; omite argumentos y resultados genéricos, razonamiento y patrones reconocibles de credenciales. Ese filtrado no garantiza detectar todos los secretos: revisa el contenido antes de compartir una captura. El formato de estos registros puede cambiar: una lectura parcial o desconocida se indica, y la actividad antigua no confirma que un proceso siga vivo. La consola `coucou --agent-monitor-json [UUID]` permite consultar los mismos metadatos desde otras herramientas. Si no hay árbol disponible, conserva la vista de agentes de hooks. Las preguntas usan el canal existente de cada integración: no se añade un canal nuevo de respuestas para Codex.
 
 En la pestaña de chat hay dos modos. **Chat Coucou** conserva su conversación independiente y requiere su propia clave de API. **Codex escritorio** permite seleccionar un chat local y abierto de la aplicación Codex, leer sus mensajes, enviar texto y detener el turno mostrado. Comparte el chat y la ejecución de la aplicación, usando su cuenta, modelo y permisos; no necesita una clave de API adicional. La isla permanece abierta mientras está el chat, y puedes cerrarla con Escape.
 

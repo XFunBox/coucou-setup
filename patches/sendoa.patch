@@ -45,7 +45,7 @@ index ab75aa7..7863ba5 100644
  | 0.5.8 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.8) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.8) | Oct 31, 2026 | 14 fixes and features by @Ohualtex: permission requests queue, Claude Desktop cards and pill, plan usage in the compact island, Flow pill in a corner |
  | 0.5.7 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.5.7) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.5.7) | Oct 31, 2026 | Mail with classic Outlook on Windows: search, filters, automatic sorting, mail plans from the chat; search the settings |
 diff --git a/windows/Cargo.lock b/windows/Cargo.lock
-index e1436a2..aef0629 100644
+index e1436a2..99a89df 100644
 --- a/windows/Cargo.lock
 +++ b/windows/Cargo.lock
 @@ -804,7 +804,7 @@ dependencies = [
@@ -53,7 +53,7 @@ index e1436a2..aef0629 100644
  [[package]]
  name = "coucou"
 -version = "0.5.9"
-+version = "0.5.9-sendoa.3"
++version = "0.5.9-sendoa.4"
  dependencies = [
   "arboard",
   "cpal",
@@ -62,12 +62,12 @@ index e1436a2..aef0629 100644
  [[package]]
  name = "coucou-hook"
 -version = "0.5.9"
-+version = "0.5.9-sendoa.3"
++version = "0.5.9-sendoa.4"
  dependencies = [
   "libc",
   "serde_json",
 diff --git a/windows/Cargo.toml b/windows/Cargo.toml
-index 6233219..0a3aae4 100644
+index 6233219..6aaa9c3 100644
 --- a/windows/Cargo.toml
 +++ b/windows/Cargo.toml
 @@ -3,7 +3,7 @@ members = ["src-tauri", "hook"]
@@ -75,31 +75,31 @@ index 6233219..0a3aae4 100644
  
  [workspace.package]
 -version = "0.5.9"
-+version = "0.5.9-sendoa.3"
++version = "0.5.9-sendoa.4"
  edition = "2021"
  license = "MIT"
  
 diff --git a/windows/package-lock.json b/windows/package-lock.json
-index c248d64..d48ff0f 100644
+index c248d64..42ded4f 100644
 --- a/windows/package-lock.json
 +++ b/windows/package-lock.json
 @@ -1,12 +1,12 @@
  {
    "name": "coucou-windows",
 -  "version": "0.5.9",
-+  "version": "0.5.9-sendoa.3",
++  "version": "0.5.9-sendoa.4",
    "lockfileVersion": 3,
    "requires": true,
    "packages": {
      "": {
        "name": "coucou-windows",
 -      "version": "0.5.9",
-+      "version": "0.5.9-sendoa.3",
++      "version": "0.5.9-sendoa.4",
        "dependencies": {
          "@tauri-apps/api": "^2"
        },
 diff --git a/windows/package.json b/windows/package.json
-index ad4baa4..a294c05 100644
+index ad4baa4..526f551 100644
 --- a/windows/package.json
 +++ b/windows/package.json
 @@ -1,13 +1,13 @@
@@ -107,7 +107,7 @@ index ad4baa4..a294c05 100644
    "name": "coucou-windows",
    "private": true,
 -  "version": "0.5.9",
-+  "version": "0.5.9-sendoa.3",
++  "version": "0.5.9-sendoa.4",
    "type": "module",
    "scripts": {
      "dev": "vite",
@@ -702,10 +702,10 @@ index 0000000..532d44d
 +}
 diff --git a/windows/src-tauri/src/codex_chat.rs b/windows/src-tauri/src/codex_chat.rs
 new file mode 100644
-index 0000000..362df62
+index 0000000..a34c141
 --- /dev/null
 +++ b/windows/src-tauri/src/codex_chat.rs
-@@ -0,0 +1,433 @@
+@@ -0,0 +1,642 @@
 +//! Local Codex desktop follower. This private protocol may change with Codex.
 +//! No rollout/credential access, payload logging, approvals, or send retries.
 +use serde::Serialize;
@@ -732,6 +732,137 @@ index 0000000..362df62
 +    pub active_turn_id: Option<String>,
 +    pub pending: bool,
 +    pub truncated: bool,
++    pub activity: Vec<Activity>,
++    pub activity_truncated: bool,
++}
++
++/// Read-only projection of explicitly structured tool items, never raw arguments.
++#[derive(Serialize, Debug)]
++pub struct Activity {
++    pub id: String,
++    pub kind: &'static str,
++    pub label: String,
++    pub status: &'static str,
++    pub command: Option<String>,
++    pub output: Option<String>,
++    pub files: Vec<ActivityFile>,
++}
++#[derive(Serialize, Debug)]
++pub struct ActivityFile { pub path: String, pub diff: Option<String>, pub kind: Option<String> }
++
++const MAX_ACTIVITY: usize = 40;
++const MAX_ACTIVITY_BYTES: usize = 256 * 1024;
++
++fn bounded_text(text: &str, limit: usize, truncated: &mut bool) -> String {
++    let mut boundary = text.len().min(limit);
++    while !text.is_char_boundary(boundary) { boundary -= 1; }
++    if boundary < text.len() { *truncated = true; }
++    text[..boundary].chars().filter(|c| !c.is_control() || *c == '\n' || *c == '\t').collect()
++}
++
++fn credential_text(text: &str) -> bool {
++    // Fail closed for recognizable credential material, including multi-line PEM.
++    let text = text.to_ascii_lowercase();
++    ["authorization", "bearer ", "password", "passwd", "secret", "token", "api_key", "apikey", "api-key",
++        "private key", "credential", "sk-", "ghp_", "github_pat_", "akia", "xoxb-", "xoxp-"]
++        .iter().any(|marker| text.contains(marker))
++}
++fn credential_path(path: &str) -> bool {
++    let path = path.to_ascii_lowercase();
++    path.split(['/', '\\']).any(|part| part == ".env" || part.starts_with(".env.") ||
++        ["auth.json", "credentials", "credentials.json", "id_rsa", "id_ed25519", "id_ecdsa", ".npmrc", ".pypirc", ".netrc"] .contains(&part)) ||
++        path.ends_with(".pem") || path.ends_with(".key")
++}
++fn activity_text(text: &str, limit: usize, truncated: &mut bool) -> String {
++    if credential_text(text) { bounded_text("[contenido sensible omitido]", limit, truncated) }
++    else { bounded_text(text, limit, truncated) }
++}
++fn tool_name(value: &Value) -> Option<&str> {
++    value.as_str().filter(|name| !name.is_empty() && name.len() <= 128 &&
++        name.bytes().all(|c| c.is_ascii_alphanumeric() || b"_-./:".contains(&c)))
++}
++fn activity_status(item: &Value) -> &'static str {
++    match item["status"].as_str() {
++        Some("inProgress") => "inProgress",
++        Some("failed" | "declined" | "cancelled" | "interrupted") => "failed",
++        Some("completed") if item["exitCode"].as_i64().is_some_and(|v| v != 0) => "failed",
++        Some("completed") => "completed",
++        _ => "unknown",
++    }
++}
++fn activity_item(item: &Value, fallback: &str, truncated: &mut bool) -> Option<Activity> {
++    let mut action = Activity { id: bounded_text(item["id"].as_str().unwrap_or(fallback), 256, truncated),
++        kind: "tool", label: String::new(), status: activity_status(item), command: None, output: None, files: vec![] };
++    match item["type"].as_str()? {
++        "commandExecution" => {
++            let commands = item["commandActions"].as_array().map(Vec::as_slice).unwrap_or(&[]);
++            action.kind = if !commands.is_empty() && commands.iter().all(|c| matches!(c["type"].as_str(), Some("read" | "listFiles" | "search"))) { "read" } else { "command" };
++            action.label = if action.kind == "read" { "Leer archivos" } else { "Ejecutar comando" }.into();
++            let sensitive = commands.iter().any(|c| c["path"].as_str().is_some_and(credential_path)) ||
++                item["command"].as_str().is_some_and(|command| credential_text(command) ||
++                    command.split_whitespace().any(|part| credential_path(part.trim_matches(|c| ['\'', '"', ';'].contains(&c)))));
++            for command in commands {
++                if let Some(path) = command["path"].as_str().filter(|p| !p.is_empty()) {
++                    if action.files.len() == 32 { *truncated = true; break; }
++                    action.files.push(ActivityFile { path: activity_text(path, 4096, truncated), diff: None, kind: None });
++                }
++            }
++            action.command = item["command"].as_str().map(|s| activity_text(s, 8 * 1024, truncated));
++            action.output = item["aggregatedOutput"].as_str().map(|s| if sensitive {
++                "[contenido sensible omitido]".into()
++            } else { activity_text(s, 16 * 1024, truncated) });
++        }
++        "fileChange" => {
++            action.kind = "edit"; action.label = "Modificar archivos".into();
++            let mut diff_remaining = 64 * 1024;
++            for file in item["changes"].as_array().into_iter().flatten() {
++                let Some(path) = file["path"].as_str().filter(|p| !p.is_empty()) else { continue };
++                if action.files.len() == 32 { *truncated = true; break; }
++                let diff = if credential_path(path) { None } else {
++                    file["diff"].as_str().map(|s| activity_text(s, diff_remaining, truncated))
++                };
++                diff_remaining = diff_remaining.saturating_sub(diff.as_ref().map_or(0, String::len));
++                let kind = file["kind"]["type"].as_str().or_else(|| file["kind"].as_str())
++                    .filter(|s| matches!(*s, "add" | "delete" | "update")).map(str::to_owned);
++                action.files.push(ActivityFile { path: activity_text(path, 4096, truncated), diff, kind });
++            }
++        }
++        "mcpToolCall" => {
++            action.label = match (tool_name(&item["server"]), tool_name(&item["tool"])) {
++                (Some(server), Some(tool)) => format!("{server} / {tool}"),
++                _ => "Herramienta MCP".into(),
++            };
++        }
++        "dynamicToolCall" | "collabAgentToolCall" => {
++            action.label = tool_name(&item["tool"]).unwrap_or("Herramienta").into();
++        }
++        "webSearch" => action.label = "Buscar en la web".into(),
++        "imageView" => action.label = "Ver imagen".into(),
++        "imageGeneration" => action.label = "Generar imagen".into(),
++        _ => return None,
++    }
++    action.label = activity_text(&action.label, 256, truncated);
++    Some(action)
++}
++fn activities(turns: &[Value], incomplete: bool) -> (Vec<Activity>, bool) {
++    let mut result = Vec::new();
++    let mut truncated = incomplete;
++    // Include JSON escaping, separators and brackets in the transport budget.
++    let mut remaining = MAX_ACTIVITY_BYTES - 2;
++    'recent: for (turn_index, turn) in turns.iter().enumerate().rev() {
++        let items = turn["items"].as_array().map(Vec::as_slice).unwrap_or(&[]);
++        for (item_index, item) in items.iter().enumerate().rev() {
++            let fallback = format!("activity-{turn_index}-{item_index}");
++            let Some(action) = activity_item(item, &fallback, &mut truncated) else { continue };
++            if result.len() == MAX_ACTIVITY { truncated = true; break 'recent; }
++            let size = serde_json::to_vec(&action).map_or(MAX_ACTIVITY_BYTES, |bytes| bytes.len()) + usize::from(!result.is_empty());
++            if size > remaining { truncated = true; break 'recent; }
++            remaining -= size;
++            result.push(action);
++        }
++    }
++    result.reverse();
++    (result, truncated)
 +}
 +
 +pub fn validate_thread(id: &str) -> Result<(), String> {
@@ -825,6 +956,7 @@ index 0000000..362df62
 +            turns[i] = Value::Object(merged);
 +        } else { turns.push(overlay.clone()); }
 +    }
++    let activity_incomplete = truncated;
 +    let active_turn_id = turns.iter().rev().find(|t| t["status"] == "inProgress")
 +        .and_then(|t| t["turnId"].as_str()).filter(|v| !v.is_empty()).map(str::to_owned);
 +    let active = turns.iter().any(|t| t["status"] == "inProgress") || state["threadRuntimeStatus"]["type"] == "active";
@@ -857,8 +989,9 @@ index 0000000..362df62
 +        remaining -= message.content.len();
 +    }
 +    messages.retain(|m| !m.content.is_empty());
++    let (activity, activity_truncated) = activities(&turns, activity_incomplete);
 +    Snapshot { thread_id: thread.to_owned(), messages, active, active_turn_id,
-+        pending: state["requests"].as_array().is_some_and(|v| !v.is_empty()), truncated }
++        pending: state["requests"].as_array().is_some_and(|v| !v.is_empty()), truncated, activity, activity_truncated }
 +}
 +
 +#[cfg(target_os = "linux")]
@@ -1131,6 +1264,82 @@ index 0000000..362df62
 +        let out = normalize(ID, &state);
 +        assert_eq!(out.messages, vec![Message{role:"user",content:"question".into()},Message{role:"assistant",content:"answer".into()}]);
 +        assert!(out.active && out.pending && !out.truncated); assert_eq!(out.active_turn_id.as_deref(),Some("one"));
++    }
++    #[test] fn activity_extracts_structured_commands_edits_and_failed_tools_only() {
++        let state = json!({"turns":[{"items":[
++            {"id":"reason","type":"reasoning","summary":["PRIVATE_REASONING"],"content":["PRIVATE_REASONING"]},
++            {"id":"message","type":"agentMessage","text":"PRIVATE_MESSAGE"},
++            {"id":"read","type":"commandExecution","command":"cat src/main.rs","status":"completed","aggregatedOutput":"hello","commandActions":[{"type":"read","path":"src/main.rs"}]},
++            {"id":"cmd","type":"commandExecution","command":"cargo test","status":"failed","exitCode":1,"aggregatedOutput":"test failed"},
++            {"id":"edit","type":"fileChange","status":"completed","changes":[{"path":"src/main.rs","kind":{"type":"update"},"diff":"@@ -1 +1 @@\n-old\n+new"},{"path":"README.md","kind":{"type":"add"}}]},
++            {"id":"tool","type":"mcpToolCall","server":"github","tool":"get_issue","status":"failed","arguments":{"text":"PRIVATE_ARGUMENT"},"result":{"text":"PRIVATE_RESULT"}}
++        ]}]});
++        let out = normalize(ID, &state);
++        assert_eq!(out.activity.len(), 4);
++        assert_eq!(out.activity[0].kind, "read");
++        assert_eq!(out.activity[0].files[0].path, "src/main.rs");
++        assert_eq!(out.activity[1].status, "failed");
++        assert_eq!(out.activity[1].output.as_deref(), Some("test failed"));
++        assert_eq!(out.activity[2].files[0].kind.as_deref(), Some("update"));
++        assert!(out.activity[2].files[1].diff.is_none());
++        assert_eq!(out.activity[3].label, "github / get_issue");
++        let activity = serde_json::to_string(&out.activity).unwrap();
++        for private in ["PRIVATE_REASONING", "PRIVATE_MESSAGE", "PRIVATE_ARGUMENT", "PRIVATE_RESULT"] { assert!(!activity.contains(private)); }
++        assert!(!out.activity_truncated);
++    }
++    #[test] fn activity_uses_merged_overlay_without_duplicates_or_losing_canonical_edits() {
++        let state = json!({"turnHistory":{"kind":"canonical","history":{"isComplete":true,
++            "islands":[{"entries":[{"value":"t1"}]}],"entitiesByKey":{"t1":{"turnId":"one","items":[
++            {"id":"cmd","type":"commandExecution","command":"cargo test","status":"inProgress"},
++            {"id":"edit","type":"fileChange","status":"completed","changes":[{"path":"src/lib.rs","diff":"+ok"}]}
++        ]}}}},"turns":[{"turnId":"one","items":[{"id":"cmd","type":"commandExecution","command":"cargo test","status":"completed","aggregatedOutput":"ok"}]}]});
++        let out = normalize(ID, &state);
++        assert_eq!(out.activity.len(), 2);
++        assert_eq!(out.activity[0].status, "completed");
++        assert_eq!(out.activity[0].output.as_deref(), Some("ok"));
++        assert_eq!(out.activity[1].files[0].diff.as_deref(), Some("+ok"));
++    }
++    #[test] fn activity_limits_count_bytes_and_unicode_and_reports_truncation() {
++        let items: Vec<_> = (0..45).map(|i| json!({"id":format!("cmd-{i}"),"type":"commandExecution","command":"é".repeat(5000),"status":"inProgress","aggregatedOutput":"🌱".repeat(9000)})).collect();
++        let out = normalize(ID, &json!({"turns":[{"items":items}]}));
++        assert!(out.activity_truncated);
++        assert!(out.activity.len() <= 40);
++        assert_eq!(out.activity.last().unwrap().id, "cmd-44");
++        assert!(serde_json::to_vec(&out.activity).unwrap().len() <= 256 * 1024);
++        for action in &out.activity { assert!(action.output.as_ref().unwrap().len() <= 16 * 1024); }
++        let out = normalize(ID, &json!({"turns":[{"items":[{"id":"diff","type":"fileChange","changes":[{"path":"é".repeat(3000),"diff":"🌱".repeat(20000)}]}]}]}));
++        assert!(out.activity_truncated);
++        assert!(out.activity[0].files[0].path.len() <= 4096);
++        assert!(out.activity[0].files[0].diff.as_ref().unwrap().len() <= 64 * 1024);
++    }
++    #[test] fn activity_tracks_missing_history_and_caps_shared_diff_budget() {
++        let out = normalize(ID, &json!({"turns":[{"items":[{"type":"fileChange","changes":[
++            {"path":"first.rs","diff":"a".repeat(64 * 1024)},
++            {"path":"second.rs","diff":"+token=synthetic"}
++        ]}]}]}));
++        assert!(out.activity[0].files.iter().filter_map(|f| f.diff.as_ref()).map(String::len).sum::<usize>() <= 64 * 1024);
++        assert!(out.activity_truncated);
++        let out = normalize(ID, &json!({"turnHistory":{"kind":"canonical","history":{"isComplete":true,
++            "islands":[{"entries":[{"value":"missing"}]}],"entitiesByKey":{}}}}));
++        assert!(out.activity_truncated);
++        let items: Vec<_> = (0..41).map(|i| json!({"id":format!("cmd-{i}"),"type":"commandExecution","command":"true"})).collect();
++        let out = normalize(ID, &json!({"turns":[{"items":items}]}));
++        assert_eq!(out.activity.len(), 40);
++        assert_eq!(out.activity[0].id, "cmd-1");
++        assert!(out.activity_truncated);
++    }
++    #[test] fn activity_redacts_credentials_and_does_not_infer_tool_success() {
++        let out = normalize(ID, &json!({"turns":[{"items":[
++            {"id":"secret-command","type":"commandExecution","command":"curl -H 'Authorization: Bearer synthetic-secret' example.test","aggregatedOutput":"TOKEN=synthetic-secret","status":"completed"},
++            {"id":"secret-file","type":"fileChange","changes":[{"path":".env","diff":"+PASSWORD=synthetic-secret"}]},
++            {"id":"web","type":"webSearch","query":"PRIVATE_QUERY"},
++            {"id":"tool","type":"dynamicToolCall","tool":"safe_tool","arguments":{"secret":"synthetic-secret"}}
++        ]}]}));
++        let text = serde_json::to_string(&out.activity).unwrap();
++        assert!(!text.contains("synthetic-secret"));
++        assert!(!text.contains("PRIVATE_QUERY"));
++        assert_eq!(out.activity[2].status, "unknown");
++        assert_eq!(out.activity[3].status, "unknown");
 +    }
 +    #[test] fn messages_skip_tools_and_keep_unicode_with_explicit_truncation() {
 +        let state = json!({"turns":[{"items":[{"type":"userMessage","content":[{"type":"text","text":"hello"}]},
@@ -3148,7 +3357,7 @@ index 2b3304c..68fb16d 100644
      fn versions_compare_as_numbers() {
          assert!(is_newer("0.10.0", "0.9.3"));
 diff --git a/windows/src-tauri/tauri.conf.json b/windows/src-tauri/tauri.conf.json
-index 8002726..7c787f2 100644
+index 8002726..f933238 100644
 --- a/windows/src-tauri/tauri.conf.json
 +++ b/windows/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -3156,7 +3365,7 @@ index 8002726..7c787f2 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "Coucou",
 -  "version": "0.5.9",
-+  "version": "0.5.9-sendoa.3",
++  "version": "0.5.9-sendoa.4",
    "identifier": "fr.louisraille.coucou",
    "build": {
      "beforeDevCommand": "npm run dev",
@@ -3200,13 +3409,23 @@ index 0000000..40c5d1f
 +  return `${symbol} ${t(label)}`;
 +}
 diff --git a/windows/src/core/bridge.ts b/windows/src/core/bridge.ts
-index 18250cf..8ffa13b 100644
+index 18250cf..22599f7 100644
 --- a/windows/src/core/bridge.ts
 +++ b/windows/src/core/bridge.ts
-@@ -24,6 +24,15 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
+@@ -24,6 +24,27 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
    }
  }
  
++export interface CodexActivity {
++  id: string;
++  kind: "read" | "edit" | "command" | "tool";
++  label: string;
++  status: "inProgress" | "completed" | "failed" | "unknown";
++  command: string | null;
++  output: string | null;
++  files: { path: string; diff: string | null; kind: string | null }[];
++}
++
 +export interface CodexChatSnapshot {
 +  threadId: string;
 +  messages: { role: "user" | "assistant"; content: string }[];
@@ -3214,12 +3433,14 @@ index 18250cf..8ffa13b 100644
 +  activeTurnId: string | null;
 +  pending: boolean;
 +  truncated: boolean;
++  activity: CodexActivity[];
++  activityTruncated: boolean;
 +}
 +
  export interface BootInfo {
    settings: Settings;
    /** Logical screen rect of the monitor the island lives on. */
-@@ -205,6 +214,7 @@ export interface PhoneAnswersStatus {
+@@ -205,6 +226,7 @@ export interface PhoneAnswersStatus {
  
  export const Bridge = {
    boot: () => call<BootInfo>("boot"),
@@ -3227,7 +3448,7 @@ index 18250cf..8ffa13b 100644
    /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
    setSystemLanguages: (languages: string[]) => call<void>("set_system_languages", { languages }),
  
-@@ -364,6 +374,12 @@ export const Bridge = {
+@@ -364,6 +386,12 @@ export const Bridge = {
  
    // ── Chat, files, secrets ──────────────────────────────────────────────────
    /** One chat turn. The API key and any file bytes never leave Rust. */
@@ -3324,7 +3545,7 @@ index 866f8f1..e70a2a8 100644
    const a = data.activity;
    if (!isObj(a) || !Array.isArray(a.weeks) || typeof a.total !== "number") return null;
 diff --git a/windows/src/core/layout.ts b/windows/src/core/layout.ts
-index 3b88a1d..c5d0995 100644
+index 3b88a1d..3d577c3 100644
 --- a/windows/src/core/layout.ts
 +++ b/windows/src/core/layout.ts
 @@ -5,6 +5,7 @@
@@ -3379,6 +3600,15 @@ index 3b88a1d..c5d0995 100644
      }
    }
  }
+@@ -151,7 +155,7 @@ export function botPosition(
+     case "hidden":
+       return { cx: 46, cy: 16, diameter: 6, opacity: 0 };
+     case "compact":
+-      return { cx: 40, cy: 16, diameter: 20, opacity: 1 };
++      return { cx: 40, cy: 16, diameter: 18, opacity: 1 };
+     case "expanded": {
+       const layout = VIEW_LAYOUTS[view];
+       if (view === "uploading") {
 @@ -182,16 +186,17 @@ export function botGlowColor(s: BotStateName): string {
        return "#A78BFA";
      case "searching":
@@ -5016,7 +5246,7 @@ index c539648..d273ec2 100644
    State.notify();
  }
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index e237b0b..a39ae88 100644
+index e237b0b..118293b 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -1,3 +1,4 @@
@@ -5206,7 +5436,24 @@ index e237b0b..a39ae88 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1373,8 +1436,22 @@ export class Island {
+@@ -1288,6 +1351,7 @@ export class Island {
+     const focus = State.focusTask;
+     // A new Coucou waits: over an idle or sleeping Mochi, the blue and the arrow
+     // badge (whats-new.ts). Anything Mochi has to say comes first.
++    this.engine.originalBody = State.mode !== "expanded";
+     this.engine.setUpdateHint(this.updateHintOn() ? UPDATE_BLUE_RGB : null);
+     // While a plan card is open Mochi wears the plan's colour, like its pill.
+     this.engine.bodyColor = planCardOpen()
+@@ -1317,7 +1381,7 @@ export class Island {
+     const mainFocused = State.focusId == null || State.focusId === State.mainPillId;
+     const showOutfit = mainFocused || State.mode !== "expanded" || inWardrobe;
+     const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit));
+-    this.engine.setOutfit(showOutfit ? outfit : "none", !inWardrobe);
++    this.engine.setOutfit(showOutfit && !this.engine.originalBody ? outfit : "none", !inWardrobe);
+     // Dances while music plays: always in the compact island, expanded only on
+     // the music pill's card (BotCanvasView, macOS). Asked every frame.
+     this.engine.setDancing(islandDances({
+@@ -1373,8 +1437,22 @@ export class Island {
  
    // ── DOM sync ────────────────────────────────────────────────────────────────
  
@@ -5229,7 +5476,7 @@ index e237b0b..a39ae88 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1395,40 +1472,59 @@ export class Island {
+@@ -1395,40 +1473,59 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -5281,7 +5528,7 @@ index e237b0b..a39ae88 100644
          this.miniGrid.replaceChildren();
          for (const t of others) {
 -          this.miniGrid.append(createMiniBot(t, 13));
-+          const worker = createMiniBot(t, 13);
++          const worker = createMiniBot(t, 11);
 +          worker.dataset.agentId = t.id;
 +          this.miniGrid.append(worker);
          }
@@ -5296,7 +5543,7 @@ index e237b0b..a39ae88 100644
      this.compactPlan.style.opacity = showPlan ? "1" : "0";
      this.compactPlan.style.pointerEvents = showPlan ? "auto" : "none";
      if (showPlan) {
-@@ -1440,23 +1536,62 @@ export class Island {
+@@ -1440,23 +1537,62 @@ export class Island {
        this.compactPlanLabel.textContent = pct != null ? `${Math.round(pct)}%` : "—";
      }
  
@@ -5368,7 +5615,7 @@ index e237b0b..a39ae88 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1473,9 +1608,12 @@ export class Island {
+@@ -1473,9 +1609,12 @@ export class Island {
      Sound.setVolume(State.settings.soundVolume);
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -5382,7 +5629,7 @@ index e237b0b..a39ae88 100644
    }
  
    get panelSize() {
-@@ -1483,6 +1621,6 @@ export class Island {
+@@ -1483,6 +1622,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -5486,10 +5733,10 @@ index a84d3dc..1c768cc 100644
    registerIntegrationHandlers(island);
    registerShortcutHandlers(island, () => setPaused(false));
 diff --git a/windows/src/mochi/engine.ts b/windows/src/mochi/engine.ts
-index a33d03d..a606206 100644
+index a33d03d..bfc2197 100644
 --- a/windows/src/mochi/engine.ts
 +++ b/windows/src/mochi/engine.ts
-@@ -67,8 +67,8 @@ const EYE_W = 0.25;
+@@ -67,8 +67,10 @@ const EYE_W = 0.25;
  const EYE_H = 0.27;
  const EYE_SP = 0.37;
  const EYE_P = -0.12;
@@ -5497,10 +5744,12 @@ index a33d03d..a606206 100644
 -const BASE_BOTTOM: RGB = [0.769, 0.773, 0.792]; // #C4C5CA
 +const BASE_TOP: RGB = [164 / 255, 1, 57 / 255]; // EVA-01 #A4FF39
 +const BASE_BOTTOM: RGB = [118 / 255, 205 / 255, 37 / 255]; // shaded EVA body
++const ORIGINAL_TOP: RGB = [237 / 255, 237 / 255, 239 / 255];
++const ORIGINAL_BOTTOM: RGB = [196 / 255, 197 / 255, 202 / 255];
  const INK = "rgb(26,20,18)"; // #1A1412
  const MINI_INK = "rgb(16,19,26)"; // #10131A
  
-@@ -77,11 +77,11 @@ const C = {
+@@ -77,11 +79,11 @@ const C = {
    working: [0.231, 0.62, 1] as RGB,
    thinking: [0.545, 0.361, 0.965] as RGB,
    searching: [0.388, 0.396, 0.949] as RGB,
@@ -5517,6 +5766,75 @@ index a33d03d..a606206 100644
    sleeping: [0.58, 0.635, 0.722] as RGB,
    dizzy: [0.957, 0.447, 0.714] as RGB,
  };
+@@ -198,6 +200,8 @@ export class BotEngine {
+   isMini = false;
+   /** Solid body colour for mini bots / integration pills (null = Mochi gradient). */
+   bodyColor: RGB | null = null;
++  /** Folded island: the original white body, independent of agent and update tints. */
++  originalBody = false;
+   /**
+    * A new Coucou waits (whats-new/whats-new.ts): while Mochi is idle or asleep
+    * he wears the up-arrow badge. The island turns his body blue alongside.
+@@ -883,21 +887,22 @@ export class BotEngine {
+ 
+   /** How much of the pumpkin's orange shows on the body (it comes and goes with the outfit). */
+   private get pumpkinAlpha(): number {
+-    if (this.isMini || this.outfit !== "pumpkin") return 0;
++    if (this.originalBody || this.isMini || this.outfit !== "pumpkin") return 0;
+     return Math.min(1, this.outfitPresence * 2.5) * (1 - this.morph);
+   }
+ 
+   private drawBody(x: CanvasRenderingContext2D, body: Path2D, R: number, rx: number, ry: number) {
+     const pumpkin = this.pumpkinAlpha;
+-    if (this.bodyColor) {
++    const bodyColor = this.originalBody ? null : this.bodyColor;
++    if (bodyColor) {
+       // Mini bots: flat solid fill — no gradient, no reflection, no highlight
+-      x.fillStyle = rgba(this.bodyColor, 1);
++      x.fillStyle = rgba(bodyColor, 1);
+       x.fill(body);
+       if (pumpkin <= 0.001) return;
+     } else {
+       const g = x.createLinearGradient(rx * 0.7, -ry * 0.85, -rx * 0.8, ry * 0.9);
+-      g.addColorStop(0, rgba(BASE_TOP));
+-      g.addColorStop(1, rgba(BASE_BOTTOM));
++      g.addColorStop(0, rgba(this.originalBody ? ORIGINAL_TOP : BASE_TOP));
++      g.addColorStop(1, rgba(this.originalBody ? ORIGINAL_BOTTOM : BASE_BOTTOM));
+       x.fillStyle = g;
+       x.fill(body);
+     }
+@@ -910,10 +915,10 @@ export class BotEngine {
+       x.fillStyle = pg;
+       x.fill(body);
+       // A flat-coloured body only gets the shading while it is a pumpkin.
+-      x.globalAlpha = this.bodyColor ? pumpkin : 1;
++      x.globalAlpha = bodyColor ? pumpkin : 1;
+     }
+ 
+-    const effectiveTint = this.tint * (1 - this.morph);
++    const effectiveTint = this.originalBody ? 0 : this.tint * (1 - this.morph);
+     if (effectiveTint > 0.01) {
+       const tg = x.createLinearGradient(0, ry, 0, -ry);
+       tg.addColorStop(0, rgba(this.col, 0.72 * effectiveTint));
+@@ -1179,12 +1184,13 @@ export class BotEngine {
+       x.translate(worldX, worldY);
+       if (handRot !== 0) x.rotate(handRot);
+       const g = x.createLinearGradient(hew * 0.7, -heh * 0.85, -hew * 0.8, heh * 0.9);
+-      if (this.bodyColor) {
+-        g.addColorStop(0, rgba(mix3(this.bodyColor, [1, 1, 1], 0.35)));
+-        g.addColorStop(1, rgba(this.bodyColor));
++      const bodyColor = this.originalBody ? null : this.bodyColor;
++      if (bodyColor) {
++        g.addColorStop(0, rgba(mix3(bodyColor, [1, 1, 1], 0.35)));
++        g.addColorStop(1, rgba(bodyColor));
+       } else {
+-        g.addColorStop(0, rgba(BASE_TOP));
+-        g.addColorStop(1, rgba(BASE_BOTTOM));
++        g.addColorStop(0, rgba(this.originalBody ? ORIGINAL_TOP : BASE_TOP));
++        g.addColorStop(1, rgba(this.originalBody ? ORIGINAL_BOTTOM : BASE_BOTTOM));
+       }
+       x.beginPath();
+       x.ellipse(0, 0, hew, heh, 0, 0, Math.PI * 2);
 diff --git a/windows/src/pill/main.ts b/windows/src/pill/main.ts
 index 07dc64c..89af3be 100644
 --- a/windows/src/pill/main.ts
@@ -5976,7 +6294,7 @@ index f05e0b2..5b9baa5 100644
  
    updatesListener = (fresh) => {
 diff --git a/windows/src/style.css b/windows/src/style.css
-index b7877d3..faf5056 100644
+index b7877d3..11c4d07 100644
 --- a/windows/src/style.css
 +++ b/windows/src/style.css
 @@ -1,5 +1,6 @@
@@ -6075,7 +6393,15 @@ index b7877d3..faf5056 100644
  #island-clip {
    position: absolute;
    inset: 0;
-@@ -225,14 +260,72 @@ body {
+@@ -171,6 +206,7 @@ body {
+   display: grid;
+   grid-template-columns: 13px 13px;
+   grid-auto-rows: 13px;
++  place-items: center;
+   gap: 3px;
+   pointer-events: none;
+   transition: opacity 0.25s ease-in-out;
+@@ -225,14 +261,72 @@ body {
    display: flex;
    align-items: center;
    justify-content: center;
@@ -6150,7 +6476,7 @@ index b7877d3..faf5056 100644
  /* The closed island's one line (core/closed.ts): the time, the plan, the song. */
  #island-closed {
    position: absolute;
-@@ -333,13 +426,13 @@ body {
+@@ -333,13 +427,13 @@ body {
  }
  
  .tab:hover {
@@ -6167,7 +6493,7 @@ index b7877d3..faf5056 100644
  }
  
  .header-actions {
-@@ -445,17 +538,17 @@ body {
+@@ -445,17 +539,17 @@ body {
  }
  
  .btn.primary {
@@ -6189,7 +6515,7 @@ index b7877d3..faf5056 100644
  }
  
  .btn .kbd {
-@@ -470,7 +563,7 @@ body {
+@@ -470,7 +564,7 @@ body {
  }
  
  .btn.secondary .kbd {
@@ -6198,7 +6524,7 @@ index b7877d3..faf5056 100644
  }
  
  .link-btn {
-@@ -485,7 +578,7 @@ body {
+@@ -485,7 +579,7 @@ body {
    height: 16px;
    border: 0;
    border-radius: 50%;
@@ -6207,7 +6533,7 @@ index b7877d3..faf5056 100644
    color: var(--dim-4);
    display: grid;
    place-items: center;
-@@ -705,7 +798,7 @@ body {
+@@ -705,7 +799,7 @@ body {
  
  .diff-line .sym {
    flex: 0 0 12px;
@@ -6216,7 +6542,7 @@ index b7877d3..faf5056 100644
  }
  
  .diff-line .txt {
-@@ -717,8 +810,8 @@ body {
+@@ -717,8 +811,8 @@ body {
  }
  
  .diff-line.added {
@@ -6227,7 +6553,7 @@ index b7877d3..faf5056 100644
  }
  
  .diff-line.added .sym {
-@@ -726,8 +819,8 @@ body {
+@@ -726,8 +820,8 @@ body {
  }
  
  .diff-line.removed {
@@ -6238,7 +6564,7 @@ index b7877d3..faf5056 100644
  }
  
  .diff-line.removed .sym {
-@@ -777,7 +870,7 @@ body {
+@@ -777,7 +871,7 @@ body {
    height: 28px;
    border-radius: 999px;
    background: var(--card-flat);
@@ -6247,7 +6573,7 @@ index b7877d3..faf5056 100644
    display: flex;
    align-items: center;
    cursor: default;
-@@ -815,7 +908,7 @@ body {
+@@ -815,7 +909,7 @@ body {
    width: 14px;
    height: 14px;
    border-radius: 50%;
@@ -6256,7 +6582,7 @@ index b7877d3..faf5056 100644
    display: grid;
    place-items: center;
  }
-@@ -873,9 +966,9 @@ body {
+@@ -873,9 +967,9 @@ body {
  
  .code {
    font: 400 12px var(--mono);
@@ -6269,7 +6595,7 @@ index b7877d3..faf5056 100644
    border-radius: 10px;
    padding: 5px 10px;
    max-width: 100%;
-@@ -939,7 +1032,7 @@ body {
+@@ -939,7 +1033,7 @@ body {
    align-items: center;
    gap: 10px;
    font: 400 12.5px var(--font);
@@ -6278,7 +6604,7 @@ index b7877d3..faf5056 100644
  }
  
  .switch {
-@@ -947,7 +1040,7 @@ body {
+@@ -947,7 +1041,7 @@ body {
    width: 32px;
    height: 18px;
    border-radius: 9px;
@@ -6287,7 +6613,7 @@ index b7877d3..faf5056 100644
    flex: 0 0 32px;
    transition: background 0.18s;
    cursor: default;
-@@ -966,11 +1059,12 @@ body {
+@@ -966,11 +1060,12 @@ body {
    width: 14px;
    height: 14px;
    border-radius: 50%;
@@ -6301,7 +6627,7 @@ index b7877d3..faf5056 100644
    transform: translateX(14px);
  }
  
-@@ -979,7 +1073,7 @@ input[type="range"] {
+@@ -979,7 +1074,7 @@ input[type="range"] {
    appearance: none;
    height: 3px;
    border-radius: 2px;
@@ -6310,7 +6636,7 @@ index b7877d3..faf5056 100644
    width: 72px;
  }
  
-@@ -988,7 +1082,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -988,7 +1083,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 11px;
    height: 11px;
    border-radius: 50%;
@@ -6319,7 +6645,7 @@ index b7877d3..faf5056 100644
  }
  
  .seg {
-@@ -1008,7 +1102,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1008,7 +1103,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .seg button.on {
@@ -6328,7 +6654,7 @@ index b7877d3..faf5056 100644
    color: var(--ink);
  }
  
-@@ -1048,10 +1142,10 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1048,10 +1143,10 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 6px;
    padding: 4px 10px;
    border-radius: 999px;
@@ -6341,7 +6667,7 @@ index b7877d3..faf5056 100644
    transform: scale(1.06);
    transition: border-color 0.3s ease-out 0.45s, transform 0.3s ease-out 0.45s;
  }
-@@ -1088,7 +1182,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1088,7 +1183,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .bubble {
@@ -6350,7 +6676,7 @@ index b7877d3..faf5056 100644
    border-radius: 12px;
    padding: 6px 10px;
    font: 400 12.5px var(--font);
-@@ -1099,7 +1193,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1099,7 +1194,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .reply {
    font: 400 12.5px var(--font);
@@ -6359,7 +6685,7 @@ index b7877d3..faf5056 100644
    white-space: pre-wrap;
    padding-right: 8px;
    user-select: text;
-@@ -1114,7 +1208,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1114,7 +1209,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .md-p {
    font: 400 12.5px var(--font);
@@ -6368,7 +6694,7 @@ index b7877d3..faf5056 100644
    white-space: pre-wrap;
    overflow-wrap: anywhere;
  }
-@@ -1131,16 +1225,16 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1131,16 +1226,16 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .reply strong {
@@ -6388,7 +6714,7 @@ index b7877d3..faf5056 100644
  }
  
  .md-link {
-@@ -1154,16 +1248,16 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1154,16 +1249,16 @@ input[type="range"]::-webkit-slider-thumb {
    align-items: flex-start;
    gap: 8px;
    padding: 10px;
@@ -6408,7 +6734,7 @@ index b7877d3..faf5056 100644
    white-space: pre-wrap;
    overflow-wrap: anywhere;
  }
-@@ -1177,7 +1271,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1177,7 +1272,7 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 0;
    border: 0;
    border-radius: 4px;
@@ -6417,7 +6743,7 @@ index b7877d3..faf5056 100644
    color: var(--dim-3);
    cursor: default;
  }
-@@ -1216,13 +1310,13 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1216,13 +1311,13 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .md-quote .md-p {
@@ -6433,7 +6759,7 @@ index b7877d3..faf5056 100644
    opacity: 0.3;
  }
  
-@@ -1269,14 +1363,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1269,14 +1364,14 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 4px 8px;
    border: 0;
    border-radius: 999px;
@@ -6451,7 +6777,7 @@ index b7877d3..faf5056 100644
  }
  
  .model-btn:disabled {
-@@ -1296,7 +1390,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1296,7 +1391,7 @@ input[type="range"]::-webkit-slider-thumb {
    text-overflow: ellipsis;
    white-space: nowrap;
    font: 500 10.5px var(--font);
@@ -6460,7 +6786,7 @@ index b7877d3..faf5056 100644
  }
  
  .picker {
-@@ -1307,8 +1401,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1307,8 +1402,8 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 8px;
    padding: 10px;
    border-radius: 12px;
@@ -6471,7 +6797,7 @@ index b7877d3..faf5056 100644
  }
  
  .chat-body.picking .picker {
-@@ -1326,25 +1420,25 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1326,25 +1421,25 @@ input[type="range"]::-webkit-slider-thumb {
    gap: 6px;
  }
  
@@ -6504,7 +6830,7 @@ index b7877d3..faf5056 100644
    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
    background: color-mix(in srgb, var(--accent) 18%, transparent);
  }
-@@ -1358,7 +1452,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1358,7 +1453,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .picker-rule {
    flex: 0 0 1px;
@@ -6513,7 +6839,7 @@ index b7877d3..faf5056 100644
    opacity: 0.4;
  }
  
-@@ -1379,19 +1473,19 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1379,19 +1474,19 @@ input[type="range"]::-webkit-slider-thumb {
    border: 0;
    border-radius: 6px;
    background: transparent;
@@ -6536,7 +6862,7 @@ index b7877d3..faf5056 100644
    background: color-mix(in srgb, var(--accent) 10%, transparent);
  }
  
-@@ -1410,7 +1504,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1410,7 +1505,7 @@ input[type="range"]::-webkit-slider-thumb {
    flex-wrap: wrap;
    padding: 4px 0;
    font: 400 11px var(--font);
@@ -6545,7 +6871,7 @@ index b7877d3..faf5056 100644
  }
  
  .picker-link {
-@@ -1427,7 +1521,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1427,7 +1522,7 @@ input[type="range"]::-webkit-slider-thumb {
    align-items: center;
    gap: 8px;
    padding: 6px 10px;
@@ -6554,7 +6880,7 @@ index b7877d3..faf5056 100644
    border-radius: 12px;
  }
  
-@@ -1452,8 +1546,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1452,8 +1547,8 @@ input[type="range"]::-webkit-slider-thumb {
    flex: 0 0 28px;
    border: 0;
    border-radius: 50%;
@@ -6565,7 +6891,7 @@ index b7877d3..faf5056 100644
    display: grid;
    place-items: center;
    cursor: default;
-@@ -1485,12 +1579,12 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1485,12 +1580,12 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .drop-card.over {
@@ -6580,7 +6906,7 @@ index b7877d3..faf5056 100644
    animation: dash-march 1.1s linear infinite;
  }
  
-@@ -1516,7 +1610,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1516,7 +1611,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .drop-title {
    font: 500 13px var(--font);
@@ -6589,7 +6915,7 @@ index b7877d3..faf5056 100644
    transition: color 0.2s;
  }
  
-@@ -1533,19 +1627,19 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1533,19 +1628,19 @@ input[type="range"]::-webkit-slider-thumb {
    font: 400 11px var(--font);
    padding: 3px 8px;
    border-radius: 999px;
@@ -6613,7 +6939,7 @@ index b7877d3..faf5056 100644
      var(--card);
  }
  
-@@ -1558,7 +1652,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1558,7 +1653,7 @@ input[type="range"]::-webkit-slider-thumb {
    justify-content: space-between;
    gap: 8px;
    font: 400 12.5px var(--font);
@@ -6622,7 +6948,7 @@ index b7877d3..faf5056 100644
  }
  
  .up-name {
-@@ -1585,13 +1679,13 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1585,13 +1680,13 @@ input[type="range"]::-webkit-slider-thumb {
    width: 526px;
    height: 6px;
    border-radius: 3px;
@@ -6638,7 +6964,7 @@ index b7877d3..faf5056 100644
  }
  
  .up-glow {
-@@ -1601,7 +1695,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1601,7 +1696,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 28px;
    height: 12px;
    border-radius: 50%;
@@ -6647,7 +6973,7 @@ index b7877d3..faf5056 100644
    filter: blur(5px);
    pointer-events: none;
  }
-@@ -1648,7 +1742,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1648,7 +1743,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-total span {
    font: 500 11px var(--font);
@@ -6656,7 +6982,7 @@ index b7877d3..faf5056 100644
    font-variant-numeric: tabular-nums;
  }
  
-@@ -1704,7 +1798,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1704,7 +1799,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-name {
    font: 500 11px var(--font);
@@ -6665,7 +6991,7 @@ index b7877d3..faf5056 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -1712,7 +1806,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1712,7 +1807,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .int-row.first .int-name {
@@ -6674,7 +7000,7 @@ index b7877d3..faf5056 100644
  }
  
  .int-ago {
-@@ -1723,7 +1817,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1723,7 +1818,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-sub {
    font: 400 10px var(--font);
@@ -6683,7 +7009,7 @@ index b7877d3..faf5056 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -1791,7 +1885,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1791,7 +1886,7 @@ input[type="range"]::-webkit-slider-thumb {
  .int-stat-value {
    margin-left: auto;
    font: 600 12px var(--font);
@@ -6692,7 +7018,7 @@ index b7877d3..faf5056 100644
    font-variant-numeric: tabular-nums;
  }
  
-@@ -1826,7 +1920,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1826,7 +1921,7 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .int-page:hover {
@@ -6701,7 +7027,7 @@ index b7877d3..faf5056 100644
    border-radius: 5px;
  }
  
-@@ -1892,7 +1986,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1892,7 +1987,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .int-commit {
    font: 400 10.5px var(--font);
@@ -6710,7 +7036,7 @@ index b7877d3..faf5056 100644
    display: -webkit-box;
    -webkit-line-clamp: 2;
    -webkit-box-orient: vertical;
-@@ -1969,7 +2063,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -1969,7 +2064,7 @@ input[type="range"]::-webkit-slider-thumb {
    padding: 4px 8px;
    border: 1px solid color-mix(in srgb, var(--plan) 14%, transparent);
    border-radius: 999px;
@@ -6719,7 +7045,7 @@ index b7877d3..faf5056 100644
    color: var(--dim-3);
    font: 600 10px var(--font);
    line-height: 12px;
-@@ -2047,7 +2141,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2047,7 +2142,7 @@ input[type="range"]::-webkit-slider-thumb {
    flex: 0 0 50px;
    height: 4px;
    border-radius: 2px;
@@ -6728,7 +7054,7 @@ index b7877d3..faf5056 100644
    overflow: hidden;
  }
  
-@@ -2062,7 +2156,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2062,7 +2157,7 @@ input[type="range"]::-webkit-slider-thumb {
    text-align: right;
    font-weight: 600;
    font-variant-numeric: tabular-nums;
@@ -6737,7 +7063,7 @@ index b7877d3..faf5056 100644
  }
  
  .plan-reset-icon {
-@@ -2081,7 +2175,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2081,7 +2176,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .plan-credits {
    font-weight: 600;
@@ -6746,7 +7072,7 @@ index b7877d3..faf5056 100644
  }
  
  /* ── GitHub pulse (GitHubPulseCardView / GitHubDetailView) ─────────────── */
-@@ -2196,12 +2290,12 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2196,12 +2291,12 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .gh-row:hover {
@@ -6761,7 +7087,7 @@ index b7877d3..faf5056 100644
  }
  
  .gh-gap {
-@@ -2211,14 +2305,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2211,14 +2306,14 @@ input[type="range"]::-webkit-slider-thumb {
  
  .gh-ref {
    font: 400 10.5px var(--font);
@@ -6778,7 +7104,7 @@ index b7877d3..faf5056 100644
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-@@ -2407,8 +2501,8 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2407,8 +2502,8 @@ input[type="range"]::-webkit-slider-thumb {
    height: 30px;
    padding: 0;
    border-radius: 7px;
@@ -6789,7 +7115,7 @@ index b7877d3..faf5056 100644
    display: grid;
    place-items: center;
    cursor: default;
-@@ -2416,11 +2510,11 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2416,11 +2511,11 @@ input[type="range"]::-webkit-slider-thumb {
  }
  
  .wardrobe-item:hover {
@@ -6803,7 +7129,7 @@ index b7877d3..faf5056 100644
  }
  
  .wardrobe-item canvas {
-@@ -2445,14 +2539,14 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2445,14 +2540,14 @@ input[type="range"]::-webkit-slider-thumb {
    max-width: 260px;
    height: 4px;
    border-radius: 999px;
@@ -6820,7 +7146,7 @@ index b7877d3..faf5056 100644
    transition: width 0.25s linear;
  }
  
-@@ -2616,7 +2710,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2616,7 +2711,7 @@ input[type="range"]::-webkit-slider-thumb {
    width: 36px;
    height: 36px;
    border-radius: 6px;
@@ -6829,7 +7155,7 @@ index b7877d3..faf5056 100644
    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
    display: grid;
    place-items: center;
-@@ -2629,7 +2723,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2629,7 +2724,7 @@ input[type="range"]::-webkit-slider-thumb {
    position: absolute;
    inset: 0;
    border-radius: 6px;
@@ -6838,7 +7164,7 @@ index b7877d3..faf5056 100644
    pointer-events: none;
  }
  
-@@ -2724,7 +2818,7 @@ input[type="range"]::-webkit-slider-thumb {
+@@ -2724,7 +2819,7 @@ input[type="range"]::-webkit-slider-thumb {
  
  .np-track {
    width: 100%;
@@ -6847,7 +7173,7 @@ index b7877d3..faf5056 100644
  }
  
  .np-bar.active .np-track,
-@@ -3108,6 +3202,114 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -3108,6 +3203,114 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
    text-align: start;
  }
  
@@ -6962,7 +7288,7 @@ index b7877d3..faf5056 100644
  /* ── Mail (classic Outlook) — MailViews.swift ─────────────────────────────── */
  .mail-card {
    height: 100%;
-@@ -3596,3 +3798,17 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
+@@ -3596,3 +3799,66 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
  ::-webkit-scrollbar-thumb:hover {
    background-color: rgba(255, 255, 255, 0.3);
  }
@@ -6980,6 +7306,55 @@ index b7877d3..faf5056 100644
 +.utilities button:disabled { opacity:.5; cursor:wait; }
 +.utility-status { font-size:10px; color:var(--dim-2); min-height:12px; overflow-wrap:anywhere; }
 +.utility-retry { align-self:flex-start; }
++
++/* Explicitly opened, local Codex activity. */
++.codex-activity { display:none; min-height:0; flex:1; flex-direction:column; gap:8px; }
++.agent-activity-open { overflow:hidden; }
++.agent-activity-open > :is(.agent-constellation,.room-empty,.agent-overflow-toggle,.agent-overflow-list,.room-detail,.room-caption) { display:none; }
++.agent-activity-open .codex-activity { display:flex; }
++.ca-toolbar { display:flex; align-items:center; gap:8px; min-height:28px; }
++.ca-eyebrow { flex:1; color:var(--eva-secondary); font-size:9px; letter-spacing:.08em; }
++.ca-toolbar button { font-size:11px; white-space:nowrap; }
++.ca-body { display:grid; grid-template-columns:148px minmax(0,1fr); flex:1; min-height:0; border:1px solid var(--eva-border); border-radius:12px; overflow:hidden; background:var(--eva-bg); }
++.ca-sidebar { display:flex; flex-direction:column; gap:8px; min-height:0; padding:12px 8px; background:var(--eva-panel); border-right:1px solid var(--eva-line); }
++.ca-avatar { display:grid; place-items:center; width:56px; height:44px; border-radius:16px; background:var(--eva-text); color:var(--eva-panel); font:700 24px monospace; letter-spacing:8px; padding-left:8px; box-sizing:border-box; }
++.ca-name { overflow-wrap:anywhere; font-size:13px; }
++.ca-agent-state { color:var(--eva-secondary); font-size:10px; }
++.ca-stages { display:grid; gap:4px; font-size:11px; padding:4px 0; }
++.ca-stage { color:var(--eva-secondary); }
++.ca-completed { color:var(--eva-accent); }
++.ca-failed { color:var(--eva-error); }
++.ca-inProgress { color:var(--eva-attention); }
++.ca-actions { overflow-y:auto; min-height:0; display:flex; flex-direction:column; gap:4px; }
++.ca-action { flex-shrink:0; text-align:left; background:transparent; border:1px solid transparent; border-radius:4px; color:var(--eva-text); cursor:pointer; padding:6px; display:grid; gap:4px; font:11px var(--font); }
++.ca-action > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
++.ca-action[aria-pressed='true'], .ca-file[aria-pressed='true'] { background:var(--eva-card); border-color:var(--eva-border); }
++.ca-action:hover, .ca-file:hover { background:var(--eva-hover); }
++.ca-state { font-size:10px; font-weight:400; }
++.ca-workspace { min-width:0; min-height:0; overflow:auto; }
++.ca-content { min-height:100%; display:flex; flex-direction:column; }
++.ca-item-heading { display:flex; justify-content:space-between; gap:8px; padding:10px 12px; font-size:11px; }
++.ca-files { display:flex; gap:4px; overflow-x:auto; flex-shrink:0; padding:0 8px 8px; }
++.ca-file { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-shrink:0; padding:6px 8px; border:1px solid transparent; border-radius:4px; color:var(--eva-text); background:var(--eva-panel); font:11px monospace; cursor:pointer; }
++.ca-diff, .ca-command, .ca-output { margin:0; font:11px/1.7 monospace; tab-size:4; }
++.ca-diff { overflow:auto; padding:8px 0; flex:1; min-height:100px; }
++.ca-line { display:flex; width:max-content; min-width:100%; }
++.ca-line-number { display:inline-block; width:32px; flex-shrink:0; text-align:right; padding-right:8px; color:var(--eva-secondary); user-select:none; }
++.ca-line code { font:inherit; padding-right:12px; }
++.ca-line-added { background:var(--eva-success-soft); color:var(--eva-accent); }
++.ca-line-removed { background:var(--eva-error-soft); color:var(--eva-error); }
++.ca-line-meta { color:var(--eva-secondary); }
++.ca-command, .ca-output { padding:12px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
++.ca-command { border-top:1px solid var(--eva-line); color:var(--eva-accent); }
++.ca-empty, .ca-note { padding:12px; color:var(--eva-secondary); font-size:11px; line-height:1.6; }
++.ca-status { min-height:16px; color:var(--eva-secondary); font-size:10px; line-height:1.5; }
++@media (max-width:440px) {
++ .ca-body { grid-template-columns:104px minmax(0,1fr); }
++ .ca-sidebar { padding:8px 4px; }
++ .ca-eyebrow { display:none; }
++ .ca-toolbar { justify-content:space-between; }
++ .ca-line-number { width:24px; padding-right:4px; }
++}
 diff --git a/windows/src/theme.css b/windows/src/theme.css
 new file mode 100644
 index 0000000..91a8088
@@ -7048,16 +7423,17 @@ index 0000000..91a8088
 +}
 diff --git a/windows/src/views/agent-room.ts b/windows/src/views/agent-room.ts
 new file mode 100644
-index 0000000..a058592
+index 0000000..db2733c
 --- /dev/null
 +++ b/windows/src/views/agent-room.ts
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,161 @@
 +import { h, clear } from "./dom";
 +import { CodexFlow } from "../core/codex-flow";
 +import { State, type AgentTask } from "../core/state";
 +import { roomAgents, agentStatus } from "../core/agent-room";
 +import { t, tl } from "../i18n/i18n";
 +import type { ViewActions, ViewHost } from "./views";
++import { buildCodexActivity } from "./codex-activity";
 +
 +export const ROOM_NODE_LIMIT = 6;
 +const SLOTS = [[50, 16], [82, 34], [82, 72], [50, 84], [18, 72], [18, 34]];
@@ -7083,6 +7459,13 @@ index 0000000..a058592
 +
 +/** Real room agents, stable slots and confirmed relationships; no simulation or polling. */
 +export function buildAgentRoom(actions: Pick<ViewActions, "setFocus" | "setView" | "blip">): ViewHost {
++  let detailAgentId: string | null = null;
++  const activity = buildCodexActivity(() => {
++    detailAgentId = null;
++    activity.setVisible(false);
++    el.classList.remove("agent-activity-open");
++    nodes.get(selectedAgentId ?? "")?.button.focus();
++  });
 +  const count = h("span", { class: "room-count" });
 +  const edges = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 +  edges.setAttribute("class", "constellation-edges");
@@ -7106,7 +7489,7 @@ index 0000000..a058592
 +    event.preventDefault(); event.stopPropagation(); closeOverflow(); more.focus();
 +  });
 +  const el = h("div", { class: "view agent-room" },
-+    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty, more, overflow, detail, caption);
++    h("div", { class: "room-heading" }, h("span", { text: tl("Agent room") }), count), grid, empty, more, overflow, detail, caption, activity.el);
 +  const nodes = new Map<string, { button: HTMLElement; name: HTMLElement; status: HTMLElement; step: HTMLElement }>();
 +  const slots: (string | null)[] = Array(ROOM_NODE_LIMIT).fill(null);
 +
@@ -7117,11 +7500,13 @@ index 0000000..a058592
 +    const request = State.pendingApproval;
 +    if (request?.pillId === id) {
 +      actions.setFocus(id); actions.setView(request.questions ? "question" : "approval");
-+    } else if (current.flow) selectRoomAgent(id);
++    } else if (current.flow) { detailAgentId = id; selectRoomAgent(id); }
 +    else { actions.setFocus(id); actions.setView("overview"); }
 +  }
 +
-+  return { el, sync() {
++  return { el, setVisible(on: boolean) {
++    if (!on) { activity.setVisible(false); detailAgentId = null; el.classList.remove("agent-activity-open"); }
++  }, sync() {
 +    const shown = State.mode === "expanded" && State.view === "agents";
 +    const tasks = new Map((shown ? roomAgents(State.tasks) : []).map(task => [task.id, task]));
 +    // Keep both DOM identity and the occupied slot when a snapshot is reordered.
@@ -7196,6 +7581,11 @@ index 0000000..a058592
 +      const stamp = seen && Number.isFinite(seen.getTime()) ? seen.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "sin fecha";
 +      detail.textContent = `${chosen.name}${meta.role ? ` · ${meta.role}` : ""} · ${meta.model || "modelo no registrado"}${meta.effort ? ` / ${meta.effort}` : ""}\n${parent ? `Depende de ${parent.name} · ` : ""}${meta.tool ? `Última herramienta: ${meta.tool} · ` : ""}Último registro: ${stamp}`;
 +    }
++    const opened = detailAgentId ? tasks.get(detailAgentId) : undefined;
++    if (!opened?.flow) detailAgentId = null;
++    el.classList.toggle("agent-activity-open", !!detailAgentId);
++    if (opened?.flow) activity.select(opened.flow.id, opened.name, statusFor(opened));
++    activity.setVisible(shown && !!detailAgentId);
 +  } };
 +}
 diff --git a/windows/src/views/chat.ts b/windows/src/views/chat.ts
@@ -7259,6 +7649,150 @@ index 4ddde19..836b8be 100644
 +  codexButton.addEventListener("click", () => select(true));
 +  sync();
 +  return { el, sync, height: () => desktop ? 360 : chatPromptHeight(State.chatHistory.length) + 30, setVisible: on => { if (visible === on) return; visible = on; sync(); }, focus: () => desktop ? codex.focus() : provider.focus?.() };
++}
+diff --git a/windows/src/views/codex-activity.ts b/windows/src/views/codex-activity.ts
+new file mode 100644
+index 0000000..a5f36c7
+--- /dev/null
++++ b/windows/src/views/codex-activity.ts
+@@ -0,0 +1,138 @@
++// Local, read-only activity for the explicitly opened Codex agent.
++import { h, clear } from "./dom";
++import { Bridge, type CodexActivity, type CodexChatSnapshot } from "../core/bridge";
++
++const STATES = { inProgress: "En curso", completed: "Completado", failed: "Fallido", unknown: "Sin estado" };
++const MARKS = { inProgress: "◌", completed: "✓", failed: "!", unknown: "·" };
++const KINDS = { read: "Lectura", edit: "Edición", command: "Comando", tool: "Herramienta" };
++
++/** Unified diff positions only: an unnumbered patch must not invent line numbers. */
++export function diffRows(diff: string) {
++  let old: number | null = null, next: number | null = null;
++  return diff.split("\n").slice(0, 4000).map(text => {
++    const header = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
++    let kind = "meta", oldLine = "", newLine = "";
++    if (header) { old = Number(header[1]); next = Number(header[2]); }
++    else if (text.startsWith("@@")) { old = null; next = null; }
++    else if (((old === null && next === null) && (text.startsWith("--- ") || text.startsWith("+++ "))) || text.startsWith("diff ")) { old = null; next = null; }
++    else if (text.startsWith("-")) { kind = "removed"; if (old !== null) oldLine = String(old++); }
++    else if (text.startsWith("+")) { kind = "added"; if (next !== null) newLine = String(next++); }
++    else if (text.startsWith(" ")) {
++      kind = "context";
++      if (old !== null) oldLine = String(old++);
++      if (next !== null) newLine = String(next++);
++    }
++    return { text, kind, oldLine, newLine };
++  });
++}
++
++export function buildCodexActivity(onBack: () => void) {
++  const name = h("b", { class: "ca-name" });
++  const state = h("span", { class: "ca-agent-state" });
++  const status = h("div", { class: "ca-status", role: "status" });
++  const actions = h("div", { class: "ca-actions", role: "group", "aria-label": "Acciones recientes de Codex" });
++  const stage = h("div", { class: "ca-stages" });
++  const content = h("div", { class: "ca-content" });
++  const open = h("button", { class: "picker-link ca-open", type: "button", text: "Abrir en Codex", onclick: () => {
++    if (threadId) void Bridge.codexChatOpen(threadId).catch(() => { status.textContent = "No se pudo abrir el chat en Codex."; });
++  } });
++  const el = h("section", { class: "codex-activity", "aria-label": "Actividad completa de Codex" },
++    h("div", { class: "ca-toolbar" },
++      h("button", { class: "picker-link ca-back", type: "button", text: "‹ Agentes", onclick: onBack }),
++      h("span", { class: "ca-eyebrow", text: "CODEX / ACTIVIDAD" }), open),
++    h("div", { class: "ca-body" },
++      h("aside", { class: "ca-sidebar" }, h("span", { class: "ca-avatar", "aria-hidden": "true", text: "••" }), name, state, stage, actions),
++      h("div", { class: "ca-workspace" }, content)), status);
++  let threadId: string | null = null;
++  let visible = false;
++  let generation = 0;
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  let snapshot: CodexChatSnapshot | null = null;
++  let selected: string | null = null;
++  let fileIndex = 0;
++  let lastKey = "";
++
++  function clearData() { snapshot = null; selected = null; fileIndex = 0; lastKey = ""; clear(actions); clear(content); clear(stage); }
++  function renderContent(item: CodexActivity | undefined) {
++    clear(content);
++    if (!item) { content.append(h("div", { class: "ca-empty", text: "Las acciones y sus cambios aparecerán aquí cuando Codex los comunique." })); return; }
++    content.append(h("div", { class: "ca-item-heading" }, h("b", { text: KINDS[item.kind] }),
++      h("span", { class: `ca-state ca-${item.status}`, text: STATES[item.status] })));
++    if (item.files.length) {
++      fileIndex = Math.min(fileIndex, item.files.length - 1);
++      const files = h("div", { class: "ca-files", role: "group", "aria-label": "Archivos de la acción" });
++      item.files.forEach((file, index) => files.append(h("button", {
++        class: "ca-file", type: "button", text: file.path, title: file.path,
++        "aria-pressed": String(index === fileIndex), onclick: () => { fileIndex = index; renderContent(item); (content.querySelector('.ca-file[aria-pressed="true"]') as HTMLElement | null)?.focus(); },
++      })));
++      content.append(files);
++      const file = item.files[fileIndex];
++      if (file.diff) {
++        const lines = h("pre", { class: "ca-diff", tabindex: "0", "aria-label": `Cambios en ${file.path}` });
++        for (const row of diffRows(file.diff)) lines.append(h("span", { class: `ca-line ca-line-${row.kind}` },
++          h("span", { class: "ca-line-number", text: row.oldLine, "aria-hidden": "true" }),
++          h("span", { class: "ca-line-number", text: row.newLine, "aria-hidden": "true" }),
++          h("code", { text: row.text })));
++        content.append(lines);
++        if (file.diff.split("\n").length > 4000) content.append(h("p", { class: "ca-note", text: "Diff parcial: límite de líneas de la vista." }));
++      } else content.append(h("p", { class: "ca-empty", text: "Codex no ha comunicado el diff de este archivo." }));
++    }
++    if (item.command) content.append(h("pre", { class: "ca-command", tabindex: "0", text: `$ ${item.command}` }));
++    if (item.output) content.append(h("pre", { class: "ca-output", tabindex: "0", text: item.output }));
++    if (!item.files.length && !item.command && !item.output) content.append(h("p", { class: "ca-empty", text: "Esta acción no incluye contenido de archivo ni salida." }));
++  }
++  function render() {
++    const list = snapshot?.activity ?? [];
++    if (!list.some(item => item.id === selected)) { selected = list.at(-1)?.id ?? null; fileIndex = 0; }
++    clear(stage);
++    for (const kind of ["read", "edit", "command"] as const) {
++      const items = list.filter(item => item.kind === kind);
++      const current = items.at(-1);
++      stage.append(h("div", { class: `ca-stage ca-${current?.status ?? "unknown"}`,
++        text: `${MARKS[current?.status ?? "unknown"]} ${KINDS[kind]}${items.length ? ` · ${items.length}` : ""}` }));
++    }
++    clear(actions);
++    for (const item of [...list].reverse()) {
++      const button = h("button", { class: "ca-action", type: "button", "aria-pressed": String(item.id === selected),
++        title: item.label, onclick: () => { selected = item.id; fileIndex = 0; render(); (Array.from(actions.children).find(child => (child as HTMLElement).dataset.activityId === item.id) as HTMLElement | undefined)?.focus(); } },
++        h("span", { text: item.label }), h("small", { class: `ca-state ca-${item.status}`, text: STATES[item.status] }));
++      button.dataset.activityId = item.id;
++      actions.append(button);
++    }
++    renderContent(list.find(item => item.id === selected));
++  }
++  function cancel() { clearTimeout(timer); timer = undefined; }
++  async function refresh() {
++    if (!visible || !threadId) return;
++    const ticket = generation, id = threadId;
++    try {
++      const next = await Bridge.codexChatSnapshot(id);
++      if (!visible || ticket !== generation || threadId !== id) return;
++      if (next.threadId !== id) throw new Error("Chat distinto");
++      snapshot = next;
++      const key = JSON.stringify([next.activity ?? [], next.activityTruncated]);
++      if (lastKey !== key) { lastKey = key; render(); }
++      status.textContent = next.pending ? "Codex requiere una decisión. Respóndela en Codex." : next.active ? "Codex está trabajando…" : "Turno sin ejecución activa.";
++      if (next.activityTruncated) status.textContent += " Actividad parcial: se alcanzó un límite de lectura.";
++    } catch {
++      if (!visible || ticket !== generation) return;
++      clearData();
++      status.textContent = "No se pudo leer la actividad de Codex. Vuelve a intentarlo desde su tarjeta.";
++    } finally {
++      if (visible && ticket === generation) timer = setTimeout(() => void refresh(), 2500);
++    }
++  }
++  return { el, select(id: string, label: string, agentState: string) {
++    name.textContent = label; state.textContent = agentState;
++    if (threadId === id) return;
++    generation++; cancel(); clearData(); threadId = id;
++    status.textContent = "Conectando con Codex…";
++    renderContent(undefined);
++    if (visible) void refresh();
++  }, setVisible(on: boolean) {
++    if (visible === on) return;
++    visible = on; generation++; cancel();
++    if (on) { (el.querySelector(".ca-back") as HTMLElement | null)?.focus(); status.textContent = "Conectando con Codex…"; void refresh(); }
++    else { clearData(); status.textContent = ""; }
++  } };
 +}
 diff --git a/windows/src/views/codex-chat.ts b/windows/src/views/codex-chat.ts
 new file mode 100644
@@ -8226,13 +8760,53 @@ index d29f9b6..a5f0b05 100644
    map.set("prompt", buildPrompt(onChatHeightChange));
    map.set("upload", buildUpload());
 diff --git a/windows/src/whats-new/whats-new.json b/windows/src/whats-new/whats-new.json
-index e98f0d5..7f22128 100644
+index e98f0d5..d217098 100644
 --- a/windows/src/whats-new/whats-new.json
 +++ b/windows/src/whats-new/whats-new.json
-@@ -1,6 +1,607 @@
+@@ -1,6 +1,647 @@
  {
    "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every Windows and Linux release adds its entry here, in the 14 languages: 1 to 4 items, a short title and one line each, an icon from scripts/test-whats-new.py. python3 scripts/test-whats-new.py checks it.",
    "releases": [
++    {
++      "version": "0.5.9-sendoa.4",
++      "items": [
++        {
++          "icon": "terminal",
++          "title": {
++            "en": "Codex activity",
++            "es": "Actividad de Codex",
++            "fr": "Activité de Codex",
++            "de": "Codex-Aktivität",
++            "pt-BR": "Atividade do Codex",
++            "tr": "Codex etkinliği",
++            "ru": "Действия Codex",
++            "id": "Aktivitas Codex",
++            "zh-Hans": "Codex 活动",
++            "hi": "Codex गतिविधि",
++            "ar": "نشاط Codex",
++            "bn": "Codex কার্যকলাপ",
++            "ko": "Codex 활동",
++            "ja": "Codex のアクティビティ"
++          },
++          "detail": {
++            "en": "Open a Codex agent to inspect its actions, commands and available code diffs.",
++            "es": "Abre un agente de Codex para consultar sus acciones, comandos y diferencias de código disponibles.",
++            "fr": "Ouvrez un agent Codex pour consulter ses actions, commandes et différences de code disponibles.",
++            "de": "Öffne einen Codex-Agenten, um Aktionen, Befehle und verfügbare Codeänderungen anzuzeigen.",
++            "pt-BR": "Abra um agente Codex para consultar ações, comandos e diferenças de código disponíveis.",
++            "tr": "Eylemleri, komutları ve mevcut kod farklarını incelemek için bir Codex ajanını açın.",
++            "ru": "Откройте агента Codex для просмотра действий, команд и доступных изменений кода.",
++            "id": "Buka agen Codex untuk melihat tindakan, perintah, dan perbedaan kode yang tersedia.",
++            "zh-Hans": "打开 Codex 代理，查看其操作、命令和可用的代码差异。",
++            "hi": "क्रियाएँ, कमांड और उपलब्ध कोड अंतर देखने के लिए Codex एजेंट खोलें।",
++            "ar": "افتح وكيل Codex للاطلاع على إجراءاته وأوامره وفروق الشيفرة المتاحة.",
++            "bn": "কাজ, কমান্ড ও উপলব্ধ কোডের পার্থক্য দেখতে Codex এজেন্ট খুলুন।",
++            "ko": "Codex 에이전트를 열어 작업, 명령 및 제공된 코드 변경 사항을 확인하세요.",
++            "ja": "Codex エージェントを開くと、操作、コマンド、提供されたコードの差分を確認できます。"
++          }
++        }
++      ]
++    },
 +    {
 +      "version": "0.5.9-sendoa.3",
 +      "items": [
@@ -8851,10 +9425,10 @@ index 305554e..4ca019e 100644
  
 diff --git a/windows/tests/agent-constellation.test.mjs b/windows/tests/agent-constellation.test.mjs
 new file mode 100644
-index 0000000..cfecaf1
+index 0000000..5c70ef5
 --- /dev/null
 +++ b/windows/tests/agent-constellation.test.mjs
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,149 @@
 +import { describe, beforeEach, afterEach, test } from "node:test";
 +import assert from "node:assert/strict";
 +import { installFakeDom } from "./fakedom.mjs";
@@ -8990,6 +9564,20 @@ index 0000000..cfecaf1
 +  State.mode = "compact"; room.sync(); assert.equal(nodes(room).length, 0);
 +});
 +});
++
++test('opening a Codex card shows full activity and Back restores the constellation', async () => {
++  const {internals}=await import('./tauri.mjs');
++  internals.invoke=async(cmd,args)=>cmd==='codex_chat_snapshot'?{threadId:args.threadId,messages:[],active:false,pending:false,activity:[],activityTruncated:false}:null;
++  installFakeDom(); State.mode='expanded'; State.view='agents'; State.pendingApproval=null;
++  flow([agent('root')]);
++  const {room}=build();room.sync();
++  node(room,'agent_codex').fire('click');room.sync();
++  assert.equal(room.el.classList.contains('agent-activity-open'),true);
++  assert.match(room.el.textContent,/CODEX \/ ACTIVIDAD/);
++  room.el.find('.ca-back')[0].fire('click');room.sync();
++  assert.equal(room.el.classList.contains('agent-activity-open'),false);
++  room.setVisible(false);applyFlow(null);State.tasks=[];
++});
 diff --git a/windows/tests/agent-room.test.mjs b/windows/tests/agent-room.test.mjs
 new file mode 100644
 index 0000000..0c8e0f5
@@ -9051,6 +9639,114 @@ index 98f65c5..0cbeb63 100644
  test("once the answer is in, the field takes the focus back, enabled", async () => {
    let finish;
    answers.chat_send = () => new Promise((resolve) => (finish = resolve));
+diff --git a/windows/tests/closed.test.mjs b/windows/tests/closed.test.mjs
+index de4ae57..3243067 100644
+--- a/windows/tests/closed.test.mjs
++++ b/windows/tests/closed.test.mjs
+@@ -53,3 +53,26 @@ test("the island is as wide as its line, within bounds", () => {
+   assert.equal(closedWidth(100, 12), 112 + CLOSED_PAD * 2);
+   assert.equal(closedWidth(5000), CLOSED_MAX_W);
+ });
++
++
++test("the folded Mochi keeps the original white gradient despite agent and update colours", async () => {
++  const { BotEngine } = await import("../src/mochi/engine.ts");
++  const engine = new BotEngine();
++  engine.originalBody = true;
++  engine.bodyColor = [0.231, 0.51, 0.965];
++  engine.tint = 0.8;
++  const stops = [], fills = [];
++  const ctx = {
++    createLinearGradient: () => ({ addColorStop: (at, color) => stops.push([at, color]) }),
++    createRadialGradient: () => ({ addColorStop() {} }),
++    fill: () => fills.push(ctx.fillStyle), save() {}, restore() {}, clip() {},
++  };
++  engine.drawBody(ctx, {}, 9, 10.26, 7.92);
++  assert.deepEqual(stops, [[0, "rgba(237,237,239,1)"], [1, "rgba(196,197,202,1)"]]);
++  assert.equal(fills.length, 3, "only the body and original shading, with no activity tint");
++  engine.originalBody = false;
++  stops.length = 0; fills.length = 0;
++  engine.drawBody(ctx, {}, 9, 10.26, 7.92);
++  assert.equal(fills.length, 1, "expanded integration body keeps its own colour");
++  assert.equal(fills[0], "rgba(59,130,246,1)");
++});
+diff --git a/windows/tests/codex-activity.test.mjs b/windows/tests/codex-activity.test.mjs
+new file mode 100644
+index 0000000..559b30d
+--- /dev/null
++++ b/windows/tests/codex-activity.test.mjs
+@@ -0,0 +1,71 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { installFakeDom } from './fakedom.mjs';
++import { internals } from './tauri.mjs';
++installFakeDom();
++const flush = () => new Promise(resolve => setTimeout(resolve, 0));
++const { buildCodexActivity, diffRows } = await import('../src/views/codex-activity.ts');
++const snapshot = (id, activity=[]) => ({threadId:id,messages:[],active:true,activeTurnId:'t',pending:false,truncated:false,activity,activityTruncated:false});
++const edit = {id:'e',kind:'edit',label:'Modificar archivo',status:'completed',command:null,output:null,files:[{path:'src/<invoice>.ts',kind:'update',diff:'@@ -12,1 +12,1 @@\n-const TVA = 0.196\n+const TVA = 0.21'}]};
++
++test('renders real edit, safe literal text, file choice and unknown line numbers', async () => {
++ internals.invoke = async (cmd,args) => cmd==='codex_chat_snapshot' ? snapshot(args.threadId,[edit]) : null;
++ const view=buildCodexActivity(()=>{}); view.select('one','Codex <b>','Trabajando'); view.setVisible(true);
++ try {
++  await flush(); await flush();
++  assert.match(view.el.textContent,/Codex <b>/); assert.match(view.el.textContent,/src\/<invoice>.ts/);
++  assert.equal(view.el.find('.ca-line-added').length,1); assert.equal(view.el.find('.ca-line-removed').length,1);
++  assert.match(view.el.textContent,/const TVA = 0.21/);
++  assert.equal(view.el.find('SCRIPT').length,0);
++  assert.deepEqual(diffRows('@@ -12 +14 @@\n-old\n+new').map(r=>[r.oldLine,r.newLine]),[['',''],['12',''],['','14']]);
++  assert.equal(diffRows('+content')[0].newLine,'');
++ } finally {view.setVisible(false);}
++});
++
++test('changing agent and hiding discard stale replies, with no send or interrupt', async () => {
++ const requests=[]; const calls=[];
++ internals.invoke=async(cmd,args)=>{ calls.push(cmd); if(cmd==='codex_chat_snapshot') return new Promise(resolve=>requests.push({id:args.threadId,resolve})); return null; };
++ const view=buildCodexActivity(()=>{}); view.select('one','One','Trabajando'); view.setVisible(true);
++ await flush(); view.select('two','Two','Trabajando'); await flush();
++ assert.deepEqual(requests.map(r=>r.id),['one','two']);
++ requests[1].resolve(snapshot('two',[{...edit,label:'SECOND'}])); await flush(); await flush();
++ requests[0].resolve(snapshot('one',[{...edit,label:'STALE'}])); await flush(); await flush();
++ assert.match(view.el.textContent,/SECOND/); assert.doesNotMatch(view.el.textContent,/STALE/);
++ view.setVisible(false); assert.doesNotMatch(view.el.textContent,/const TVA/);
++ assert.ok(calls.every(cmd=>cmd==='codex_chat_snapshot'));
++});
++
++test('missing diffs and failed commands remain explicit', async () => {
++ const activity=[{...edit,id:'missing',files:[{path:'a.ts',diff:null,kind:'update'}]}, {id:'cmd',kind:'command',label:'Ejecutar',status:'failed',command:'npm test',output:'<img src=x onerror=alert(1)>',files:[]}];
++ internals.invoke=async(cmd,args)=>cmd==='codex_chat_snapshot'?snapshot(args.threadId,activity):null;
++ const view=buildCodexActivity(()=>{});view.select('one','Codex','Trabajando');view.setVisible(true);
++ try { await flush(); await flush();
++  assert.match(view.el.textContent,/Fallido/); assert.match(view.el.textContent,/npm test/);
++  assert.equal(view.el.find('IMG').length,0);
++  view.el.find('.ca-action').find(b=>b.dataset.activityId==='missing').fire('click');
++  assert.match(view.el.textContent,/Codex no ha comunicado el diff/);
++ } finally {view.setVisible(false);}
++});
++
++test('diff content resembling file headers retains hunk numbering', () => {
++ const rows=diffRows('@@ -4,1 +4,1 @@\n--- content\n+++ content');
++ assert.deepEqual(rows.slice(1).map(r=>[r.kind,r.oldLine,r.newLine]),[['removed','4',''],['added','','4']]);
++});
++
++test('polling retains the manually selected action when a newer action arrives', async () => {
++ let calls=0;
++ internals.invoke=async(cmd,args)=>{
++  if(cmd!=='codex_chat_snapshot') return null;
++  calls++;
++  return snapshot(args.threadId,calls===1?[edit,{...edit,id:'second',label:'Second'}]:[edit,{...edit,id:'second',label:'Second'},{...edit,id:'third',label:'Third'}]);
++ };
++ const view=buildCodexActivity(()=>{});view.select('one','Codex','Trabajando');view.setVisible(true);
++ try {
++  await flush();await flush();
++  view.el.find('.ca-action').find(b=>b.dataset.activityId==='e').fire('click');
++  await new Promise(resolve=>setTimeout(resolve,2600));
++  assert.equal(calls,2);
++  assert.equal(view.el.find('.ca-action').find(b=>b.dataset.activityId==='e').getAttribute('aria-pressed'),'true');
++  assert.match(view.el.textContent,/Third/);
++ } finally {view.setVisible(false);}
++});
 diff --git a/windows/tests/codex-chat.test.mjs b/windows/tests/codex-chat.test.mjs
 new file mode 100644
 index 0000000..1f7890f
