@@ -1,3 +1,8 @@
+# Verificación — 2026-11-18 — fotograma congelado al plegar
+
+- Regresión del canvas comprobada antes y después. La superficie conserva su tamaño durante el plegado, se limpia por completo y mantiene el dibujo centrado al cambiar la escala de pantalla.
+- 618 pruebas Node, TypeScript, Vite y compilación nativa correctos. Tras instalar la corrección, Sendoa indica que en sus pruebas parece resuelto. La causa en WebKit sigue siendo una hipótesis.
+
 # Verificación — 2026-11-13 — actividad de Codex y Mochi original
 
 Versión **0.5.9-sendoa.4**, sobre la misma fuente oficial Linux 0.5.9. Conserva las personalizaciones publicadas en .3.

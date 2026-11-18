@@ -1,5 +1,9 @@
 # Cambios
 
+## 0.5.9-sendoa.4 — corrección del 18/11/2026
+
+- Corrige el fotograma congelado que podía quedar encima de Mochi al compactar o cerrar la isla durante el baile.
+
 ## 0.5.9-sendoa.4 — 2026-11-13
 
 - Añade el detalle de actividad del agente Codex seleccionado: lecturas, ediciones, comandos, estados, selección de archivos y diffs con numeración cuando está disponible.

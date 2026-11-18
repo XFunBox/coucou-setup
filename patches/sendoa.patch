@@ -5246,7 +5246,7 @@ index c539648..d273ec2 100644
    State.notify();
  }
 diff --git a/windows/src/island/island.ts b/windows/src/island/island.ts
-index e237b0b..4f1afa5 100644
+index e237b0b..23bf21c 100644
 --- a/windows/src/island/island.ts
 +++ b/windows/src/island/island.ts
 @@ -1,3 +1,4 @@
@@ -5461,7 +5461,39 @@ index e237b0b..4f1afa5 100644
      this.botCanvas.style.opacity = visible ? "1" : "0";
  
      if (State.mode === "expanded" && State.view !== "uploading" && !greetingActive && !this.uploadActive && !away) {
-@@ -1288,6 +1352,7 @@ export class Island {
+@@ -1267,20 +1331,23 @@ export class Island {
+     const size = this.botSize.value;
+     const w = Math.max(1, Math.round(size));
+     const hCss = w + BOT_OVERHANG;
+-    const wCss = w + BOT_SIDE * 2;
+     const dpr = Math.min(2, window.devicePixelRatio || 1);
+-    // Drawn at the current ratio, so a bitmap sized for another monitor's
+-    // would show Mochi too big and cut, or too small.
+-    if (this.canvasPx !== w || this.canvasDpr !== dpr) {
+-      this.canvasPx = w;
++    // Keep the surface stable while folding. Replacing its backing bitmap on
++    // every spring frame can leave an old, larger frame in WebKit's compositor.
++    // Grow if necessary, and rebuild when moving to a different display scale.
++    const capacity = Math.max(128, this.canvasPx, w);
++    const wCss = capacity + BOT_SIDE * 2;
++    const surfaceHeight = capacity + BOT_OVERHANG;
++    if (this.canvasPx !== capacity || this.canvasDpr !== dpr) {
++      this.canvasPx = capacity;
+       this.canvasDpr = dpr;
+       this.botCanvas.width = Math.round(wCss * dpr);
+-      this.botCanvas.height = Math.round(hCss * dpr);
++      this.botCanvas.height = Math.round(surfaceHeight * dpr);
+       this.botCanvas.style.width = `${wCss}px`;
+-      this.botCanvas.style.height = `${hCss}px`;
++      this.botCanvas.style.height = `${surfaceHeight}px`;
+     }
+     this.botCanvas.style.left = `${this.botCx.value - wCss / 2}px`;
+-    this.botCanvas.style.top = `${this.botCy.value - BOT_OVERHANG / 2 - hCss / 2}px`;
++    this.botCanvas.style.top = `${this.botCy.value - BOT_OVERHANG / 2 - surfaceHeight / 2}px`;
+ 
+     const ctx = this.botCanvas.getContext("2d");
+     if (!ctx) return;
+@@ -1288,6 +1355,7 @@ export class Island {
      const focus = State.focusTask;
      // A new Coucou waits: over an idle or sleeping Mochi, the blue and the arrow
      // badge (whats-new.ts). Anything Mochi has to say comes first.
@@ -5469,7 +5501,7 @@ index e237b0b..4f1afa5 100644
      this.engine.setUpdateHint(this.updateHintOn() ? UPDATE_BLUE_RGB : null);
      // While a plan card is open Mochi wears the plan's colour, like its pill.
      this.engine.bodyColor = planCardOpen()
-@@ -1317,7 +1382,7 @@ export class Island {
+@@ -1317,7 +1385,7 @@ export class Island {
      const mainFocused = State.focusId == null || State.focusId === State.mainPillId;
      const showOutfit = mainFocused || State.mode !== "expanded" || inWardrobe;
      const outfit = State.wardrobePreview ?? this.seasons.get(parseOutfit(State.settings.mochiOutfit));
@@ -5478,7 +5510,17 @@ index e237b0b..4f1afa5 100644
      // Dances while music plays: always in the compact island, expanded only on
      // the music pill's card (BotCanvasView, macOS). Asked every frame.
      this.engine.setDancing(islandDances({
-@@ -1373,8 +1438,22 @@ export class Island {
+@@ -1335,7 +1403,8 @@ export class Island {
+     // through it (a hat in a roll) piled up there into a coloured bar.
+     ctx.setTransform(1, 0, 0, 1, 0, 0);
+     ctx.clearRect(0, 0, this.botCanvas.width, this.botCanvas.height);
+-    ctx.setTransform(dpr, 0, 0, dpr, BOT_SIDE * dpr, 0);
++    const inset = (capacity - w) / 2;
++    ctx.setTransform(dpr, 0, 0, dpr, (BOT_SIDE + inset) * dpr, inset * dpr);
+     ctx.save();
+     this.engine.applyDance(ctx, w, hCss);
+     this.engine.draw(ctx, w, hCss);
+@@ -1373,8 +1442,22 @@ export class Island {
  
    // ── DOM sync ────────────────────────────────────────────────────────────────
  
@@ -5501,7 +5543,7 @@ index e237b0b..4f1afa5 100644
      const greetingActive = expanded && State.view === "greeting";
  
      const live = expanded && !greetingActive;
-@@ -1395,40 +1474,59 @@ export class Island {
+@@ -1395,40 +1478,59 @@ export class Island {
      for (const [name, view] of this.views) {
        const on = name === State.view;
        view.el.classList.toggle("on", on);
@@ -5568,7 +5610,7 @@ index e237b0b..4f1afa5 100644
      this.compactPlan.style.opacity = showPlan ? "1" : "0";
      this.compactPlan.style.pointerEvents = showPlan ? "auto" : "none";
      if (showPlan) {
-@@ -1440,23 +1538,62 @@ export class Island {
+@@ -1440,23 +1542,62 @@ export class Island {
        this.compactPlanLabel.textContent = pct != null ? `${Math.round(pct)}%` : "—";
      }
  
@@ -5640,7 +5682,7 @@ index e237b0b..4f1afa5 100644
    }
  
    /** Applies settings coming from Rust at boot. */
-@@ -1473,9 +1610,12 @@ export class Island {
+@@ -1473,9 +1614,12 @@ export class Island {
      Sound.setVolume(State.settings.soundVolume);
      this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
      this.fsm.openOnHover = State.settings.openOnHover;
@@ -5654,7 +5696,7 @@ index e237b0b..4f1afa5 100644
    }
  
    get panelSize() {
-@@ -1483,6 +1623,6 @@ export class Island {
+@@ -1483,6 +1627,6 @@ export class Island {
    }
  
    get chatHeight() {
@@ -9641,6 +9683,62 @@ index 0000000..0c8e0f5
 + State.mode='compact';room.sync();assert.equal(room.el.find('.agent-desk').length,0);
 + State.mode='expanded';room.sync();assert.equal(room.el.find('.agent-desk').length,1);
 + State.tasks=[];room.sync();assert.equal(room.el.find('.agent-desk').length,0);assert.ok(room.el.textContent.includes('Conecta'));
++});
+diff --git a/windows/tests/bot-surface.test.mjs b/windows/tests/bot-surface.test.mjs
+new file mode 100644
+index 0000000..9c9d373
+--- /dev/null
++++ b/windows/tests/bot-surface.test.mjs
+@@ -0,0 +1,50 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { installFakeDom } from './fakedom.mjs';
++import { Island } from '../src/island/island.ts';
++import { State } from '../src/core/state.ts';
++
++test('folding reuses the bitmap while keeping Mochi centred at fractional DPI', () => {
++  const { root } = installFakeDom();
++  State.mode = 'compact';
++  const previousDpr = window.devicePixelRatio;
++  window.devicePixelRatio = 1.5;
++  const canvas = root();
++  let transform;
++  const clears = [];
++  const context = {
++    setTransform: (...values) => { transform = values; },
++    clearRect: (...values) => clears.push(values), save() {}, restore() {},
++  };
++  canvas.getContext = () => context;
++  const host = {
++    canvasPx: 0, canvasDpr: 0, botCanvas: canvas,
++    botSize: { value: 110 }, botCx: { value: 68 }, botCy: { value: 80 },
++    updateHintOn: () => false, lookX: () => 0, lookY: () => 0,
++    seasons: { get: () => 'none' },
++    engine: {
++      morph: 0, setUpdateHint() {}, setOutfit() {}, setDancing() {}, update() {}, applyDance() {},
++      draw(_ctx, w, h) {
++        const [dpr, , , , tx, ty] = transform;
++        assert.equal(parseFloat(canvas.style.left) + tx / dpr + w / 2, host.botCx.value);
++        assert.equal(parseFloat(canvas.style.top) + ty / dpr + h / 2 + 20, host.botCy.value);
++      },
++    },
++  };
++  try {
++    Island.prototype.drawBot.call(host, 0.016);
++    const surface = [canvas.width, canvas.height, canvas.style.width, canvas.style.height];
++    for (const size of [80, 42, 30]) {
++      host.botSize.value = size;
++      Island.prototype.drawBot.call(host, 0.016);
++      assert.deepEqual([canvas.width, canvas.height, canvas.style.width, canvas.style.height], surface,
++        'folding must not replace or shrink the backing surface');
++      assert.deepEqual(clears.at(-1), [0, 0, canvas.width, canvas.height]);
++    }
++    window.devicePixelRatio = 2;
++    Island.prototype.drawBot.call(host, 0.016);
++    assert.ok(canvas.width > surface[0], 'moving to a denser display rebuilds the backing surface');
++  } finally {
++    window.devicePixelRatio = previousDpr;
++  }
 +});
 diff --git a/windows/tests/chat.test.mjs b/windows/tests/chat.test.mjs
 index 98f65c5..0cbeb63 100644

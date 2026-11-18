@@ -28,6 +28,7 @@ Incluye:
 - Detalle de actividad de Codex: lecturas, ediciones, comandos y estados; selección de archivos, diffs y salida acotada cuando Codex los comunica. Funciona para el agente principal y sus subagentes disponibles.
 - Mochi principal blanco/gris original con la isla recogida, sin tinte de actividad ni traje; ojos e insignias conservan el estado. Mochis compactos más pequeños.
 - Al parar la música y recoger la isla, el Mochi termina la transición del baile y recupera su postura de reposo.
+- Al compactar o cerrar la isla mientras Mochi baila, se evita que quede un fotograma congelado encima del personaje.
 
 - Utilidades compactas con accesos a Terminal, Carpeta personal y Obsidian; vuelta con Atrás o Escape.
 - Música limitada a Spotifast y Spotify, con prioridad para Spotifast. Al cerrar ambos, la tarjeta queda sin reproductor y no selecciona Chrome ni otros servicios MPRIS.
